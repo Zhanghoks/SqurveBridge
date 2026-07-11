@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "slug": "<evolve_slug>",
+  "phase": "initialized",
+  "round": 0,
+  "active_stage": null,
+  "current_node": null,
+  "policy": "bounded_search_default",
+  "baseline_run_slug": "<run_slug>",
+  "method": "<method>",
+  "benchmark": "<benchmark>",
+  "budget": {
+    "smoke_rollouts": 20,
+    "bounded_rollouts": 10,
+    "dry_round_limit": 2
+  },
+  "last_transition": null,
+  "human_gate": null,
+  "failure": null,
+  "created_at": "<iso8601>",
+  "updated_at": "<iso8601>"
+}

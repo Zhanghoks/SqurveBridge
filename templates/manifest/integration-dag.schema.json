@@ -1,0 +1,15 @@
+{
+  "integration": {
+    "dag": {
+      "llm_provider": [],
+      "embedding": [],
+      "prompt": ["llm_provider"],
+      "rag": ["embedding"],
+      "external": [],
+      "actor": ["prompt", "rag", "external"],
+      "workflow": ["actor"],
+      "adapter": ["llm_provider", "embedding", "prompt", "rag", "external", "workflow"]
+    },
+    "notes": ""
+  }
+}

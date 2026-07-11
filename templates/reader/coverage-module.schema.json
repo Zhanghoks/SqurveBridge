@@ -1,0 +1,9 @@
+{
+  "id": "<module_id>",
+  "files": ["<relative/path.py>"],
+  "summary": "<module behavior>",
+  "squrve_component": "actor.generator",
+  "inputs": ["question", "schema"],
+  "outputs": ["pred_sql"],
+  "io_artifact": "pred_sql"
+}

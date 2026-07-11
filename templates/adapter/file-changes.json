@@ -1,0 +1,19 @@
+{
+  "adapter_type": "method",
+  "slug": "<slug>",
+  "target_dataset": "<dataset>",
+  "reproduce_config": "reproduce/configs/<dataset>/<slug>.json",
+  "changes": [
+    {
+      "path": "<path>",
+      "owner": "<skill>",
+      "reason": "<why this change is required>"
+    }
+  ],
+  "verification": [
+    {
+      "command": "python tools/verify.py json-load --path reproduce/configs/<dataset>/<slug>.json",
+      "status": "pending"
+    }
+  ]
+}

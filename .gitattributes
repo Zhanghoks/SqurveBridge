@@ -1,0 +1,7 @@
+benchmarks/spider/database/wta_1.sqlite filter=lfs diff=lfs merge=lfs -text
+benchmarks/spider/database/soccer_1.sqlite filter=lfs diff=lfs merge=lfs -text
+benchmarks/bird/dev/database/card_games.sqlite filter=lfs diff=lfs merge=lfs -text
+benchmarks/bird/dev/database/codebase_community.sqlite filter=lfs diff=lfs merge=lfs -text
+benchmarks/bird/dev/database/european_football_2.sqlite filter=lfs diff=lfs merge=lfs -text
+benchmarks/**/*.json whitespace=-trailing-space
+benchmarks/**/*.csv whitespace=-trailing-space

@@ -1,0 +1,21 @@
+{
+  "evolve_slug": "<evolve_slug>",
+  "baseline_run_slug": "<run_slug>",
+  "method": "<method>",
+  "benchmark": "<benchmark>",
+  "policy": {
+    "smoke_samples": 50,
+    "bounded_samples": 200,
+    "full_confirmation": true
+  },
+  "round": 0,
+  "rounds_completed": 0,
+  "nodes": [],
+  "best_node": null,
+  "recommendation": "continue",
+  "stagnation": {
+    "branch_stagnant": [],
+    "global_stagnant": false,
+    "dry_rounds": 0
+  }
+}

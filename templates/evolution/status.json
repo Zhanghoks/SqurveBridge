@@ -1,0 +1,11 @@
+{
+  "node_id": "n001_<short_name>",
+  "status": "planned",
+  "reason": "",
+  "updated_at": "<iso8601>",
+  "artifacts": {
+    "scores": null,
+    "delta": null,
+    "evaluator_report": null
+  }
+}

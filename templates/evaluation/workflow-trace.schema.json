@@ -1,0 +1,19 @@
+{
+  "run_id": "<run_id>",
+  "stages": [
+    {
+      "task_id": "<task_id>",
+      "task_type": "<TaskClass>",
+      "actor_type": "<ActorClass>",
+      "input_path": "<path>",
+      "output_path": "<path>",
+      "metrics": {}
+    }
+  ],
+  "per_sample": [
+    {
+      "instance_id": "<id>",
+      "workflow": []
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "run_id": "<run_id>",
+  "method": "<method>",
+  "dataset_name": "<dataset>",
+  "split": "dev",
+  "sample_count": 0,
+  "aggregate": {
+    "ex": {"avg": 0.0},
+    "em": {"avg": 0.0},
+    "sf1": {"avg": 0.0}
+  },
+  "stage_metrics": {},
+  "workflow_trace": {},
+  "by_sql_feature": {},
+  "by_scenario": {},
+  "qvt": {},
+  "token_usage": {},
+  "per_sample": []
+}

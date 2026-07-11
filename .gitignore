@@ -1,0 +1,44 @@
+# Secrets & local env
+.env
+.env.local
+.env.*.local
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / demo frontend
+demo-app/node_modules/
+demo-app/dist/
+npm-debug.log*
+yarn-error.log*
+
+# Runtime outputs
+files/
+artifacts/
+tmp/
+*.log
+*.sqlite-shm
+*.sqlite-wal
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Agent runtime symlinks (recreated by harness/install)
+.claude/
+.agents/
+.squrve/
+
+# Optional local state
+.omc/
+.omx/
+.gradio/

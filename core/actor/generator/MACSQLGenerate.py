@@ -1,0 +1,1072 @@
+import json
+import time
+import pandas as pd
+from pathlib import Path
+from typing import Union, List, Dict, Optional, Tuple
+from loguru import logger
+import re
+
+from core.actor.generator.BaseGenerate import BaseGenerator
+from core.data_manage import Dataset, load_dataset, save_dataset
+from core.utils import parse_schema_from_df
+from core.data_manage import single_central_process
+from core.db_connect import get_sql_exec_result
+from llama_index.core.llms.llm import LLM
+from core.actor.parser.parse_utils import format_schema_links
+
+# MAC-SQL constants
+MAX_ROUND = 3
+SELECTOR_NAME = 'Selector'
+DECOMPOSER_NAME = 'Decomposer'
+REFINER_NAME = 'Refiner'
+SYSTEM_NAME = 'System'
+
+
+# Utility functions
+def parse_json(text: str) -> dict:
+    """Parse JSON format text"""
+    # Find JSON block
+    start = text.find("```json")
+    end = text.find("```", start + 7)
+    
+    if start != -1 and end != -1:
+        json_string = text[start + 7: end].strip()
+        try:
+            return json.loads(json_string)
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON parsing failed: {e}")
+            return {}
+    
+    # If no JSON block found, try parsing entire text directly
+    try:
+        return json.loads(text.strip())
+    except json.JSONDecodeError:
+        pass
+    
+    return {}
+
+
+def parse_sql_from_string(input_string: str) -> str:
+    """Extract SQL from string"""
+    sql_pattern = r'```sql(.*?)```'
+    all_sqls = []
+    for match in re.finditer(sql_pattern, input_string, re.DOTALL):
+        all_sqls.append(match.group(1).strip())
+    if all_sqls:
+        return all_sqls[-1]
+    else:
+        return "error: No SQL found in the input string"
+
+
+def load_json_file(file_path: str) -> dict:
+    """Load JSON file"""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+
+# Utility function for schema parsing
+def parse_schema_to_bird_format(schema: pd.DataFrame) -> Tuple[str, str]:
+    """Convert DataFrame schema to BIRD format string"""
+    desc_str = ""
+    fk_str = ""
+
+    # Group by table name
+    table_groups = {}
+    foreign_keys = []
+
+    for _, row in schema.iterrows():
+        table_name = row.get('table_name', '')
+        column_name = row.get('column_name', '')
+        column_type = row.get('column_type', '')
+
+        if table_name not in table_groups:
+            table_groups[table_name] = []
+
+        # Build column description
+        col_desc = f"  ({column_name}, {column_name}"
+        if column_type:
+            col_desc += f". Type: {column_type}"
+        col_desc += ".),\n"
+
+        table_groups[table_name].append(col_desc)
+
+        # Process foreign keys
+        if 'foreign_key' in row and pd.notna(row['foreign_key']):
+            fk_info = row['foreign_key']
+            if isinstance(fk_info, str) and '=' in fk_info:
+                foreign_keys.append(fk_info)
+
+    # Build description string
+    for table_name, columns in table_groups.items():
+        desc_str += f"# Table: {table_name}\n[\n"
+        desc_str += "".join(columns)
+        desc_str = desc_str.rstrip(",\n") + "\n]\n"
+
+    # Build foreign key string
+    fk_str = "\n".join(set(foreign_keys))
+
+    return desc_str.strip(), fk_str.strip()
+
+
+# MAC-SQL Prompt Templates
+selector_template = '''
+As an experienced and professional database administrator, your task is to analyze a user question and a database schema to provide relevant information. The database schema consists of table descriptions, each containing multiple column descriptions. Your goal is to identify the relevant tables and columns based on the user question and evidence provided.
+
+[Instruction]:
+1. Discard any table schema that is not related to the user question and evidence.
+2. Sort the columns in each relevant table in descending order of relevance and keep the top 6 columns.
+3. Ensure that at least 3 tables are included in the final output JSON.
+4. The output should be in JSON format.
+
+Requirements:
+1. If a table has less than or equal to 10 columns, mark it as "keep_all".
+2. If a table is completely irrelevant to the user question and evidence, mark it as "drop_all".
+3. Prioritize the columns in each relevant table based on their relevance.
+
+Here is a typical example:
+
+==========
+【DB_ID】 banking_system
+【Schema】
+# Table: account
+[
+  (account_id, the id of the account. Value examples: [11382, 11362, 2, 1, 2367].),
+  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].),
+  (frequency, frequency of the acount. Value examples: ['POPLATEK MESICNE', 'POPLATEK TYDNE', 'POPLATEK PO OBRATU'].),
+  (date, the creation date of the account. Value examples: ['1997-12-29', '1997-12-28'].),
+]
+# Table: client
+[
+  (client_id, the unique number. Value examples: [13998, 13971, 2, 1, 2839].),
+  (gender, gender. Value examples: ['M', 'F']. And F：female . M：male ),
+  (birth_date, birth date. Value examples: ['1987-09-27', '1986-08-13'].),
+  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].),
+]
+# Table: loan
+[
+  (loan_id, the id number identifying the loan data. Value examples: [4959, 4960, 4961].),
+  (account_id, the id number identifying the account. Value examples: [10, 80, 55, 43].),
+  (date, the date when the loan is approved. Value examples: ['1998-07-12', '1998-04-19'].),
+  (amount, the id number identifying the loan data. Value examples: [1567, 7877, 9988].),
+  (duration, the id number identifying the loan data. Value examples: [60, 48, 24, 12, 36].),
+  (payments, the id number identifying the loan data. Value examples: [3456, 8972, 9845].),
+  (status, the id number identifying the loan data. Value examples: ['C', 'A', 'D', 'B'].)
+]
+# Table: district
+[
+  (district_id, location of branch. Value examples: [77, 76].),
+  (A2, area in square kilometers. Value examples: [50.5, 48.9].),
+  (A4, number of inhabitants. Value examples: [95907, 95616].),
+  (A5, number of households. Value examples: [35678, 34892].),
+  (A6, literacy rate. Value examples: [95.6, 92.3, 89.7].),
+  (A7, number of entrepreneurs. Value examples: [1234, 1456].),
+  (A8, number of cities. Value examples: [5, 4].),
+  (A9, number of schools. Value examples: [15, 12, 10].),
+  (A10, number of hospitals. Value examples: [8, 6, 4].),
+  (A11, average salary. Value examples: [12541, 11277].),
+  (A12, poverty rate. Value examples: [12.4, 9.8].),
+  (A13, unemployment rate. Value examples: [8.2, 7.9].),
+  (A15, number of crimes. Value examples: [256, 189].)
+]
+【Foreign keys】
+client.`district_id` = district.`district_id`
+【Question】
+What is the gender of the youngest client who opened account in the lowest average salary branch?
+【Evidence】
+Later birthdate refers to younger age; A11 refers to average salary
+【Answer】
+```json
+{{
+  "account": "keep_all",
+  "client": "keep_all",
+  "loan": "drop_all",
+  "district": ["district_id", "A11", "A2", "A4", "A6", "A7"]
+}}
+```
+Question Solved.
+
+==========
+
+Here is a new example, please start answering:
+
+【DB_ID】 {db_id}
+【Schema】
+{desc_str}
+【Foreign keys】
+{fk_str}
+【Question】
+{query}
+【Evidence】
+{evidence}
+【Answer】
+'''
+
+decompose_template_bird = '''Given a 【Database schema】 description, a knowledge 【Evidence】 and the 【Question】, you need to use valid SQLite and understand the database and knowledge, and then decompose the question into subquestions for text-to-SQL generation.
+When generating SQL, we should always consider constraints:
+【Constraints】
+- In `SELECT <column>`, just select needed columns in the 【Question】 without any unnecessary column or value
+- In `FROM <table>` or `JOIN <table>`, do not include unnecessary table
+- If use max or min func, `JOIN <table>` FIRST, THEN use `SELECT MAX(<column>)` or `SELECT MIN(<column>)`
+- If [Value examples] of <column> has 'None' or None, use `JOIN <table>` or `WHERE <column> is NOT NULL` is better
+- If use `ORDER BY <column> ASC|DESC`, add `GROUP BY <column>` before to select distinct values
+
+==========
+
+【Database schema】
+# Table: frpm
+[
+  (CDSCode, CDSCode. Value examples: ['01100170109835', '01100170112607'].),
+  (Charter School (Y/N), Charter School (Y/N). Value examples: [1, 0, None]. And 0: N;. 1: Y),
+  (Enrollment (Ages 5-17), Enrollment (Ages 5-17). Value examples: [5271.0, 4734.0].),
+  (Free Meal Count (Ages 5-17), Free Meal Count (Ages 5-17). Value examples: [3864.0, 2637.0]. And eligible free rate = Free Meal Count / Enrollment)
+]
+# Table: satscores
+[
+  (cds, California Department Schools. Value examples: ['10101080000000', '10101080109991'].),
+  (sname, school name. Value examples: ['None', 'Middle College High', 'John F. Kennedy High', 'Independence High', 'Foothill High'].),
+  (NumTstTakr, Number of Test Takers in this school. Value examples: [24305, 4942, 1, 0, 280]. And number of test takers in each school),
+  (AvgScrMath, average scores in Math. Value examples: [699, 698, 289, None, 492]. And average scores in Math),
+  (NumGE1500, Number of Test Takers Whose Total SAT Scores Are Greater or Equal to 1500. Value examples: [5837, 2125, 0, None, 191]. And Number of Test Takers Whose Total SAT Scores Are Greater or Equal to 1500. . commonsense evidence:. . Excellence Rate = NumGE1500 / NumTstTakr)
+]
+【Foreign keys】
+frpm.`CDSCode` = satscores.`cds`
+【Question】
+List school names of charter schools with an SAT excellence rate over the average.
+【Evidence】
+Charter schools refers to `Charter School (Y/N)` = 1 in the table frpm; Excellence rate = NumGE1500 / NumTstTakr
+
+
+Decompose the question into sub questions, considering 【Constraints】, and generate the SQL after thinking step by step:
+Sub question 1: Get the average value of SAT excellence rate of charter schools.
+SQL
+```sql
+SELECT AVG(CAST(T2.`NumGE1500` AS REAL) / T2.`NumTstTakr`)
+    FROM frpm AS T1
+    INNER JOIN satscores AS T2
+    ON T1.`CDSCode` = T2.`cds`
+    WHERE T1.`Charter School (Y/N)` = 1
+```
+
+Sub question 2: List out school names of charter schools with an SAT excellence rate over the average.
+SQL
+```sql
+SELECT T2.`sname`
+  FROM frpm AS T1
+  INNER JOIN satscores AS T2
+  ON T1.`CDSCode` = T2.`cds`
+  WHERE T2.`sname` IS NOT NULL
+  AND T1.`Charter School (Y/N)` = 1
+  AND CAST(T2.`NumGE1500` AS REAL) / T2.`NumTstTakr` > (
+    SELECT AVG(CAST(T4.`NumGE1500` AS REAL) / T4.`NumTstTakr`)
+    FROM frpm AS T3
+    INNER JOIN satscores AS T4
+    ON T3.`CDSCode` = T4.`cds`
+    WHERE T3.`Charter School (Y/N)` = 1
+  )
+```
+
+Question Solved.
+
+==========
+
+【Database schema】
+# Table: account
+[
+  (account_id, the id of the account. Value examples: [11382, 11362, 2, 1, 2367].),
+  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].),
+  (frequency, frequency of the acount. Value examples: ['POPLATEK MESICNE', 'POPLATEK TYDNE', 'POPLATEK PO OBRATU'].),
+  (date, the creation date of the account. Value examples: ['1997-12-29', '1997-12-28'].)
+]
+# Table: client
+[
+  (client_id, the unique number. Value examples: [13998, 13971, 2, 1, 2839].),
+  (gender, gender. Value examples: ['M', 'F']. And F：female . M：male ),
+  (birth_date, birth date. Value examples: ['1987-09-27', '1986-08-13'].),
+  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].)
+]
+# Table: district
+[
+  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].),
+  (A4, number of inhabitants . Value examples: ['95907', '95616', '94812'].),
+  (A11, average salary. Value examples: [12541, 11277, 8114].)
+]
+【Foreign keys】
+account.`district_id` = district.`district_id`
+client.`district_id` = district.`district_id`
+【Question】
+What is the gender of the youngest client who opened account in the lowest average salary branch?
+【Evidence】
+Later birthdate refers to younger age; A11 refers to average salary
+
+Decompose the question into sub questions, considering 【Constraints】, and generate the SQL after thinking step by step:
+Sub question 1: What is the district_id of the branch with the lowest average salary?
+SQL
+```sql
+SELECT `district_id`
+  FROM district
+  ORDER BY `A11` ASC
+  LIMIT 1
+```
+
+Sub question 2: What is the youngest client who opened account in the lowest average salary branch?
+SQL
+```sql
+SELECT T1.`client_id`
+  FROM client AS T1
+  INNER JOIN district AS T2
+  ON T1.`district_id` = T2.`district_id`
+  ORDER BY T2.`A11` ASC, T1.`birth_date` DESC 
+  LIMIT 1
+```
+
+Sub question 3: What is the gender of the youngest client who opened account in the lowest average salary branch?
+SQL
+```sql
+SELECT T1.`gender`
+  FROM client AS T1
+  INNER JOIN district AS T2
+  ON T1.`district_id` = T2.`district_id`
+  ORDER BY T2.`A11` ASC, T1.`birth_date` DESC 
+  LIMIT 1 
+```
+Question Solved.
+
+==========
+
+【Database schema】
+{desc_str}
+【Foreign keys】
+{fk_str}
+【Question】
+{query}
+【Evidence】
+{evidence}
+
+Decompose the question into sub questions, considering 【Constraints】, and generate the SQL after thinking step by step:
+'''
+
+decompose_template_spider = '''Given a 【Database schema】 description, and the 【Question】, you need to use valid SQLite and understand the database, and then generate the corresponding SQL.
+
+==========
+
+【Database schema】
+# Table: stadium
+[
+  (Stadium_ID, stadium id. Value examples: [1, 2, 3, 4, 5, 6].),
+  (Location, location. Value examples: ['Stirling Albion', 'Raith Rovers', "Queen's Park", 'Peterhead', 'East Fife', 'Brechin City'].),
+  (Name, name. Value examples: ["Stark's Park", 'Somerset Park', 'Recreation Park', 'Hampden Park', 'Glebe Park', 'Gayfield Park'].),
+  (Capacity, capacity. Value examples: [52500, 11998, 10104, 4125, 4000, 3960].),
+  (Highest, highest. Value examples: [4812, 2363, 1980, 1763, 1125, 1057].),
+  (Lowest, lowest. Value examples: [1294, 1057, 533, 466, 411, 404].),
+  (Average, average. Value examples: [2106, 1477, 864, 730, 642, 638].)
+]
+# Table: concert
+[
+  (concert_ID, concert id. Value examples: [1, 2, 3, 4, 5, 6].),
+  (concert_Name, concert name. Value examples: ['Week 1', 'Week 2', 'Super bootcamp', 'Home Visits', 'Auditions'].),
+  (Theme, theme. Value examples: ['Wide Awake', 'Party All Night', 'Happy Tonight', 'Free choice 2', 'Free choice', 'Bleeding Love'].),
+  (Stadium_ID, stadium id. Value examples: ['2', '9', '7', '10', '1'].),
+  (Year, year. Value examples: ['2015', '2014'].)
+]
+【Foreign keys】
+concert.`Stadium_ID` = stadium.`Stadium_ID`
+【Question】
+Show the stadium name and the number of concerts in each stadium.
+
+SQL
+```sql
+SELECT T1.`Name`, COUNT(*) FROM stadium AS T1 JOIN concert AS T2 ON T1.`Stadium_ID` = T2.`Stadium_ID` GROUP BY T1.`Stadium_ID`
+```
+
+Question Solved.
+
+==========
+
+【Database schema】
+# Table: singer
+[
+  (Singer_ID, singer id. Value examples: [1, 2].),
+  (Name, name. Value examples: ['Tribal King', 'Timbaland'].),
+  (Country, country. Value examples: ['France', 'United States', 'Netherlands'].),
+  (Song_Name, song name. Value examples: ['You', 'Sun', 'Love', 'Hey Oh'].),
+  (Song_release_year, song release year. Value examples: ['2016', '2014'].),
+  (Age, age. Value examples: [52, 43].)
+]
+# Table: concert
+[
+  (concert_ID, concert id. Value examples: [1, 2].),
+  (concert_Name, concert name. Value examples: ['Super bootcamp', 'Home Visits', 'Auditions'].),
+  (Theme, theme. Value examples: ['Wide Awake', 'Party All Night'].),
+  (Stadium_ID, stadium id. Value examples: ['2', '9'].),
+  (Year, year. Value examples: ['2015', '2014'].)
+]
+# Table: singer_in_concert
+[
+  (concert_ID, concert id. Value examples: [1, 2].),
+  (Singer_ID, singer id. Value examples: ['3', '6'].)
+]
+【Foreign keys】
+singer_in_concert.`Singer_ID` = singer.`Singer_ID`
+singer_in_concert.`concert_ID` = concert.`concert_ID`
+【Question】
+Show the name and the release year of the song by the youngest singer.
+
+SQL
+```sql
+SELECT `Song_Name`, `Song_release_year` FROM singer WHERE Age = (SELECT MIN(Age) FROM singer)
+```
+
+Question Solved.
+
+==========
+
+【Database schema】
+{desc_str}
+【Foreign keys】
+{fk_str}
+【Question】
+{query}
+
+SQL
+
+'''
+
+refiner_template = '''【Instruction】
+When executing SQL below, some errors occurred, please fix up SQL based on query and database info.
+Solve the task step by step if you need to. Using SQL format in the code block, and indicate script type in the code block.
+When you find an answer, verify the answer carefully. Include verifiable evidence in your response if possible.
+【Constraints】
+- In `SELECT <column>`, just select needed columns in the 【Question】 without any unnecessary column or value
+- In `FROM <table>` or `JOIN <table>`, do not include unnecessary table
+- If use max or min func, `JOIN <table>` FIRST, THEN use `SELECT MAX(<column>)` or `SELECT MIN(<column>)`
+- If [Value examples] of <column> has 'None' or None, use `JOIN <table>` or `WHERE <column> is NOT NULL` is better
+- If use `ORDER BY <column> ASC|DESC`, add `GROUP BY <column>` before to select distinct values
+【Query】
+-- {query}
+【Evidence】
+{evidence}
+【Database info】
+{desc_str}
+【Foreign keys】
+{fk_str}
+【old SQL】
+```sql
+{original_sql}
+```
+【SQLite error】 
+{error}
+
+Now please fixup old SQL and generate new SQL again.
+【correct SQL】
+'''
+
+
+class Selector:
+    """MAC-SQL Selector Agent: Responsible for database schema selection and pruning"""
+    name = SELECTOR_NAME
+
+    def __init__(self, llm: LLM, dataset_name: str, without_selector: bool = False):
+        self.llm = llm
+        self.dataset_name = dataset_name
+        self.without_selector = without_selector
+        self._message = {}
+
+    def _parse_schema_to_bird_format(self, schema: pd.DataFrame) -> Tuple[str, str]:
+        """Convert DataFrame schema to BIRD format string (delegates to module-level function)"""
+        return parse_schema_to_bird_format(schema)
+
+    def _is_need_prune(self, schema_str: str) -> bool:
+        """Determine if schema pruning is needed"""
+        if self.without_selector:
+            return False
+
+        # More precise heuristic rules based on original implementation
+        table_count = schema_str.count("# Table:")
+        
+        # Calculate total column count (more precise calculation)
+        column_count = 0
+        lines = schema_str.split('\n')
+        for line in lines:
+            if line.strip().startswith('(') and ',' in line:
+                column_count += 1
+
+        # Decision logic based on original implementation
+        if table_count <= 3:
+            return False
+            
+        # If average columns per table <= 6 and total columns <= 30, no pruning needed
+        avg_columns = column_count / table_count if table_count > 0 else 0
+        if avg_columns <= 6 and column_count <= 30:
+            return False
+            
+        return True
+
+    def _prune_schema(self, db_id: str, query: str, schema_str: str, fk_str: str, evidence: str, data_logger=None) -> Dict:
+        """Use LLM for schema pruning"""
+        try:
+            prompt = selector_template.format(
+                db_id=db_id,
+                desc_str=schema_str,
+                fk_str=fk_str,
+                query=query,
+                evidence=evidence
+            )
+            response = self.llm.complete(prompt)
+            response_text = response.text.strip()
+            if data_logger:
+                data_logger.info(f"{SELECTOR_NAME}.llm_output | {response_text}")
+            return parse_json(response_text)
+        except Exception as e:
+            logger.error(f"Schema pruning failed: {e}")
+            return {}
+
+    def talk(self, message: Dict):
+        """Main logic of Selector agent"""
+        if message.get('send_to') != self.name:
+            return
+
+        self._message = message
+        db_id = message.get('db_id', '')
+        query = message.get('query', '')
+        evidence = message.get('evidence', '')
+        schema = message.get('schema')
+
+        if schema is None:
+            logger.error("Schema information missing")
+            message['send_to'] = SYSTEM_NAME
+            return
+
+        # Convert schema format
+        if isinstance(schema, pd.DataFrame):
+            desc_str, fk_str = self._parse_schema_to_bird_format(schema)
+        else:
+            logger.error("Unsupported schema format")
+            message['send_to'] = SYSTEM_NAME
+            return
+
+        # Determine if pruning is needed
+        need_prune = self._is_need_prune(desc_str)
+
+        if need_prune:
+            logger.debug("Starting schema pruning...")
+            data_logger = message.get('data_logger')
+            extracted_schema = self._prune_schema(db_id, query, desc_str, fk_str, evidence, data_logger)
+            message['extracted_schema'] = extracted_schema
+            message['pruned'] = True
+            logger.debug(f"Pruning result: {extracted_schema}")
+        else:
+            message['extracted_schema'] = {}
+            message['pruned'] = False
+
+        message['send_to'] = DECOMPOSER_NAME
+
+
+class Decomposer:
+    """MAC-SQL Decomposer Agent: Responsible for question decomposition and SQL generation"""
+    name = DECOMPOSER_NAME
+
+    def __init__(self, llm: LLM, dataset_name: str):
+        self.llm = llm
+        self.dataset_name = dataset_name
+        self._message = {}
+
+    def talk(self, message: Dict):
+        """Main logic of Decomposer agent"""
+        if message.get('send_to') != self.name:
+            return
+
+        self._message = message
+        query = message.get('query', '')
+        evidence = message.get('evidence', '')
+        schema = message.get('schema')
+
+        # Retrieve externally provided schema_links
+        schema_links_str = message.get('schema_links_str')
+
+        if not query or schema is None:
+            logger.error("Missing required query or schema information")
+            message['send_to'] = SYSTEM_NAME
+            return
+
+        # Generate desc_str and fk_str from schema
+        if not isinstance(schema, pd.DataFrame):
+            logger.error("Invalid schema format")
+            message['send_to'] = SYSTEM_NAME
+            return
+        
+        desc_str, fk_str = parse_schema_to_bird_format(schema)
+
+        # Enrich evidence with externally provided schema_links
+        enriched_evidence = evidence
+        if schema_links_str:
+            enriched_evidence += f"\n\nRelevant schema links:\n{schema_links_str}"
+
+        # Select appropriate template
+        if self.dataset_name == 'bird':
+            template = decompose_template_bird
+            prompt = template.format(
+                desc_str=desc_str,
+                fk_str=fk_str,
+                query=query,
+                evidence=enriched_evidence
+            )
+        else:
+            template = decompose_template_spider
+            prompt = template.format(
+                desc_str=desc_str,
+                fk_str=fk_str,
+                query=query
+            )
+            # For non-bird datasets, append schema_links as supplementary hints
+            if schema_links_str:
+                context_hint = f"\n【Schema Links】\n{schema_links_str}"
+                prompt = prompt.rstrip() + context_hint + "\n\nSQL\n"
+
+        try:
+            logger.debug("Starting question decomposition and SQL generation...")
+            data_logger = message.get('data_logger')
+            response = self.llm.complete(prompt)
+            reply = response.text.strip()
+            if data_logger:
+                data_logger.info(f"{DECOMPOSER_NAME}.llm_output | {reply}")
+
+            # Extract final SQL
+            final_sql = parse_sql_from_string(reply)
+
+            message['final_sql'] = final_sql
+            message['qa_pairs'] = reply
+            message['fixed'] = False
+            message['send_to'] = REFINER_NAME
+
+            logger.debug(f"Generated SQL: {final_sql[:100]}...")
+
+        except Exception as e:
+            logger.error(f"Question decomposition failed: {e}")
+            message['final_sql'] = "error: Failed to generate SQL"
+            message['send_to'] = SYSTEM_NAME
+
+
+class Refiner:
+    """MAC-SQL Refiner Agent: Responsible for SQL execution validation and refinement"""
+    name = REFINER_NAME
+
+    def __init__(self, llm: LLM, dataset_name: str):
+        self.llm = llm
+        self.dataset_name = dataset_name
+        self._message = {}
+
+    def _execute_sql(self, sql: str, db_type: str, db_path: str, db_id: str, credential: Dict = None) -> Dict:
+        """Execute SQL using Squrve framework's get_sql_exec_result"""
+        try:
+            # Build parameters
+            exec_args = {
+                "sql_query": sql,
+                "db_path": db_path,
+                "db_id": db_id,
+                "credential_path": credential
+            }
+
+            # Execute SQL
+            result = get_sql_exec_result(db_type, **exec_args)
+
+            if isinstance(result, tuple):
+                if len(result) >= 2:
+                    data, error = result[0], result[1]
+                    if error:
+                        return {"success": False, "error": str(error)}
+                    elif data is None or (hasattr(data, 'empty') and data.empty):
+                        return {"success": True, "result": [], "row_count": 0}
+                    else:
+                        return {"success": True, "result": data,
+                                "row_count": len(data) if hasattr(data, '__len__') else 1}
+                else:
+                    return {"success": False, "error": "Execution result format error"}
+            else:
+                return {"success": False, "error": "Execution result format error"}
+
+        except Exception as e:
+            logger.error(f"SQL execution failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    def _is_need_refine(self, exec_result: Dict) -> bool:
+        """Determine if SQL needs refinement"""
+        if not exec_result.get("success", False):
+            return True
+
+        # For Spider dataset, empty results don't necessarily need refinement
+        if self.dataset_name == 'spider':
+            return False
+
+        # For other datasets, empty results need refinement
+        row_count = exec_result.get("row_count", 0)
+        return row_count == 0
+
+    def _refine_sql(self, query: str, evidence: str, desc_str: str, fk_str: str, original_sql: str, error: str, data_logger=None) -> str:
+        """Use LLM to refine SQL"""
+        try:
+            prompt = refiner_template.format(
+                desc_str=desc_str,
+                fk_str=fk_str,
+                query=query,
+                evidence=evidence,
+                original_sql=original_sql,
+                error=error
+            )
+            response = self.llm.complete(prompt)
+            reply = response.text.strip()
+            if data_logger:
+                data_logger.info(f"{REFINER_NAME}.llm_output | {reply}")
+            return parse_sql_from_string(reply)
+
+        except Exception as e:
+            logger.error(f"SQL refinement failed: {e}")
+            return original_sql
+
+    def talk(self, message: Dict):
+        """Main logic of Refiner agent"""
+        if message.get('send_to') != self.name:
+            return
+
+        self._message = message
+        db_id = message.get('db_id', '')
+        db_type = message.get('db_type', 'sqlite')
+        db_path = message.get('db_path', '')
+        credential = message.get('credential')
+        final_sql = message.get('final_sql', '')
+        query = message.get('query', '')
+        evidence = message.get('evidence', '')
+        desc_str = message.get('desc_str', '')
+        fk_str = message.get('fk_str', '')
+
+        # If SQL contains error message, return directly
+        if 'error' in final_sql.lower():
+            message['try_times'] = message.get('try_times', 0) + 1
+            message['pred'] = final_sql
+            message['send_to'] = SYSTEM_NAME
+            return
+
+        # Execute SQL
+        logger.debug("Starting SQL validation execution...")
+        data_logger = message.get('data_logger')
+        if data_logger:
+            data_logger.info(f"{REFINER_NAME}.sql_execute | {final_sql}")
+        exec_result = self._execute_sql(final_sql, db_type, db_path, db_id, credential)
+        if data_logger:
+            if not exec_result.get("success", False):
+                error_info = exec_result.get('error', 'Unknown error')
+                data_logger.info(f"{REFINER_NAME}.sql_error | {error_info}")
+            else:
+                row_count = exec_result.get('row_count', 0)
+                data_logger.info(f"{REFINER_NAME}.sql_result | success=True, row_count={row_count}")
+
+        # Determine if refinement is needed
+        need_refine = self._is_need_refine(exec_result)
+
+        if not need_refine:
+            # SQL execution successful, no refinement needed
+            message['try_times'] = message.get('try_times', 0) + 1
+            message['pred'] = final_sql
+            message['send_to'] = SYSTEM_NAME
+            logger.debug("SQL execution successful, no refinement needed")
+        else:
+            # SQL needs refinement
+            try_times = message.get('try_times', 0)
+            if try_times >= MAX_ROUND - 1:
+                # Reached maximum attempts, return original SQL
+                message['try_times'] = try_times + 1
+                message['pred'] = final_sql
+                message['send_to'] = SYSTEM_NAME
+                logger.warning(f"Reached maximum refinement attempts {MAX_ROUND}, returning original SQL")
+            else:
+                # Attempt to refine SQL
+                logger.debug("Starting SQL refinement...")
+                error_info = exec_result.get('error', 'Empty result set')
+                refined_sql = self._refine_sql(query, evidence, desc_str, fk_str, final_sql, error_info, data_logger)
+
+                message['try_times'] = try_times + 1
+                message['final_sql'] = refined_sql
+                message['fixed'] = True
+                message['send_to'] = REFINER_NAME
+                logger.debug(f"SQL refinement completed: {refined_sql[:100]}...")
+
+
+class ChatManager:
+    """MAC-SQL ChatManager: Manages collaboration between three agents"""
+
+    def __init__(self, llm: LLM, dataset_name: str, without_selector: bool = False):
+        self.llm = llm
+        self.dataset_name = dataset_name
+        self.chat_group = [
+            Selector(llm=llm, dataset_name=dataset_name, without_selector=without_selector),
+            Decomposer(llm=llm, dataset_name=dataset_name),
+            Refiner(llm=llm, dataset_name=dataset_name)
+        ]
+
+    def _chat_single_round(self, message: Dict):
+        """Execute single round of conversation"""
+        for agent in self.chat_group:
+            if message.get('send_to') == agent.name:
+                agent.talk(message)
+                break
+
+    def start(self, user_message: Dict):
+        """Start multi-agent collaboration"""
+        start_time = time.time()
+
+        if user_message.get('send_to') == SYSTEM_NAME:
+            user_message['send_to'] = SELECTOR_NAME
+
+        for round_num in range(MAX_ROUND):
+            logger.debug(f"Starting round {round_num + 1}, sending to: {user_message.get('send_to')}")
+            self._chat_single_round(user_message)
+
+            if user_message.get('send_to') == SYSTEM_NAME:
+                logger.debug("Conversation ended")
+                break
+
+        end_time = time.time()
+        exec_time = end_time - start_time
+        logger.info(f"MAC-SQL collaboration completed, time elapsed: {exec_time:.2f} seconds")
+
+
+@BaseGenerator.register_actor
+class MACSQLGenerator(BaseGenerator):
+    """
+    MAC-SQL Generator: Multi-Agent Collaborative SQL Generation
+    Implements end-to-end Text-to-SQL generation using MAC-SQL method
+    """
+
+    NAME = "MACSQLGenerator"
+    OUTPUT_NAME = "pred_sql"
+
+    SKILL = """# MACSQLGenerator
+
+MAC-SQL uses a three-agent pipeline (Selector→Decomposer→Refiner) that collaborates via message passing: Selector prunes large schemas (BIRD format, drop irrelevant tables/columns), Decomposer decomposes and generates SQL in one step (dataset-specific templates for BIRD vs Spider), Refiner executes SQL and iteratively fixes by error feedback up to MAX_ROUND. Skips Selector when `schema_links` provided. Advantage: multi-agent specialization; drawback: round-bound refinement, depends on DB for Refiner.
+
+## Inputs
+- `schema_links`: Precomputed links from question to tables/columns/values. If provided, skips Selector and enriches Decomposer evidence.
+
+## Output
+`pred_sql`
+
+## Steps
+1. Schema preparation; skip Selector if `schema_links` provided.
+2. Selector: prune schema (drop irrelevant tables, top-6 columns per table) when needed.
+3. Decomposer: decompose question + generate SQL (BIRD: with evidence; Spider: direct).
+4. Refiner: execute SQL → if error or empty (non-Spider), fix by error feedback; repeat up to MAX_ROUND.
+5. Return `pred_sql`.
+"""
+
+    def __init__(
+            self,
+            dataset: Optional[Dataset] = None,
+            llm: Optional[LLM] = None,
+            is_save: bool = True,
+            save_dir: Union[str, Path] = "../files/pred_sql",
+            max_round: int = 3,
+            dataset_name: str = "spider",
+            without_selector: bool = False,
+            use_external: bool = True,
+            db_path: Optional[Union[str, Path]] = None,
+            credential: Optional[Dict] = None,
+            **kwargs
+    ):
+        super().__init__()
+        self.dataset = dataset
+        self.llm = llm
+        self.is_save = is_save
+        self.save_dir = Path(save_dir)
+        self.max_round = max_round
+        self.dataset_name = dataset_name
+        self.without_selector = without_selector
+        self.use_external: bool = use_external
+
+        # Safely initialize db_path and credential, checking if dataset is None
+        if db_path is not None:
+            self.db_path = db_path
+        elif self.dataset is not None:
+            self.db_path = self.dataset.db_path
+        else:
+            self.db_path = None
+
+        if credential is not None:
+            self.credential = credential
+        elif self.dataset is not None:
+            self.credential = self.dataset.credential
+        else:
+            self.credential = None
+
+    def _validate_inputs(self, item, schema) -> Tuple[bool, str]:
+        """Validate input parameters"""
+        if self.dataset is None:
+            return False, "Dataset not initialized"
+
+        if self.llm is None:
+            return False, "LLM not initialized"
+
+        try:
+            row = self.dataset[item]
+            if 'question' not in row:
+                return False, "Data sample missing 'question' field"
+            if 'db_id' not in row:
+                return False, "Data sample missing 'db_id' field"
+        except Exception as e:
+            return False, f"Cannot access data sample: {e}"
+
+        return True, ""
+
+    def _prepare_schema(self, item, schema) -> pd.DataFrame:
+        """Prepare and standardize schema"""
+        # Load schema
+        if isinstance(schema, (str, Path)):
+            schema = load_dataset(schema)
+
+        if schema is None:
+            # Get schema from dataset
+            schema = self.dataset.get_db_schema(item)
+            if schema is None:
+                raise Exception("Cannot retrieve valid database schema!")
+
+        # Standardize schema format
+        if isinstance(schema, dict):
+            schema = single_central_process(schema)
+        if isinstance(schema, list):
+            schema = pd.DataFrame(schema)
+
+        if not isinstance(schema, pd.DataFrame):
+            raise Exception("Cannot process database schema format!")
+
+        return schema
+
+    def _prepare_database_info(self, row) -> Tuple[str, str, str, Dict]:
+        """Prepare database connection information"""
+        db_id = row['db_id']
+        db_type = row.get('db_type', 'sqlite')
+
+        # Set database path
+        if self.db_path:
+            if db_type == 'sqlite':
+                db_path = str(Path(self.db_path) / f"{db_id}.sqlite")
+            else:
+                db_path = str(self.db_path)
+        else:
+            db_path = ""
+
+        credential = self.credential if self.credential else {}
+
+        return db_id, db_type, db_path, credential
+
+    @classmethod
+    def load_external_knowledge(cls, external: Union[str, Path] = None):
+        if not external:
+            return None
+        try:
+            external = load_dataset(external)
+        except FileNotFoundError:
+            logger.debug("External file not found, treat it as content.")
+        if external and len(external) > 50:
+            external = "####[External Prior Knowledge]:\n" + external
+            return external
+        return None
+
+    def act(
+            self,
+            item,
+            schema: Union[str, Path, Dict, List] = None,
+            schema_links: Union[str, List[str]] = None,
+            data_logger=None,
+            **kwargs
+    ):
+        """Implement end-to-end SQL generation logic for MAC-SQL"""
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
+        logger.info(f"MACSQLGenerator starting to process sample {item}")
+
+        # Validate input
+        is_valid, error_msg = self._validate_inputs(item, schema)
+        if not is_valid:
+            logger.error(f"Input validation failed: {error_msg}")
+            raise Exception(error_msg)
+
+        # Get data sample
+        row = self.dataset[item]
+        question = row['question']
+        evidence = row.get('evidence', '')
+
+        # evidence 与 external 实为同一类先验知识，提示词使用 evidence，故将 external 赋给 evidence
+        if self.use_external:
+            external_knowledge = self.load_external_knowledge(row.get("external", None))
+            if external_knowledge:
+                evidence = evidence + "\n" + external_knowledge if evidence else external_knowledge
+                logger.debug("已加载外部知识")
+
+        logger.debug(f"Processing question: {question[:100]}...")
+
+        # Parse externally provided schema_links
+        schema_links_str = None
+        if schema_links is None:
+            schema_link_path = row.get("schema_links", None)
+            if schema_link_path:
+                schema_links = load_dataset(schema_link_path)
+                logger.debug(f"Loaded schema links from: {schema_link_path}")
+        else:
+            logger.debug("Using externally provided schema links")
+
+        if not isinstance(schema_links, str) and schema_links is not None:
+            schema_links_str = format_schema_links(schema_links, "C")
+
+        # Prepare schema
+        schema_df = self._prepare_schema(item, schema)
+
+        # Prepare database information
+        db_id, db_type, db_path, credential = self._prepare_database_info(row)
+
+        logger.debug(f"Database info: db_id={db_id}, db_type={db_type}")
+
+        # Determine if Selector should be skipped when schema_links is provided
+        skip_selector = schema_links_str is not None
+        
+        # Create ChatManager
+        chat_manager = ChatManager(
+            llm=self.llm,
+            dataset_name=self.dataset_name,
+            without_selector=self.without_selector or skip_selector
+        )
+
+        # Initialize user message
+        user_message = {
+            "idx": row.get('instance_id', item),
+            "db_id": db_id,
+            "db_type": db_type,
+            "db_path": db_path,
+            "credential": credential,
+            "query": question,
+            "evidence": evidence,
+            "schema": schema_df,
+            "extracted_schema": {},
+            "ground_truth": row.get('query', ''),
+            "send_to": SYSTEM_NAME,
+            "data_logger": data_logger
+        }
+
+        # Pass schema_links to the multi-agent pipeline
+        if schema_links_str:
+            user_message['schema_links_str'] = schema_links_str
+            user_message['send_to'] = DECOMPOSER_NAME
+            logger.debug("Skipping Selector due to provided schema_links")
+
+        # Execute MAC-SQL process
+        logger.debug("Starting MAC-SQL multi-agent collaboration...")
+        chat_manager.start(user_message)
+
+        # Get generated SQL
+        pred_sql = user_message.get('pred', user_message.get('final_sql', ''))
+
+        logger.debug(f"Final generated SQL: {pred_sql[:100]}...")
+
+        pred_sql = self.save_output(pred_sql, item, row.get("instance_id"))
+
+        logger.info(f"MACSQLGenerator sample {item} processing completed")
+        if data_logger:
+            data_logger.info(f"{self.NAME}.final_sql | sql={pred_sql}")
+        return pred_sql

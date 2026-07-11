@@ -1,0 +1,19 @@
+{
+  "llm": [],
+  "embedding": [],
+  "prompt": [],
+  "rag": [],
+  "few_shot": [],
+  "external": [],
+  "actor": {
+    "generator": [],
+    "parser": [],
+    "reducer": [],
+    "scaler": [],
+    "decomposer": [],
+    "optimizer": [],
+    "selector": [],
+    "agent": []
+  },
+  "config": []
+}

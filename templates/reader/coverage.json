@@ -1,0 +1,22 @@
+{
+  "root": "<path>",
+  "scanned_files": [],
+  "skipped_paths": [
+    {
+      "path": "<path>",
+      "reason": "<reason>"
+    }
+  ],
+  "modules": [
+    {
+      "id": "<module_id>",
+      "files": ["<relative/path.py>"],
+      "summary": "<what this module does>",
+      "squrve_component": "actor.generator",
+      "inputs": ["question", "schema"],
+      "outputs": ["pred_sql"],
+      "io_artifact": "pred_sql"
+    }
+  ],
+  "open_questions": []
+}

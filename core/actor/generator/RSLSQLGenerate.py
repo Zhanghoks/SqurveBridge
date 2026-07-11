@@ -1,0 +1,1019 @@
+from os import PathLike
+from typing import Union, Optional, Dict, Any, List
+import json
+import pandas as pd
+from pathlib import Path
+from loguru import logger
+import re
+
+from core.actor.decomposer.decompose_utils import format_sub_questions
+from core.actor.generator.BaseGenerate import BaseGenerator
+from core.data_manage import Dataset, load_dataset, single_central_process
+from core.utils import save_dataset
+from core.db_connect import get_sql_exec_result
+from core.actor.parser.parse_utils import normalize_schema_links
+
+
+# Prompts from Instruction.py
+TABLE_AUG_INSTRUCTION = '''
+You are an intelligent agent responsible for identifying the database tables involved based on the user's questions and database structure information. Your main tasks are:
+
+1. Understand user questions: parse user questions and extract keywords and intentions.
+2. Obtain database structure information: Based on the provided database structure information, understand all tables and their relationships.
+3. Identify relevant tables:
+   - Based on the keywords and intentions in the user's questions, identify directly related tables.
+   - Consider the situation of intermediate tables, such as connection tables or cross tables, which may involve the tables in the user's questions.
+4. Generate a list of tables: Integrate directly related tables and intermediate tables to form the final list of tables.
+5. Return the results in json format, the format is {"tables": ["table1", "table2", ...],"columns":["table1.`column1`","table2.`column2`",...]}
+
+### Input:
+- Database structure information: including table names, fields, and relationships between tables (such as foreign keys, etc.).
+- User questions: queries or questions in natural language form.
+
+### Output:
+- List of database tables involved: including directly related tables and intermediate tables.
+
+### Operation steps:
+1. Parse user questions: extract keywords and intentions from the questions.
+2. Identify key tables: preliminarily identify the direct tables related to the user's questions.
+3. Check intermediate tables: Based on the database structure information, identify intermediate tables related to the direct tables.
+4. Integrate the results: integrate direct tables and intermediate tables to form the final list of tables.
+5. Output the results: return all table lists involved in the user's questions. Select the top 15 columns most relevant to the question for each table.
+
+### Note:
+- Ensure that all possible intermediate tables are considered, especially tables involving many-to-many relationships.
+- Ensure that the output table list is unique and without duplicates.
+'''
+
+SQL_GENERATION_INSTRUCTION = '''
+You are a smart agent responsible for generating the correct SQL statements based on the following information:
+- A small number of SQL Q&A pairs: used for reference and learning common query patterns.
+- Database structure information: including table names, fields, relationships between tables (such as foreign keys, etc.).
+- The first three rows of values in the table: sample data for understanding the content and data distribution of the table.
+- User questions: natural language queries or questions.
+- Query requirements and conditions: specific query requirements and conditions in user questions.
+- Tables involved in SQL statements: tables involved in user questions.
+- Auxiliary query conditions: additional query conditions provided, which may affect the generation of SQL statements.
+- definition: Information for prompts, this message is very important.
+
+Your main tasks are:
+
+1. Parse user questions:
+   - Use natural language processing (NLP) techniques to parse user questions and extract query requirements and conditions.
+
+2. Refer to SQL Q&A pairs:
+    - Use the provided SQL Q&A pairs as a reference to understand common query patterns and SQL statement structures.
+
+3. Analyze database structure information:
+    - Based on the database structure information, understand the fields and relationships of the table, and build the basic framework of the SQL statement.
+
+4. Check sample data:
+    - Analyze the data characteristics based on the first three rows of the table, which helps to determine how to construct query conditions and filter results.
+
+5. Generate SQL statements:
+    - Based on user questions, query requirements and conditions, tables involved, and auxiliary query conditions, construct complete SQL statements.
+
+6. Verification and optimization:
+    - Check whether the generated SQL statement is logical and optimize it if necessary.
+
+### Input:
+- SQL Q&A pairs: a small number of example SQL Q&A pairs.
+- Database structure information: including table names, fields, relationships between tables (such as foreign keys, etc.).
+- The first three rows of values in the table: sample data.
+- User questions: natural language queries or questions.
+- Query requirements and conditions: specific query requirements and conditions in user questions.
+- Auxiliary query conditions: additional query conditions.
+- definition: Information for prompts, this message is very important.
+
+### Output:
+- Return the result in json format, the format is {"sql": "SQL statement that meets the user's question requirements"}
+
+### Operation steps:
+1. Parse user questions: extract query requirements and conditions from the questions.
+2. Refer to SQL Q&A pairs: understand common query patterns and SQL statement structures.
+3. Analyze database structure information: build the basic framework of the SQL statement.
+4. Check sample data: determine query conditions and filter results.
+5. Generate SQL statements: construct complete SQL statements.
+6. Verification and optimization: ensure the logical correctness of the SQL statement and optimize it.
+
+### Note:
+- Ensure that the SQL statement accurately reflects the query requirements and conditions in the user questions.
+- Reasonably construct query logic based on database structure and sample data.
+- When generating SQL statements, consider all the information provided to ensure the correctness and efficiency of the statements.
+- If the user question involves complex query requirements, please consider all requirements and conditions to generate SQL statements.
+
+### The most important thing is to remember:
+- definition: Information for prompts, this message is very important.
+- In the generated SQL statement, table names and field names need to be enclosed in backticks, such as `table_name`, `column_name`.
+- In the generated SQL statement, table names and field names must be correct to ensure the correctness and efficiency of the statement.
+'''
+
+KEY_WORD_AUG_INSTRUCTION = '''
+You are an AI tasked with determining whether SQL statements need to use the following keywords or operations based on database structure information, the first three rows of a table, and user questions: `DISTINCT`, fuzzy matching, exact matching, `INTERSECT`, `UNION`, etc. Your main tasks are:
+
+1. Understand user questions:
+   - Parse user questions, extract key query requirements, such as whether to remove duplicates, fuzzy matching, exact matching, etc.
+
+2. Analyze database structure information:
+    - Based on the provided database structure information, understand table fields and data types, and determine whether it is necessary to use `DISTINCT`, fuzzy matching, or other keywords.
+
+3. Check sample data:
+    - Analyze data characteristics based on the first three rows of the table, determine whether duplicate data exists, and whether fuzzy matching is needed.
+
+4. Determine keywords and operations:
+    - Based on user questions, database structure, and sample data, determine whether the following keywords are needed:
+      - Fuzzy matching (LIKE): Used to match similar strings.
+      - Exact matching (=): Used for precise matching.
+      - `INTERSECT`: Used to obtain the intersection of two query results.
+      - `UNION`: Used to merge two query results.
+
+5. Generate suggestions:
+    - Return SQL statement keywords for the user question.
+
+### Input:
+- Database structure information: including table names, fields, relationships between tables (such as foreign keys), etc.
+- The first three rows of the table: sample data to help understand the table content.
+- User questions: queries or questions in natural language form.
+
+### Output:
+- Suggested SQL keywords: such as fuzzy matching `LIKE`, exact matching `=`, `INTERSECT`, `UNION`, etc.
+- Return the results in json format, in the format {"sql_keywords": ["keyword1", "keyword2", ...]}
+
+### Procedure:
+1. Parse user questions: Extract key query requirements from the questions.
+2. Analyze database structure information: Understand table fields and data types.
+3. Check sample data: Analyze data characteristics to determine whether deduplication or fuzzy matching is needed.
+4. Determine keywords and operations: Generate appropriate SQL keywords and operation suggestions based on the above information.
+5. Generate results: Output suggested SQL keywords and operations.
+
+### Note:
+- Ensure that you understand the query requirements in user questions to accurately suggest SQL keywords and operations.
+- Based on database structure and sample data, make reasonable judgments on whether specific SQL keywords or operations are needed.
+- If user questions involve multiple query requirements, consider all requirements to generate suggestions.
+'''
+
+CONDITION_AUG_INSTRUCTION = '''
+You are an intelligent agent responsible for identifying the conditions in the user's question and clarifying the relationships between these conditions. Your main tasks are:
+
+1. Understand the user's question: parse the user's question and extract all the conditions in the question.
+2. Identify conditions:
+   - Identify specific conditions from the user's question. For example, "age over 30" or "income over 5000".
+3. Generate output:
+    - List all identified conditions.
+
+### Input:
+- User question: a natural language query or question.
+
+### Output:
+- Condition list: all conditions extracted from the user question.
+
+### Operation steps:
+1. Parse the user's question: use natural language processing techniques to extract the conditions and relationships in the question.
+2. Identify conditions: based on the parsing results, identify all conditions in the user's question.
+3. Generate results: form a list of conditions and relationships and return them to the user.
+4. Return in json format, format: {"conditions": ["condition1", "condition2", ...]}.
+
+### Note:
+- Ensure that all conditions in the user's question are correctly extracted and understood.
+- If the user's question contains complex conditions or multiple relationships, please make a reasonable judgment based on the context.
+'''
+
+SELF_CORRECTION_PROMPT = '''You are an AI agent responsible for generating the correct SQL statements based on the following information:
+- A small number of SQL Q&A pairs: used for reference and learning common query patterns.
+- Database structure information: including table names, fields, relationships between tables (such as foreign keys, etc.).
+- The first three rows of values in the table: sample data for understanding the content and data distribution of the table.
+- User questions: queries or questions in natural language form.
+- Query requirements and conditions: specific query requirements and conditions in user questions.
+- Tables involved in SQL statements: tables involved in user questions.
+- Auxiliary query conditions: additional query conditions that may affect the generation of SQL statements.
+- Hint: Information for prompting, this message is very important.
+
+Your main tasks are:
+
+1. Parse user questions:
+   - Use natural language processing (NLP) techniques to parse user questions and extract query requirements and conditions.
+
+2. Refer to SQL Q&A pairs:
+    - Use the provided SQL Q&A pairs as a reference to understand common query patterns and SQL statement structures.
+
+3. Analyze database structure information:
+    - Based on the database structure information, understand the fields and relationships of the table, and build the basic framework of the SQL statement.
+
+4. Check sample data:
+    - Analyze the data characteristics based on the first three rows of the table values to help determine how to construct query conditions and filter results.
+
+5. Generate SQL statements:
+    - Based on user questions, query requirements and conditions, tables involved, and auxiliary query conditions, build a complete SQL statement.
+
+6. Verification and optimization:
+    - Check whether the generated SQL statement is logical and optimize it if necessary.
+
+### Input:
+- SQL Q&A pairs: a small number of example SQL Q&A pairs.
+- Database structure information: including table names, fields, relationships between tables (such as foreign keys, etc.).
+- The first three rows of values in the table: sample data.
+- User questions: queries or questions in natural language form.
+- Query requirements and conditions: specific query requirements and conditions in user questions.
+- Auxiliary query conditions: additional query conditions.
+- Hint: Information for prompting, this message is very important.
+
+### Output:
+- Return the result in json format, the format is {"sql": "SQL statement that meets the user question requirements"}
+
+### Note:
+- Ensure that the SQL statement accurately reflects the query requirements and conditions in the user question.
+- Reasonably construct the query logic based on the database structure and sample data.
+- When generating SQL statements, consider all the provided information to ensure the correctness and efficiency of the statement.
+- If the SQL statement is incorrect or inefficient, make improvements. Ensure that the statement is both efficient and accurate.
+- Hint: Information for prompting, this message is very important.
+- In the generated SQL statement, table names and field names need to be enclosed in backquotes, such as `table_name`, `column_name`.
+- In the generated SQL statement, table names and field names must be correct to ensure the correctness and efficiency of the statement.
+- The hint aims to direct your focus towards the specific elements of the database schema that are crucial for answering the question effectively.
+'''
+
+BINARY_PROMPT = '''{table_info}
+
+### Select the best SQL query to answer the  question:
+
+{candidate_sql}
+
+Your answer should be returned by json format.
+{{
+    "sql": "...",# your SQL query
+}}
+'''
+
+@BaseGenerator.register_actor
+class RSLSQLGenerator(BaseGenerator):
+    """RSL-SQL method implementation: Reinforcement Schema Linking with multi-stage augmentation and self-correction."""
+
+    NAME = "RSLSQLGenerator"
+
+    SKILL = """# RSLSQLGenerator
+
+RSL-SQL reinforces schema linking via bidirectional linking (evidence + preliminary SQL + LLM) and information augmentation (table, keyword, condition), then binary-selection between two SQL candidates and self-correction for empty results. Advantage: robust schema linking; drawback: many LLM calls, depends on DB for selection and correction.
+
+## Inputs
+- `schema_links`: Precomputed links (tables/columns). If absent, produced by table_column_selection.
+- `sub_questions`: Sub-questions for decomposition. If provided, injected into SQL generation prompts.
+
+## Output
+`pred_sql`
+
+## Steps
+1. Preliminary SQL: table_column_selection (or use `schema_links`) → preliminary_sql_gen.
+2. Bidirectional schema linking: merge links from evidence, preliminary SQL, and LLM output; filter by actual schema.
+3. Information augmentation: table_column_selection, key_word_augmentation, condition_augmentation → sql_generation_aug.
+4. Binary selection: execute preliminary SQL and augmented SQL → LLM picks the better one.
+5. Self-correction: execute → if empty result, fix by LLM; repeat up to max iterations.
+6. Return `pred_sql`.
+"""
+
+    def __init__(
+            self,
+            dataset: Optional[Dataset] = None,
+            llm=None,
+            is_save: bool = True,
+            save_dir: Union[str, PathLike] = "../files/pred_sql",
+            use_external: bool = True,
+            use_few_shot: bool = True,
+            db_path: Optional[Union[str, PathLike]] = None,
+            credential: Optional[dict] = None,
+            few_shot_examples: Optional[list] = None,
+            **kwargs
+    ):
+        self.dataset = dataset
+        self.llm = llm
+        self.is_save = is_save
+        self.save_dir = save_dir
+        self.use_external = use_external
+        self.use_few_shot = use_few_shot
+        self.few_shot_examples = few_shot_examples or []
+
+        # 安全地初始化 db_path 和 credential，检查 dataset 是否为 None
+        if db_path is not None:
+            self.db_path = db_path
+        elif dataset is not None:
+            self.db_path = dataset.db_path
+        else:
+            self.db_path = None
+
+        if credential is not None:
+            self.credential = credential
+        elif dataset is not None:
+            self.credential = dataset.credential
+        else:
+            self.credential = None
+
+    @classmethod
+    def load_external_knowledge(cls, external: Union[str, Path] = None):
+        if not external:
+            return None
+        try:
+            external = load_dataset(external)
+        except FileNotFoundError:
+            logger.debug("External file not found, treat it as content.")
+        if external and len(external) > 50:
+            external = "####[External Prior Knowledge]:\n" + external
+            return external
+        return None
+
+    @property
+    def name(self):
+        return self.NAME
+
+    def _get_db_path(self, row, db_id, db_type):
+        """
+        Get database path/identifier based on db_type.
+        Database-agnostic approach that works with get_sql_exec_result.
+        """
+        if db_type == "sqlite":
+            # For SQLite, we need the actual file path
+            if self.db_path:
+                db_path = Path(self.db_path)
+                if db_path.is_file():
+                    return str(db_path)
+                else:
+                    return str(db_path / f"{db_id}.sqlite")
+            else:
+                return row.get('path_db', f"{db_id}.sqlite")
+        elif db_type == "big_query":
+            # For BigQuery, db_path is not used, only credential_path matters
+            return row.get('project_id', db_id)
+        elif db_type == "snowflake":
+            # For Snowflake, db_path is actually the database name
+            return row.get('database_name', db_id)
+        else:
+            # For other database types, return the db_id as identifier
+            logger.debug(f"Using db_id as path for unsupported database type: {db_type}")
+            return db_id
+
+    def try_direct_parse(self, response: str) -> Optional[Dict[str, Any]]:
+        """Attempt direct JSON parsing."""
+        try:
+            return json.loads(response)
+        except json.JSONDecodeError:
+            return None
+
+    def try_extract_json(self, response: str) -> Optional[Dict[str, Any]]:
+        """Extract and parse JSON using regex patterns."""
+        json_patterns = [
+            r'\{.*\}',  # Basic JSON object
+            r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}',  # Nested JSON
+        ]
+        for pattern in json_patterns:
+            matches = re.findall(pattern, response, re.DOTALL)
+            for match in matches:
+                try:
+                    return json.loads(match)
+                except json.JSONDecodeError:
+                    continue
+        return None
+
+    def try_fix_common_issues(self, response: str) -> Optional[Dict[str, Any]]:
+        """Fix common JSON issues and attempt parsing."""
+        fixed_response = response.replace("\\", "\\\\")
+
+        # Fix unescaped quotes in SQL strings
+        sql_pattern = r'["\'](SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|WITH).*?["\']'
+
+        def escape_sql_quotes(match):
+            sql_content = match.group(0)
+            if sql_content.startswith('"') and sql_content.endswith('"'):
+                sql_content = sql_content[1:-1].replace('"', '\\"')
+                return f'"{sql_content}"'
+            elif sql_content.startswith("'") and sql_content.endswith("'"):
+                sql_content = sql_content[1:-1].replace("'", "\\'")
+                return f"'{sql_content}'"
+            return match.group(0)
+
+        fixed_response = re.sub(sql_pattern, escape_sql_quotes, fixed_response, flags=re.IGNORECASE | re.DOTALL)
+
+        # Additional fixes
+        fixed_response = re.sub(r',(\s*[}\]])', r'\1', fixed_response)
+        fixed_response = re.sub(r'(\w+):', r'"\1":', fixed_response)
+
+        try:
+            return json.loads(fixed_response)
+        except json.JSONDecodeError:
+            return None
+
+    def try_extract_sql_field(self, response: str) -> Dict[str, Any]:
+        """Extract SQL from 'sql' field as fallback."""
+        sql_match = re.search(r'"sql"\s*:\s*["\']([^"\']*(?:\\.[^"\']*)*)["\']', response, re.DOTALL)
+        if sql_match:
+            sql_content = sql_match.group(1).replace('\n', ' ').replace('\r', ' ')
+            return {"sql": sql_content}
+        return {"sql": "SELECT 1", "tables": [], "columns": [], "sql_keywords": [], "conditions": []}
+
+    def try_extract_any_sql(self, response: str) -> Dict[str, Any]:
+        """Extract any SQL-like content as last resort."""
+        sql_match = re.search(
+            r'(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|WITH).*?(?:FROM|INTO|UPDATE|DELETE|CREATE|ALTER|DROP|$)',
+            response, re.IGNORECASE | re.DOTALL)
+        if sql_match:
+            sql_content = sql_match.group(0).strip().replace('\n', ' ').replace('\r', ' ')
+            return {"sql": sql_content}
+        return {"sql": "SELECT 1", "tables": [], "columns": [], "sql_keywords": [], "conditions": []}
+
+    def parse_json_response(self, response: str) -> Dict[str, Any]:
+        """Robust JSON parsing with multiple fallback strategies."""
+        if not response or not isinstance(response, str):
+            logger.warning(f"Invalid response type: {type(response)}")
+            return {"sql": "SELECT 1", "tables": [], "columns": [], "sql_keywords": [], "conditions": []}
+
+        response = response.strip()
+
+        # Try direct parsing
+        result = self.try_direct_parse(response)
+        if result:
+            return result
+
+        # Try extracting JSON
+        result = self.try_extract_json(response)
+        if result:
+            return result
+
+        # Try fixing common issues
+        result = self.try_fix_common_issues(response)
+        if result:
+            return result
+
+        # Try extracting sql field
+        result = self.try_extract_sql_field(response)
+        if result.get("sql") != "SELECT 1":
+            return result
+
+        # Try extracting any SQL
+        result = self.try_extract_any_sql(response)
+        if result.get("sql") != "SELECT 1":
+            return result
+
+        logger.warning(f"Failed to parse JSON response: {response[:200]}...")
+        return {"sql": "SELECT 1", "tables": [], "columns": [], "sql_keywords": [], "conditions": []}
+
+    def execute_sql(self, sql, db_id, db_type, row=None):
+        """Execute SQL query and return row count, column count, and partial results."""
+        try:
+            db_path = self._get_db_path(row or {}, db_id, db_type)
+            sql_args = {
+                "db_type": db_type,
+                "sql_query": sql,
+                "db_path": db_path,
+                "db_id": db_id,
+                "credential_path": self.credential if self.credential else None
+            }
+            df, err = get_sql_exec_result(**sql_args)
+            if err:
+                return 0, 0, f"Error: {err}"
+            row_count = len(df) if df is not None else 0
+            column_count = len(df.columns) if df is not None and not df.empty else 0
+            result = str(df.head(5).to_dict(orient="records")) if df is not None else ""
+            return row_count, column_count, result
+        except Exception as e:
+            logger.error(f"Error executing SQL: {e}")
+            return 0, 0, f"Error: {str(e)}"
+
+    def get_all_tables_from_schema(self, schema_df):
+        """从schema DataFrame中获取所有表名"""
+        if schema_df is None or schema_df.empty:
+            return []
+        return schema_df['table_name'].unique().tolist()
+
+    def get_table_columns_from_schema(self, schema_df, table_name):
+        """从schema DataFrame中获取指定表的列名"""
+        if schema_df is None or schema_df.empty:
+            return []
+        table_schema = schema_df[schema_df['table_name'] == table_name]
+        return table_schema['column_name'].tolist()
+
+    def get_all_schema_from_df(self, schema_df):
+        """从schema DataFrame中获取所有schema信息"""
+        if schema_df is None or schema_df.empty:
+            return []
+        schema_list = []
+        for _, row in schema_df.iterrows():
+            schema_list.append(f"{row['table_name']}.{row['column_name']}")
+        return schema_list
+
+    def get_simple_ddl_from_schema(self, schema_df, tables=None, columns=None):
+        """从schema DataFrame生成简单的DDL，更接近原始实现"""
+        if schema_df is None or schema_df.empty:
+            return "#\n# ", {}
+
+        if tables is None:
+            tables = self.get_all_tables_from_schema(schema_df)
+
+        table_list = {}
+        simple_ddl = "#\n# "
+
+        for table in tables:
+            if columns:
+                # 从columns中筛选属于当前表的列
+                col_list = []
+                for col in columns:
+                    if '.' in col:
+                        table_part, col_part = col.split('.', 1)
+                        if table_part.lower() == table.lower():
+                            col_name = col_part.strip("`")
+                            col_list.append(col_name)
+            else:
+                col_list = self.get_table_columns_from_schema(schema_df, table)
+
+            if col_list:  # 只有当表有列时才添加
+                simple_ddl += f"{table}(" + ",".join([f"`{col}`" for col in col_list]) + ")\n# "
+                table_list[table] = [f"`{col}`" for col in col_list]
+
+        return simple_ddl.strip(), table_list
+
+    def get_ddl_data_from_schema(self, schema_df, tables, table_list, db_id=None, db_type="sqlite"):
+        """从schema DataFrame生成DDL数据信息"""
+        if schema_df is None or schema_df.empty:
+            return "# "
+
+        simplified_ddl_data = []
+        for table in tables:
+            if table not in table_list:
+                continue
+
+            col_str = ",".join(table_list[table])
+
+            # First try to get sample data from schema if available
+            table_schema = schema_df[schema_df['table_name'] == table]
+            has_sample_data = False
+
+            if not table_schema.empty:
+                # Check if we have sample_rows in schema
+                sample_rows = table_schema.iloc[0].get('sample_rows', [])
+                if isinstance(sample_rows, list) and len(sample_rows) > 0:
+                    has_sample_data = True
+                    test = ""
+                    for _, row in table_schema.iterrows():
+                        col_name = row['column_name']
+                        sample_vals = row.get('sample_rows', [])
+                        if isinstance(sample_vals, list) and len(sample_vals) > 0:
+                            vals = [str(sample_vals[i]) if i < len(sample_vals) else "" for i in
+                                    range(min(3, len(sample_vals)))]
+                        else:
+                            vals = ["", "", ""]
+                        test += f"{col_name}[{','.join(vals)}],"
+
+                    if test:
+                        simplified_ddl_data.append(f"{table}({test[:-1]})")
+                        continue
+
+            # If no sample data in schema and db_id provided, query database
+            if not has_sample_data and db_id is not None:
+                try:
+                    sql = f"SELECT {col_str} FROM `{table}` LIMIT 3"
+                    sql_args = {
+                        "db_type": db_type,
+                        "sql_query": sql,
+                        "db_path": self._get_db_path({}, db_id, db_type),
+                        "db_id": db_id,
+                        "credential_path": self.credential
+                    }
+                    df, err = get_sql_exec_result(**sql_args)
+                    if err or df is None:
+                        continue
+
+                    col_names = df.columns.tolist()
+                    data_rows = df.values.tolist()
+                    test = ""
+                    for idx, col in enumerate(col_names):
+                        vals = [str(data_rows[r][idx]) if r < len(data_rows) else "" for r in range(3)]
+                        test += f"{col}[{','.join(vals)}],"
+
+                    if test:
+                        simplified_ddl_data.append(f"{table}({test[:-1]})")
+                except Exception as e:
+                    logger.warning(f"Failed to get sample data for table {table}: {e}")
+                    continue
+
+        ddls_data = "# " + ";\n# ".join(simplified_ddl_data) + ";\n# "
+        return ddls_data
+
+    def get_foreign_key_from_schema(self, schema_df, tables=None):
+        """从schema DataFrame中提取外键信息，参考 parse_schema_from_df 的外键加载逻辑"""
+        if schema_df is None or schema_df.empty:
+            return "#\n# "
+
+        if tables is None:
+            tables = self.get_all_tables_from_schema(schema_df)
+
+        foreign_key_lines = []
+        for _, row in schema_df.iterrows():
+            table_name = row.get('table_name', '')
+            col_name = row.get('column_name', '')
+            if table_name not in tables:
+                continue
+
+            # 格式1: foreign_key 为字符串，如 "[ref_table.ref_col]"（参考 parse_schema_from_df）
+            foreign_key = row.get("foreign_key", "")
+            if foreign_key and isinstance(foreign_key, str):
+                keys = re.findall(r"\[(.*?)\]", foreign_key)
+                for key in keys:
+                    foreign_key_lines.append(f"{table_name}({col_name}) references {key}")
+            else:
+                # 格式2: foreign_key_table + foreign_key_column 分开存储
+                fk_table = row.get("foreign_key_table") or row.get("referenced_table")
+                fk_col = row.get("foreign_key_column") or row.get("referenced_column")
+                if fk_table and fk_col and str(fk_table).strip() and str(fk_col).strip():
+                    foreign_key_lines.append(f"{table_name}({col_name}) references {fk_table}.{fk_col}")
+
+        if foreign_key_lines:
+            return "# " + ";\n# ".join(foreign_key_lines) + ";\n# "
+        return "#\n# "
+
+    def get_explanation_from_schema(self, schema_df, tables, columns):
+        """从schema DataFrame中获取列描述信息"""
+        if schema_df is None or schema_df.empty:
+            return ""
+
+        explanation = ""
+        columns_lower = [col.replace("`", "").lower() for col in columns]
+
+        for _, row in schema_df.iterrows():
+            table_name = row['table_name']
+            col_name = row['column_name']
+            col_desc = row.get('column_descriptions', '')
+
+            if table_name in tables and f"{table_name}.`{col_name}`".lower() in columns_lower:
+                if col_desc:
+                    explanation += f"# {table_name}.{col_name}: {col_desc}\n"
+
+        return explanation
+
+    def get_enhanced_explanation_from_schema(self, schema_df, tables, columns, db_id=None):
+        """增强的列描述信息获取，包含更多语义信息"""
+        if schema_df is None or schema_df.empty:
+            return ""
+
+        explanation = ""
+        columns_lower = [col.replace("`", "").lower() for col in columns]
+
+        for _, row in schema_df.iterrows():
+            table_name = row['table_name']
+            col_name = row['column_name']
+            col_desc = row.get('column_descriptions', '')
+            col_type = row.get('column_type', '')
+
+            if table_name in tables and f"{table_name}.`{col_name}`".lower() in columns_lower:
+                # 构建更详细的列描述
+                desc_parts = []
+                if col_desc:
+                    desc_parts.append(col_desc)
+                if col_type:
+                    desc_parts.append(f"Type: {col_type}")
+                
+                if desc_parts:
+                    explanation += f"# {table_name}.{col_name}: {' | '.join(desc_parts)}\n"
+
+        return explanation
+
+    def select_few_shot_examples(self, question, k=3):
+        """简化的few-shot示例选择，基于关键词匹配"""
+        if not self.few_shot_examples or k == 0:
+            return ""
+        
+        # 简单的关键词匹配选择
+        question_words = set(question.lower().split())
+        scored_examples = []
+        
+        for example in self.few_shot_examples:
+            if 'question' in example and 'sql' in example:
+                example_words = set(example['question'].lower().split())
+                # 计算词汇重叠度
+                overlap = len(question_words.intersection(example_words))
+                if overlap > 0:
+                    scored_examples.append((overlap, example))
+        
+        # 按重叠度排序，选择前k个
+        scored_examples.sort(key=lambda x: x[0], reverse=True)
+        selected_examples = [ex[1] for ex in scored_examples[:k]]
+        
+        if not selected_examples:
+            return ""
+        
+        # 格式化示例
+        formatted_examples = "### Some example pairs of question and corresponding SQL query are provided based on similar problems:\n"
+        for example in selected_examples:
+            formatted_examples += f"\n### {example['question'].replace(chr(10), ' ').strip()}\n{example['sql'].replace(chr(10), ' ').strip()}"
+        
+        return formatted_examples
+
+    def table_column_selection(self, table_info, question, evidence):
+        prompt = table_info.strip() + '\n\n### definition: ' + evidence + "\n### Question: " + question + "\n\nReturn your answer in JSON format as specified."
+        response = self.llm.complete(TABLE_AUG_INSTRUCTION + "\n" + prompt).text
+        return self.parse_json_response(response)
+
+    def preliminary_sql_gen(self, table_info, table_column, example, question, evidence, sub_questions: str = ""):
+        table_info += f'### tables: {table_column["tables"]}\n'
+        table_info += f'### columns: {table_column["columns"]}\n'
+        question_part = "### definition: " + evidence
+        if isinstance(sub_questions, str) and sub_questions.strip():
+            question_part += f"\n### Sub-questions (decomposition for reference):\n{sub_questions.strip()}"
+        question_part += "\n### Question: " + question + "\n\nReturn your answer in JSON format as {\"sql\": \"your sql\"}."
+        prompt = example.strip() + "\n\n### Answer the question by sqlite SQL query only and with no explanation. You must minimize SQL execution time while ensuring correctness.\n" + table_info.strip() + "\n\n" + question_part
+        response = self.llm.complete(SQL_GENERATION_INSTRUCTION + "\n" + prompt).text
+        return self.parse_json_response(response)['sql'].replace('\n', ' ')
+
+    def extract_from_text(self, text, db_schema):
+        """Extract schema links from text (evidence or SQL) using column name matching."""
+        pred = []
+        if not text or not db_schema:
+            return {"tables": [], "columns": []}
+        
+        text_lower = text.lower()
+        for item in db_schema:
+            try:
+                if '.' not in item:
+                    continue
+                parts = item.split('.')
+                if len(parts) < 2:
+                    continue
+                table, column = parts[0].lower(), '.'.join(parts[1:]).lower()
+                if table == 'sqlite_sequence':
+                    continue
+                # More flexible column matching - 改进匹配策略
+                column_clean = column.strip('`').strip()
+                # 检查列名是否在文本中，支持部分匹配
+                if column_clean in text_lower or any(word in text_lower for word in column_clean.split('_')):
+                    pred.append(item)
+            except (ValueError, AttributeError) as e:
+                logger.debug(f"Skipping malformed schema item {item}: {e}")
+                continue
+        
+        pred = list(set(pred))
+        tables = list(set([p.split('.')[0] for p in pred if '.' in p]))
+        columns = []
+        for p in pred:
+            if '.' in p:
+                table_part, col_part = p.split('.', 1)
+                if not col_part.startswith('`'):
+                    col_part = '`' + col_part
+                if not col_part.endswith('`'):
+                    col_part = col_part + '`'
+                columns.append(f"{table_part}.{col_part}")
+        return {"tables": tables, "columns": columns}
+
+    def merge_schema_links(self, sl_sql, sl_llm, sl_hint):
+        tables = list(set(sl_llm['tables'] + sl_sql['tables'] + sl_hint['tables']))
+        columns = list(set(sl_llm['columns'] + sl_sql['columns'] + sl_hint['columns']))
+        return {"tables": [t.lower() for t in tables], "columns": [c.lower() for c in columns]}
+
+    def filter_schema_links(self, schema_links, db_schema):
+        """Filter schema links to ensure they exist in the actual database schema."""
+        if not schema_links or not db_schema:
+            return {"tables": [], "columns": []}
+        
+        pred = []
+        db_schema_lower = [s.lower() for s in db_schema if s]
+        
+        for col in schema_links.get('columns', []):
+            if not col:
+                continue
+            col_clean = col.replace('`', '').lower().strip()
+            for sch in db_schema:
+                if sch and sch.lower() == col_clean:
+                    pred.append(sch)
+                    break
+        
+        pred = list(set(pred))
+        tables = list(set([p.split('.')[0] for p in pred if '.' in p and p.split('.')[0]]))
+        columns = []
+        for p in pred:
+            if '.' in p:
+                table_part, col_part = p.split('.', 1)
+                if not col_part.startswith('`'):
+                    col_part = '`' + col_part
+                if not col_part.endswith('`'):
+                    col_part = col_part + '`'
+                columns.append(f"{table_part}.{col_part}")
+        
+        return {"tables": tables, "columns": columns}
+
+    def key_word_augmentation(self, table_info, question, evidence):
+        prompt = table_info.strip() + '\n\n### definition: ' + evidence + "\n### Question: " + question + "\n\nReturn your answer in JSON format as specified."
+        response = self.llm.complete(KEY_WORD_AUG_INSTRUCTION + "\n" + prompt).text
+        return self.parse_json_response(response)
+
+    def condition_augmentation(self, question):
+        prompt = question + "\n\nReturn your answer in JSON format as specified."
+        response = self.llm.complete(CONDITION_AUG_INSTRUCTION + "\n" + prompt).text
+        return self.parse_json_response(response)
+
+    def sql_generation_aug(self, table_info, table_aug, word_aug, cond_aug, example, question, evidence, sub_questions: str = ""):
+        table_info += f'\n### sql_keywords: {word_aug["sql_keywords"]}\n'
+        table_info += f'### tables: {table_aug["tables"]}\n'
+        table_info += f'### columns: {table_aug["columns"]}\n'
+        table_info += f'### conditions: {cond_aug["conditions"]}'
+        question_part = "### definition: " + evidence
+        if isinstance(sub_questions, str) and sub_questions.strip():
+            question_part += f"\n### Sub-questions (decomposition for reference):\n{sub_questions.strip()}"
+        question_part += "\n### Question: " + question + "\n\nReturn your answer in JSON format as {\"sql\": \"your sql\"}."
+        prompt = example.strip() + '\n\n### Answer the question by sqlite SQL query only and with no explanation. You must minimize SQL execution time while ensuring correctness.\n' + table_info.strip() + "\n\n" + question_part
+        response = self.llm.complete(SQL_GENERATION_INSTRUCTION + "\n" + prompt).text
+        return self.parse_json_response(response)['sql'].replace('\n', ' ')
+
+    def binary_selection(self, table_info, sql1, re1, sql2, re2):
+        candidate_sql = f"### sql1: {sql1} \n### result1: {re1} \n### sql2: {sql2} \n### result2: {re2}"
+        prompt = table_info + "\n\n### Select the best SQL query to answer the question:\n" + candidate_sql + "\n\nReturn your answer in JSON format as {\"sql\": \"your selected or new sql\"}."
+        response = self.llm.complete(BINARY_PROMPT.format(table_info=table_info, candidate_sql=candidate_sql)).text
+        return self.parse_json_response(response)['sql'].replace('\n', ' ')
+
+    def self_correction(self, table_info, pre_sql, db_id, db_type, row=None):
+        """增强的self-correction机制，更接近原始实现"""
+        # 构建初始prompt，包含完整的上下文信息
+        initial_prompt = SELF_CORRECTION_PROMPT + '\n' + table_info + '\n\nReturn your answer in JSON format as {"sql": "your sql"}.'
+        
+        num = 0
+        max_iterations = 5
+        conversation_history = []
+        
+        while num < max_iterations:
+            try:
+                row_count, column_count, result = self.execute_sql(pre_sql, db_id, db_type, row)
+            except Exception as e:
+                logger.error(f"SQL execution error: {e}")
+                break
+            
+            # 如果SQL执行成功（有结果），则停止修正
+            if row_count > 0 or column_count > 0:
+                break
+                
+            # 构建修正prompt
+            if num == 0:
+                # 第一次尝试，使用完整prompt
+                current_prompt = initial_prompt
+            else:
+                # 后续尝试，使用对话式修正
+                current_prompt = f"### Buggy SQL: {pre_sql.strip()}\n### The result of the buggy SQL is [{result.strip()}]. Please fix the SQL to get the correct result.\n\nReturn your answer in JSON format as {{\"sql\": \"your corrected sql\"}}."
+            
+            # 使用对话式API进行修正
+            if hasattr(self.llm, 'chat_complete'):
+                # 如果LLM支持对话式API
+                conversation_history.append({"role": "user", "content": current_prompt})
+                response = self.llm.chat_complete(conversation_history).text
+                conversation_history.append({"role": "assistant", "content": response})
+            else:
+                # 回退到单次调用
+                response = self.llm.complete(current_prompt).text
+            
+            sql_dict = self.parse_json_response(response)
+            pre_sql = sql_dict['sql'].strip()
+            num += 1
+            
+        return pre_sql.replace('\n', ' ')
+
+    def act(
+            self,
+            item,
+            schema: Union[str, PathLike, Dict, List] = None,
+            schema_links: Union[str, List[str]] = None,
+            sub_questions: Union[str, List[str], Dict] = None,
+            data_logger=None,
+            **kwargs
+    ):
+        """Generate predicted SQL for the given dataset item using RSLSQL methodology."""
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
+        logger.info(f"RSLSQLGenerator processing item {item}")
+        row = self.dataset[item]
+        question = row['question']
+        db_id = row['db_id']
+        db_type = row.get('db_type', 'sqlite')
+        evidence = row.get('evidence', '') or (self.load_external_knowledge(row.get('external', None)) or '') if self.use_external else ''
+        # 优先使用动态选择的few-shot示例，回退到静态示例
+        if self.use_few_shot:
+            dynamic_example = self.select_few_shot_examples(question, k=3)
+            static_example = load_dataset(row.get('reasoning_examples', ''))
+            example = dynamic_example or static_example or ''
+        else:
+            example = ''
+        evidence = evidence or ''
+
+        # Load and process schema - 参考DINSQLGenerate的实现
+        logger.debug("Processing database schema...")
+        if isinstance(schema, (str, PathLike)) and Path(schema).exists():
+            schema = load_dataset(schema)
+
+        if schema is None:
+            instance_schema_path = row.get("instance_schemas")
+            if instance_schema_path:
+                schema = load_dataset(instance_schema_path)
+                logger.debug(f"Loaded schema from: {instance_schema_path}")
+            else:
+                logger.debug("Fetching schema from dataset")
+                schema = self.dataset.get_db_schema(item)
+
+            if schema is None:
+                raise ValueError("Failed to load a valid database schema for the sample!")
+
+        # Normalize schema type
+        if isinstance(schema, dict):
+            schema = single_central_process(schema)
+        if isinstance(schema, list):
+            schema = pd.DataFrame(schema)
+
+        if isinstance(schema, pd.DataFrame):
+            schema_df = schema
+        else:
+            raise ValueError("Invalid schema format")
+
+        if sub_questions is not None:
+            sub_questions = format_sub_questions(sub_questions, output_type="C")
+
+        # Step 1: Preliminary SQL - 使用schema DataFrame而不是直接访问数据库
+        if schema_links is None:
+            schema_link_path = row.get("schema_links", None)
+            if schema_link_path:
+                schema_links = load_dataset(schema_link_path)
+                if not isinstance(schema_links, str):
+                    schema_links = normalize_schema_links(schema_links, "B")
+                    logger.debug(f"Loaded schema links from: {schema_link_path}")
+
+        try:
+            simple_ddl, _ = self.get_simple_ddl_from_schema(schema_df)
+            ddl_data = self.get_ddl_data_from_schema(schema_df, self.get_all_tables_from_schema(schema_df),
+                                                     {t: self.get_table_columns_from_schema(schema_df, t) for t in
+                                                      self.get_all_tables_from_schema(schema_df)}, db_id, db_type)
+            foreign_key = self.get_foreign_key_from_schema(schema_df)
+            table_info = f'### Sqlite SQL tables, with their properties:\n{simple_ddl}\n### Here are some data information about database references.\n{ddl_data}\n### Foreign key information of Sqlite SQL tables, used for table joins:\n{foreign_key}'
+            if schema_links is None or isinstance(schema_links, str):
+                logger.debug("Generating schema links using RSL-SQL")
+                table_column = self.table_column_selection(table_info, question, evidence)
+            else:
+                table_column = schema_links
+
+            pre_sql = self.preliminary_sql_gen(table_info, table_column, example, question, evidence, sub_questions or "")
+        except Exception as e:
+            logger.error(f"Error in preliminary SQL generation: {e}")
+            # Fallback to a simple SQL
+            pre_sql = "SELECT 1"
+            table_column = {"tables": [], "columns": []}
+
+        # Bidirectional Schema Linking
+        try:
+            db_schema = self.get_all_schema_from_df(schema_df)
+            sl_hint = self.extract_from_text(evidence, db_schema)
+            sl_sql = self.extract_from_text(pre_sql, db_schema)
+            sl_llm = table_column
+            schema_links = self.merge_schema_links(sl_sql, sl_llm, sl_hint)
+            schema_links = self.filter_schema_links(schema_links, db_schema)
+        except Exception as e:
+            logger.error(f"Error in schema linking: {e}")
+            schema_links = {"tables": [], "columns": []}
+
+        # Step 2: Information Augmentation
+        try:
+            simple_ddl, table_list = self.get_simple_ddl_from_schema(schema_df, schema_links['tables'],
+                                                                     schema_links['columns'])
+            ddl_data = self.get_ddl_data_from_schema(schema_df, schema_links['tables'], table_list, db_id, db_type)
+            foreign_key = self.get_foreign_key_from_schema(schema_df, schema_links['tables'])
+            # 使用增强的列描述信息
+            explanation = self.get_enhanced_explanation_from_schema(schema_df, schema_links['tables'], schema_links['columns'], db_id)
+            table_info_aug = f'### Sqlite SQL tables, with their properties:\n{simple_ddl}\n### Here are some data information about database references.\n{ddl_data}\n### Foreign key information of Sqlite SQL tables, used for table joins:\n{foreign_key}\n### The meaning of every column:\n#\n{explanation.strip()}\n#\n'
+
+            table_aug = self.table_column_selection(table_info_aug, question, evidence)  # Similar to table_augmentation
+            word_aug = self.key_word_augmentation(table_info_aug, question, evidence)
+            cond_aug = self.condition_augmentation(question)
+            sql2 = self.sql_generation_aug(table_info_aug, table_aug, word_aug, cond_aug, example, question, evidence, sub_questions or "")
+        except Exception as e:
+            logger.error(f"Error in information augmentation: {e}")
+            # Fallback values
+            table_aug = {"tables": [], "columns": []}
+            word_aug = {"sql_keywords": []}
+            cond_aug = {"conditions": []}
+            sql2 = "SELECT 1"
+
+        # Step 3: Binary Selection
+        try:
+            r1, c1, re1 = self.execute_sql(pre_sql, db_id, db_type, row)
+            r2, c2, re2 = self.execute_sql(sql2, db_id, db_type, row)
+            selected_sql = self.binary_selection(table_info_aug, pre_sql, re1, sql2, re2)
+        except Exception as e:
+            logger.error(f"Error in binary selection: {e}")
+            selected_sql = pre_sql
+
+        # Step 4: Self Correction
+        try:
+            # 构建完整的self-correction上下文，包含所有增强信息
+            full_table_info = table_info_aug + f'\n### sql_keywords: {word_aug["sql_keywords"]}\n### conditions: {cond_aug["conditions"]}'
+            pred_sql = self.self_correction(
+                full_table_info,
+                selected_sql,
+                db_id,
+                db_type,
+                row
+            )
+        except Exception as e:
+            logger.error(f"Error in self correction: {e}")
+            pred_sql = selected_sql
+
+        pred_sql = self.save_output(pred_sql, item, row.get("instance_id"))
+
+        if data_logger:
+            data_logger.info(f"{self.NAME}.final_sql | sql={pred_sql}")
+            data_logger.info(f"{self.NAME}.act end | item={item}")
+        return pred_sql

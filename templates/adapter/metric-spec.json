@@ -1,0 +1,38 @@
+{
+  "owner": "metric-adapter",
+  "slug": "<slug>",
+  "target_dataset": "<dataset>",
+  "metric_id": "<metric_id>",
+  "enabled": false,
+  "confirmed_by_user": false,
+  "applicability": {
+    "scope": "",
+    "requires_official_metric": false,
+    "limitations": []
+  },
+  "inputs": {
+    "gold": "",
+    "prediction": "",
+    "database": "",
+    "schema": "",
+    "artifacts": []
+  },
+  "dependencies": {
+    "python_packages": [],
+    "external_scripts": [],
+    "environment": []
+  },
+  "output_schema": {
+    "scores_key": "external_metrics.<metric_id>",
+    "aggregate": {},
+    "per_sample": []
+  },
+  "config_snippet": {
+    "external_eval": {
+      "enabled": false,
+      "adapters": []
+    }
+  },
+  "notes": "",
+  "verification": []
+}

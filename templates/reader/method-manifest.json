@@ -1,0 +1,44 @@
+{
+  "slug": "<slug>",
+  "type": "method",
+  "source_path": "<candidate_path>",
+  "target_datasets": ["<dataset>"],
+  "pipeline": {
+    "exec_process": ["generate"],
+    "standalone_fallback": false,
+    "standalone_reason": ""
+  },
+  "integration": {
+    "dag": {
+      "llm_provider": [],
+      "embedding": [],
+      "prompt": ["llm_provider"],
+      "rag": ["embedding"],
+      "external": [],
+      "actor": ["prompt", "rag", "external"],
+      "workflow": ["actor"],
+      "adapter": ["llm_provider", "embedding", "prompt", "rag", "external", "workflow"]
+    },
+    "notes": ""
+  },
+  "components": {
+    "llm": [],
+    "embedding": [],
+    "prompt": [],
+    "rag": [],
+    "few_shot": [],
+    "external": [],
+    "actor": {
+      "generator": [],
+      "parser": [],
+      "reducer": [],
+      "scaler": [],
+      "decomposer": [],
+      "optimizer": [],
+      "selector": [],
+      "agent": []
+    },
+    "config": []
+  },
+  "open_questions": []
+}

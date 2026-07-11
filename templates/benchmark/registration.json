@@ -1,0 +1,15 @@
+{
+  "id": "<benchmark_slug>",
+  "root_path": "../benchmarks/<benchmark_slug>",
+  "db_type": "sqlite",
+  "has_sub": true,
+  "external": false,
+  "database": true,
+  "sub_data": [
+    {
+      "sub_id": "dev",
+      "has_label": true,
+      "use_local_database": true
+    }
+  ]
+}

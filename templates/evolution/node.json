@@ -1,0 +1,17 @@
+{
+  "node_id": "n001_<short_name>",
+  "parent_id": "baseline",
+  "branch_id": 1,
+  "stage": "improve",
+  "method": "<method>",
+  "benchmark": "<benchmark>",
+  "target_dimensions": [],
+  "change_scope": "prompt",
+  "allowed_scope": [],
+  "plan_path": "change-plan.md",
+  "patch_path": "patch.diff",
+  "run_command_path": "run-command.sh",
+  "fitness": null,
+  "status": "planned",
+  "decision": "candidate"
+}

@@ -1,0 +1,12 @@
+{
+  "run_id": "<run_id>",
+  "stage": "<stage>",
+  "task_id": "<task_id>",
+  "metrics": {
+    "<metric_name>": {
+      "avg": 0.0,
+      "available": true
+    }
+  },
+  "per_sample": []
+}

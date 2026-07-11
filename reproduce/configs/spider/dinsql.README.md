@@ -1,0 +1,56 @@
+# spider/dinsql
+
+<!--
+Generated fields are bracketed by markers so tools can refresh them from the
+reproduce config. Keep manual notes outside generated blocks.
+-->
+
+<!-- SQURVE:CONFIG-README:BEGIN -->
+| Field | Value |
+|---|---|
+| Config | `reproduce/configs/spider/dinsql.json` |
+| Dataset | `spider` |
+| Method | `dinsql` |
+| Run identifier | `spider-dinsql` |
+| Data source | `spider:dev:` |
+| Schema source | `spider:dev` |
+| LLM provider | `qwen` |
+| LLM model | `deepseek-v4-flash` |
+| Generate num | `1` |
+| Checkpoint | `enabled, interval=10` |
+
+## Run
+
+From the repository root:
+
+```bash
+python reproduce/run.py spider dinsql
+```
+
+For smoke/debug runs, prefer changing only the third `data_source` segment (`<benchmark>:<split>:<filter>`) in the config, then run the same command.
+
+## Workflow
+
+| Task | Type | Actor binding | Eval | Snapshot |
+| --- | --- | --- | --- | --- |
+| generate | GenerateTask | generate_type=DINSQLGenerator | execute_accuracy | `../files/datasets/spider_dinsql.json` |
+
+## Outputs
+
+| Name | Kind | Path |
+| --- | --- | --- |
+| generate | stage | `../files/datasets/spider_dinsql.json` |
+<!-- SQURVE:CONFIG-README:END -->
+
+## Project Notes
+
+- Purpose:
+- Candidate/source reference:
+- Expected run scale:
+- Known prerequisites:
+
+## Validation
+
+```bash
+python tools/verify.py reproduce-contract --path reproduce/configs/spider/dinsql.json
+```

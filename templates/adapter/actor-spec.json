@@ -1,0 +1,30 @@
+{
+  "layer": "generator",
+  "status": "draft",
+  "actors": [
+    {
+      "class_name": "<ClassName>",
+      "file_path": "core/actor/generator/<ClassName>.py",
+      "source_files": ["<candidate_file.py>"],
+      "inputs": ["question", "schema"],
+      "outputs": ["pred_sql"],
+      "io_artifact": "pred_sql",
+      "notes": ""
+    }
+  ],
+  "task_meta": [
+    {
+      "task_id": "<slug>_generate",
+      "task_type": "GenerateTask",
+      "dataset_save_path": "files/datasets/<slug>_generate.json",
+      "is_save_dataset": true,
+      "eval_type": ["execute_accuracy"],
+      "meta": {
+        "task": {
+          "generate_type": "<ClassName>"
+        }
+      }
+    }
+  ],
+  "verification": []
+}

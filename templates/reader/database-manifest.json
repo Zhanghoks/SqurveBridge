@@ -1,0 +1,35 @@
+{
+  "slug": "<slug>",
+  "type": "database",
+  "source_path": "<candidate_path>",
+  "target_datasets": ["<dataset>"],
+  "integration": {
+    "dag": {
+      "dataset": [],
+      "schema": ["dataset"],
+      "benchmark_data": ["dataset", "schema"],
+      "sysconfig": ["benchmark_data"],
+      "embedding": [],
+      "rag": ["embedding"],
+      "few_shot": [],
+      "external": [],
+      "db_backend": [],
+      "credential": ["db_backend"],
+      "adapter": ["benchmark_data", "sysconfig", "schema", "rag", "few_shot", "external", "credential"]
+    },
+    "notes": ""
+  },
+  "components": {
+    "dataset": [],
+    "schema": [],
+    "database_files": [],
+    "benchmark_meta": [],
+    "embedding": [],
+    "rag": [],
+    "few_shot": [],
+    "external": [],
+    "db_backend": [],
+    "credential": []
+  },
+  "open_questions": []
+}
