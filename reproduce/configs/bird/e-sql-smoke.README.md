@@ -27,9 +27,7 @@ From the repository root:
 python reproduce/run.py bird e-sql-smoke
 ```
 
-This config uses the registered BIRD development split. Control smoke/debug
-sampling with `SQURVE_EVAL_SAMPLE_LIMIT`, `SQURVE_EVAL_SAMPLE_MODE`, and
-`SQURVE_EVAL_SAMPLE_SEED` rather than a machine-local JSON slice.
+For smoke/debug runs, prefer changing only the third `data_source` segment (`<benchmark>:<split>:<filter>`) in the config, then run the same command.
 
 ## Workflow
 

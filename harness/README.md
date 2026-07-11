@@ -1,59 +1,65 @@
-# Squrve Harness
+# Integration Harness
 
-Squrve follows the ARIS skill model: a command is a `SKILL.md` with frontmatter.
-There is no separate `commands/` source tree.
+The SqurveBridge integration harness converts released Text-to-SQL methods and
+external benchmarks into native, runnable platform artifacts.
 
-Workbench source:
+It has three implementation surfaces:
+
+| Surface | Responsibility |
+| --- | --- |
+| `skills/` | Semantic integration contracts and review gates |
+| `tools/` | Deterministic validation and state transitions |
+| `templates/` | Manifests, configuration schemas, and evidence layouts |
+
+## Method Path
+
+A method adapter reads a released implementation as algorithm documentation,
+extracts its reasoning flow and data assumptions, and rewrites that behavior with
+Squrve Actor interfaces. The resulting workflow does not import or execute the
+candidate repository.
 
 ```text
-skills/      SKILL.md contracts, discovered as slash commands
-tools/       deterministic helper scripts
-templates/   reusable text artifacts
+released method
+  -> source and I/O analysis
+  -> native Actor components
+  -> registered Actor pipeline
+  -> runnable reproduction configuration
 ```
 
-Runtime factory:
+## Benchmark Path
+
+A benchmark adapter normalizes databases, schema metadata, questions, gold SQL,
+splits, execution settings, and evaluation assumptions into the shared benchmark
+contract.
 
 ```text
-.claude/skills/<name> -> ../../skills/<name>
-.agents/skills/<name> -> ../../skills/<name>
-.squrve/tools         -> ../tools
-.squrve/templates     -> ../templates
+external benchmark
+  -> source and license review
+  -> normalized dataset/schema/database layout
+  -> benchmark registration
+  -> runnable reproduction configuration
 ```
 
-## Setup
+## Deterministic Gates
 
-Run from the Squrve repo root:
+Before a configuration is considered runnable, the harness checks registration,
+Actor imports, data and schema sources, stage snapshots, evaluation types, and the
+declared execution process. Use:
+
+```bash
+python tools/verify.py reproduce-contract --path reproduce/configs/spider/c3sql.json
+```
+
+The harness preserves intermediate manifests and decisions so integration evidence
+can be reviewed independently of an agent session.
+
+## Local Skill Installation
+
+The repository can expose the same contracts to compatible coding agents through
+local symlinks:
 
 ```bash
 bash harness/install_squrve_harness.sh .
 ```
 
-The setup is local to this workbench. It removes stale runtime files under
-`.claude/` and `.agents/`, then recreates flat per-skill symlinks. This mirrors
-ARIS: the host scans one level under `.claude/skills/` or `.agents/skills/`,
-parses each `SKILL.md` frontmatter, and registers `/name`.
-
-## Check
-
-```bash
-bash harness/update_squrve_harness.sh --project .
-```
-
-## Design Rule
-
-If a capability should be invokable, put it in `skills/<name>/SKILL.md`.
-If it needs deterministic code, keep single-owner helpers under
-`skills/<name>/scripts/`; shared helpers stay in `tools/`. Reusable text
-artifacts live in `templates/`.
-
-## Harness State
-
-The integration state machine is owned by `tools/artifact_state.py` and explained in [docs/harness-state-machine.md](../docs/harness-state-machine.md).
-
-Short version:
-
-```text
-candidate-reader -> state.json + manifest.json -> integration-pipeline -> adapter done -> run
-```
-
-Skills describe workflow and review gates. Tools own deterministic status transitions, DAG scheduling, branch checks, cascade resets, and validation.
+This installation helper is not required to run an existing reproduction config.

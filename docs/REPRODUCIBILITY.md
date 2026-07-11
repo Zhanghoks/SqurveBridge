@@ -1,68 +1,94 @@
-# Reproducible Evaluation
+# Reproducibility and Recorded Evidence
 
-Public demo evaluation boundary for SqurveBridge. Historical local runs from
-other machines are not part of this package.
+SqurveBridge treats a reproduction configuration and its persisted outputs as the
+source of truth. Terminal output and chat history are not evaluation evidence.
 
-## Prerequisites
+## Reproduction Unit
 
-- Python 3.11 or newer
-- Node.js 20 or newer (live demo)
-- Bundled benchmarks under `benchmarks/spider/` and `benchmarks/bird/`
-- Provider credentials in a local, Git-ignored `.env`
+One run must identify:
 
-Start from `.env.example`. Never place a real key in a reproduce config or a
-tracked file.
+1. method, benchmark, and split;
+2. sample scope and random seed;
+3. provider, model, and workflow configuration;
+4. evaluator and metric definitions; and
+5. the output directory containing the resulting evidence.
 
-## Start the workspace
+Do not compare runs that differ on these fields without labeling the difference.
 
-From the package root:
+## Configuration Validation
+
+Run deterministic checks before spending inference tokens:
 
 ```bash
-./demo/start.sh
+python tools/verify.py reproduce-contract --path reproduce/configs/spider/c3sql.json
+python tools/verify.py reproduce-contract --path reproduce/configs/bird/e-sql-smoke.json
 ```
 
-Or manually:
+## Bundled Configurations
+
+| Configuration | Role | Data source |
+| --- | --- | --- |
+| `spider/c3sql` | C3SQL three-stage workflow | `spider:dev:200` |
+| `bird/e-sql-smoke` | E-SQL BIRD example | `bird:dev:` |
+
+Inspect the JSON before running. Provider calls incur cost, and parallel settings
+can increase request volume.
 
 ```bash
-.venv/bin/python demo/api_server.py
-```
-
-In a second terminal:
-
-```bash
-cd demo-app
-npm ci
-npm run dev
-```
-
-Open `http://127.0.0.1:5173`.
-
-## Defaults
-
-| Setting | Value |
-|---------|-------|
-| Dataset | `spider` |
-| Split | `dev` |
-| Method | `c3sql` |
-| Provider | DeepSeek (via `DEEPSEEK_API_KEY` or UI) |
-
-## Sampling contract
-
-- Default UI sample: first or random 100 rows (`slice` / `random` + seed).
-- CLI uses configs under `reproduce/configs/spider/` and `reproduce/configs/bird/`.
-
-## CLI
-
-```bash
+cp .env.example .env
 python reproduce/run.py spider c3sql
 python reproduce/run.py bird e-sql-smoke
 ```
 
-## Agent harness
+## Four-Layer Score Bundle
 
-Integration skills live under `skills/`; deterministic helpers under `tools/`.
-Install runtime symlinks with:
+The unified evaluation system records evidence at four diagnostic layers:
 
-```bash
-bash harness/install_squrve_harness.sh .
-```
+| Layer | Evidence | Interpretation |
+| --- | --- | --- |
+| L1 SQL Quality | EX, EM, SF1, VES, RVES when configured | Correctness and valid efficiency |
+| L2 Runtime Cost | Token usage, mean/p95 Actor latency | Operational cost of the workflow |
+| L3 Structure | SQL-component CF1 and feature deltas | Clause-level strengths and weaknesses |
+| L4 Errors | Deterministic attribution labels | Concrete diagnostic categories for failed samples |
+
+Not every configuration enables every metric. Missing evidence must remain missing;
+it must not be reconstructed from unrelated runs.
+
+## Persisted Outputs
+
+Depending on the run mode and configuration, outputs include:
+
+| Artifact | Purpose |
+| --- | --- |
+| `scores.json` | Aggregate score bundle and diagnostic summaries |
+| stage dataset snapshots | Inputs and outputs at Actor boundaries |
+| workflow trace | Stage timing, row changes, and errors |
+| detailed report | Human-readable evaluation evidence |
+| evaluation store | Queryable sample- and run-level records |
+
+Runtime files are written below ignored `files/` and `artifacts/` directories. A
+paper result is reproducible only when its configuration and concrete run artifacts
+are retained together.
+
+## Sampling
+
+The reproduction configuration controls the dataset source. Optional evaluation
+sampling uses:
+
+- `SQURVE_EVAL_SAMPLE_LIMIT`
+- `SQURVE_EVAL_SAMPLE_MODE`
+- `SQURVE_EVAL_SAMPLE_SEED`
+
+Record all three values with any reported slice. A smoke or bounded run is not a
+full-split result.
+
+## Evidence Boundaries
+
+- **Source-aligned reproduction** requires the same method, origin benchmark,
+  split, model, and evaluation protocol as the source result.
+- **Cross-benchmark execution** shows that an integrated method runs on another
+  normalized benchmark; it is not source alignment.
+- **Metric-guided loop evidence** requires a baseline, candidate checkpoints,
+  accept/reject decisions, and target plus monitor results.
+- Never merge values from separate runs into a single result row without an
+  explicit aggregation rule.

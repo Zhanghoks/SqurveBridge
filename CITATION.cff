@@ -1,15 +1,13 @@
 cff-version: 1.2.0
 message: "If you use SqurveBridge in research, please cite it using the metadata below."
-title: "SqurveBridge: A Platform for Cross-Domain Text-to-SQL Evaluation"
+title: "SqurveBridge: A Harness-Centered Platform for Cross-Domain Text-to-SQL Evaluation and Metric-Guided Loop Engineering"
 authors:
-  - family-names: Anonymous
-    given-names: Authors
+  - family-names: Zhanghoks
 year: 2026
 license: MIT
 preferred-citation:
   type: article
-  title: "SqurveBridge: A Platform for Cross-Domain Text-to-SQL Evaluation"
+  title: "SqurveBridge: A Harness-Centered Platform for Cross-Domain Text-to-SQL Evaluation and Metric-Guided Loop Engineering"
   authors:
-    - family-names: Anonymous
-      given-names: Authors
+    - family-names: Zhanghoks
   year: 2026

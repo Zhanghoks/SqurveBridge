@@ -25,7 +25,7 @@ npm run dev     # http://127.0.0.1:5173 ，/api → :7861
 
 ## 功能概览
 
-- **SQL Studio**：数据库、Actor 工作流、SQL 生成与执行；评测连线与 Agent Harness
+- **SQL Studio**：选择 method/benchmark、配置 Actor 工作流、生成并执行 SQL
 - **Experiment Board**：多方法同协议对比与 Formal tables
 - **Archive**：阅读 `artifacts/` / `tmp/demo-runs/` 产物
 

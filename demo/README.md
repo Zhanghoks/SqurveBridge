@@ -60,7 +60,7 @@ python3 -m venv .venv
 
 | 导航 | 作用 |
 |------|------|
-| **01 SQL Studio** | 选库、配置 Actor 工作流、生成/执行 SQL；method×dataset 连线与 Agent Harness |
+| **01 SQL Studio** | 选择 method/benchmark、配置 Actor 工作流并生成与执行 SQL |
 | **02 Experiment Board** | 同一 dataset 上多方法对比（雷达、Formal tables、错误/特征、成本） |
 | **03 Archive** | 浏览 `artifacts/` 与 `tmp/demo-runs/` 中的 score bundle 与报告 |
 
@@ -75,16 +75,6 @@ cd demo-app && npm run dev
 ```
 
 Vite 将 `/api` 代理到 `http://127.0.0.1:7861`。
-
-## 可选 Gradio UI
-
-旧版 Gradio 界面仍可单独启动（默认 `:7860`），与上述 React 工作台无关：
-
-```bash
-.venv/bin/python demo/gradio_demo.py
-```
-
-详见同目录历史说明；**EMNLP demo 录制与审稿请使用 React 工作台**。
 
 ## 常见问题
 
@@ -105,7 +95,6 @@ lsof -nP -iTCP:5173 -sTCP:LISTEN
 
 `start.sh` 若检测到已有 PID 或端口占用会直接退出，先 `./demo/stop.sh`。
 
-## 录制 / 投稿注意
+## 安全边界
 
-- 投稿 live demo 需提供**可访问的安装包或托管链接**；本地 `localhost` 不能当作公开 live demo URL。
-- 视频分镜见 `论文/paper/support/EMNLP2026_DEMO_VIDEO_SCRIPT.md`。
+API 默认只监听 `127.0.0.1`。这是本地研究界面，不应直接暴露到不受信任的网络。
