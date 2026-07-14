@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './styles.css'
 import ExperimentBoard from './ExperimentBoard.jsx'
 import Archive from './Archive.jsx'
-import { deploymentTarget, featureEnabled } from './runtimeMode.js'
+import { deploymentTarget, featureEnabled, studioSurface } from './runtimeMode.js'
 
 const AgentHarness = lazy(() => import('./AgentHarness.jsx'))
 
@@ -52,11 +52,11 @@ function ShellNav({ page, setPage }) {
   </aside>
 }
 
-function Topbar({ health, capabilities, refresh, busy, showProviderConfig = true }) {
+function Topbar({ health, capabilities, refresh, busy, hosted = false, showProviderConfig = true }) {
   const provider = health?.provider
   const tone = !health ? 'neutral' : provider?.message && !provider?.ready ? 'danger' : provider?.verified ? 'success' : 'warning'
   const label = !health ? 'Connecting' : provider?.verified ? `${provider.provider} credential verified` : provider?.configured ? `${provider.provider} · ${provider.model || 'model'}` : 'Provider setup required'
-  return <header className="topbar"><div><strong>Squrve-native runtime</strong><span>Local demo session</span></div><div className="runtime-state"><Status tone={tone}>{label}</Status>{showProviderConfig && <ProviderConfig health={health} capabilities={capabilities} refresh={refresh} />}<button className="icon-button" onClick={refresh} disabled={busy} title="Refresh runtime" aria-label="Refresh runtime">↻</button></div></header>
+  return <header className="topbar"><div><strong>Squrve-native runtime</strong><span>{hosted ? 'Hugging Face Space' : 'Local demo session'}</span></div><div className="runtime-state"><Status tone={tone}>{label}</Status>{showProviderConfig && <ProviderConfig health={health} capabilities={capabilities} refresh={refresh} />}<button className="icon-button" onClick={refresh} disabled={busy} title="Refresh runtime" aria-label="Refresh runtime">↻</button></div></header>
 }
 
 function ProviderConfig({ health, capabilities, refresh }) {
@@ -150,7 +150,7 @@ function ResultTable({ result }) {
   return <div className="table-wrap"><table><thead><tr>{result.columns.map(column => <th key={column}>{column}</th>)}</tr></thead><tbody>{result.rows.map((row, index) => <tr key={index}>{row.map((value, cell) => <td key={cell}>{value == null ? <em>NULL</em> : String(value)}</td>)}</tr>)}</tbody></table></div>
 }
 
-function Studio({ health, capabilities, databases, selectedDb, setSelectedDb }) {
+function Studio({ health, capabilities, databases, selectedDb, setSelectedDb, showAgentHarness = true }) {
   const [workflowIndex, setWorkflowIndex] = useState(1)
   const [actorSelections, setActorSelections] = useState({})
   const [provider, setProvider] = useState('')
@@ -206,7 +206,7 @@ function Studio({ health, capabilities, databases, selectedDb, setSelectedDb }) 
       <section className="tool-panel config-block actor-config-block"><div className="config-step"><i>03</i><div><span>Actor Workflow</span><small>{workflow.join(' → ')}</small></div></div><ActorComposer {...{ capabilities, workflowIndex, setWorkflowIndex, actorSelections, setActorSelections }} /></section></div>
     <div className="run-config-grid"><section className="tool-panel config-preview"><div className="config-step"><i>04</i><div><span>Run Config</span><small>Database + LLM + Actor pipeline</small></div></div><pre>{JSON.stringify(configPreview, null, 2)}</pre></section><section className="tool-panel run-input"><label className="field"><span>Natural-language input</span><textarea value={question} onChange={event => setQuestion(event.target.value)} placeholder="Ask a question for this configured workflow." /></label><button className="button primary" disabled={busy || !selectedDb || !question.trim() || !providerConfig?.configured || selectedActors.length !== workflow.length} onClick={runConfig}>{busy ? 'Running Squrve config…' : 'Run config'}</button>{error && <p className="error-banner">{error}</p>}</section></div>
     {(sql || result) && <section className="tool-panel studio-result"><div className="result-summary"><div><span>Generated SQL</span><code>{sql}</code></div><div><span>Actor path</span><b>{trace.map(item => item.actor_name).join(' → ') || selectedActors.join(' → ')}</b></div></div><div className="result-meta"><span>Read-only database execution</span>{result && <b>{result.row_count} rows · {result.elapsed_ms} ms</b>}</div><ResultTable result={result} /></section>}
-    <Suspense fallback={<section className="tool-panel agent-harness-loading"><Empty title="Loading interactive terminals" /></section>}><AgentHarness {...{ api, postJson, Status }} /></Suspense>
+    {showAgentHarness && <Suspense fallback={<section className="tool-panel agent-harness-loading"><Empty title="Loading interactive terminals" /></section>}><AgentHarness {...{ api, postJson, Status }} /></Suspense>}
   </div>
 }
 
@@ -250,19 +250,19 @@ function WorkspaceStudio({ capabilities, databases, showAgentHarness = true, liv
   const normalizedCandidateUrl = candidateUrl.trim().replace(/\.git\/?$/, '').replace(/\/$/, '')
   const comparisonJobs = jobs.filter(job => job.comparison_id === comparisonId)
   const running = comparisonJobs.some(job => job.status === 'running')
-  const missingSelected = selected.filter(key => !configs.some(item => keyOf(item) === key))
+  const missingSelected = showAgentHarness ? selected.filter(key => !configs.some(item => keyOf(item) === key)) : []
 
   useEffect(() => { setConfigs(capabilityConfigs) }, [capabilities])
 
   const configCommand = ({ method, dataset, split }) => `/config-adapter method=${method} target_dataset=${dataset}${split ? ` target_split=${split}` : ''}. The method and dataset are already integrated in Squrve. Reuse their existing Actor workflow, benchmark registration, adapter artifacts, and reproduce configs. Create the reproduce spec draft and stop at SPEC_REVIEW. After user approval, generate reproduce/configs/${dataset}/${method}.json with stage eval, dataset_save_path, workflow trace fields, and no secrets; validate the reproduce contract and then explain how to run /run ${dataset} ${method}.`
 
-  const queueConfigGeneration = pair => {
+  const queueConfigGeneration = showAgentHarness ? pair => {
     const request = { ...pair, split: pair.split || benchmarks.find(item => item.dataset === pair.dataset)?.defaultSplit || '' }
     const key = keyOf(request)
     const id = `${key}-${Date.now()}`
     setConfigRequests(current => [...current.filter(item => item.key !== key), { ...request, key, id, status: 'queued' }])
     setHarnessTask({ id, command: configCommand(request) })
-  }
+  } : null
 
   const startCandidateReader = () => {
     if (!githubReady) {
@@ -361,11 +361,13 @@ function WorkspaceStudio({ capabilities, databases, showAgentHarness = true, liv
 
   return <div className="workspace registry-workspace"><PageHeading eyebrow="Squrve evaluation workspace" title="SQL Studio" status={<Status tone={running ? 'running' : comparisonJobs.length ? 'success' : 'neutral'}>{running ? 'evaluation running' : `${methods.length} methods · ${benchmarks.length} datasets`}</Status>} />
     <section className="tool-panel experiment-builder relation-studio"><div className="panel-title"><div><span>Method × dataset evaluation graph</span><small>Select any method, then connect any integrated dataset</small></div><Status tone={missingSelected.length ? 'warning' : selected.length >= 2 ? 'success' : 'neutral'}>{selected.length} connected</Status></div><EvaluationGraph configs={configs} methods={methods.map(item => item.method)} datasets={benchmarks.map(item => item.dataset)} selected={selected} setSelected={setSelected} onMissingConfig={queueConfigGeneration} />{missingSelected.length > 0 && <div className="config-generation-panel"><div><span>Config generation queue</span><small>The selected agent uses config-adapter and pauses at SPEC_REVIEW before delivery.</small></div><div className="config-generation-list">{missingSelected.map(key => { const request = configRequests.find(item => item.key === key); const [dataset, method] = key.split('/'); return <div key={key}><span><b>{method}</b><i>→</i><b>{dataset}</b></span><Status tone={request?.status === 'sent' ? 'running' : 'warning'}>{request?.status === 'sent' ? 'awaiting review' : 'queued'}</Status><button className="button compact" onClick={() => queueConfigGeneration({ method, dataset })}>Send again</button></div> })}</div><ol><li>Review the reproduce spec in the Agent Harness below.</li><li>Approve SPEC_REVIEW in the same agent conversation.</li><li>Run the suggested command; this edge becomes runnable when the config appears.</li></ol><button className="button secondary compact" onClick={() => refreshConfigs().catch(err => setError(err.message))}>Refresh configs</button></div>}{liveEvaluation ? <div className="evaluation-command"><div className="sampling-controls"><div className="scope-control"><span>Sample size</span><div>{[[20, '20'], [50, '50'], [100, '100'], [200, '200']].map(([value, label]) => <button key={label} className={sampleLimit === value ? 'active' : ''} onClick={() => setSampleLimit(value)}>{label}</button>)}</div></div><div className="sample-mode"><span>Sampling</span><div className="segmented"><button className={sampleMode === 'slice' ? 'active' : ''} onClick={() => setSampleMode('slice')}>Dev slice</button><button className={sampleMode === 'random' ? 'active' : ''} onClick={() => setSampleMode('random')}>Random</button></div>{sampleMode === 'random' && <label><span>Seed</span><input type="number" value={sampleSeed} onChange={event => setSampleSeed(Number(event.target.value))} /></label>}</div></div><button className="button primary" disabled={selected.length < 2 || missingSelected.length > 0 || running} onClick={start}>{running ? 'Evaluation in progress' : missingSelected.length ? `Generate ${missingSelected.length} missing config${missingSelected.length > 1 ? 's' : ''} before running` : `Run ${selected.length} connected evaluations · ${sampleMode === 'slice' ? 'dev slice' : 'random'} ${sampleLimit}${sampleMode === 'random' ? ` · seed ${sampleSeed}` : ''}`}</button></div> : <div className="hosted-readonly-note">Live evaluation launch is available from a local SqurveBridge checkout.</div>}{error && <p className="error-banner">{error}</p>}</section>
-    <div className="run-monitor-layout"><section className="tool-panel live-runs"><div className="panel-title"><div><span>Live run control</span><small>{comparisonId || 'Current browser session'}</small></div></div>{comparisonJobs.length ? comparisonJobs.map(job => <button key={job.job_id} className={selectedJob === job.job_id ? 'active' : ''} onClick={() => setSelectedJob(job.job_id)}><span><b>{job.method}</b><small>{job.dataset} · {job.config?.scope}</small></span><Status tone={jobTone(job.status)}>{job.status}</Status>{job.status === 'running' && <i role="button" aria-label={`Cancel ${job.method} on ${job.dataset}`} onClick={event => { event.stopPropagation(); cancel(job.job_id) }}>×</i>}</button>) : <Empty title="No evaluations started" detail="Connect at least two method-dataset pairs to compare them." />}</section><section className="tool-panel evaluation-log"><div className="panel-title"><div><span>Selected run log</span><small>{selectedJob || 'No run selected'}</small></div></div><pre>{log || 'Run logs will appear here during evaluation.'}</pre></section></div>
-    <div className="harness-section-head"><div><span>Agent Harness</span><small>GitHub candidate → native integration → reproducible run</small></div><Status tone={candidatePhase === 'running' ? 'running' : githubReady ? 'success' : 'neutral'}>{candidatePhase === 'running' ? 'candidate reader running' : candidatePhase === 'starting' ? 'starting agent' : githubReady ? 'repository ready' : 'GitHub URL required'}</Status></div>
-    <section className="tool-panel github-intake"><label className="field"><span>Candidate GitHub repository</span><input ref={candidateInputRef} type="url" value={candidateUrl} onChange={event => { setCandidateUrl(event.target.value); setCandidateError(''); setCandidatePhase('idle') }} aria-invalid={Boolean(candidateError)} placeholder="https://github.com/owner/repository" />{candidateError && <small className="field-error">{candidateError}</small>}</label><div><code>{githubReady ? `/candidate-reader ${normalizedCandidateUrl}` : '/candidate-reader <github-repository-url>'}</code></div><button className="button primary" disabled={!githubReady || candidatePhase === 'starting'} onClick={startCandidateReader}>{candidatePhase === 'starting' ? 'Starting…' : 'Start candidate reader'}</button></section>
-    <div className="skill-route">{HARNESS_SKILLS.map(([index, skill, purpose]) => <div key={skill}><i>{index}</i><span><b>{skill}</b><small>{purpose}</small></span></div>)}</div>
-    {showAgentHarness && <Suspense fallback={<section className="tool-panel agent-harness-loading"><Empty title="Loading interactive terminals" /></section>}><AgentHarness candidateUrl={githubReady ? normalizedCandidateUrl : ''} onCandidateReaderStart={startCandidateReader} onCandidateUrlRequired={() => { setCandidateError('Enter a valid public GitHub repository URL first.'); candidateInputRef.current?.focus(); candidateInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }} queuedCommand={harnessTask} onQueuedCommandSent={id => { if (id.startsWith('candidate-')) setCandidatePhase('running'); setConfigRequests(current => current.map(item => item.id === id ? { ...item, status: 'sent' } : item)) }} {...{ api, postJson, Status }} /></Suspense>}
+    <div className="run-monitor-layout"><section className="tool-panel live-runs"><div className="panel-title"><div><span>Live run control</span><small>{comparisonId || 'Current browser session'}</small></div></div>{comparisonJobs.length ? comparisonJobs.map(job => <button key={job.job_id} className={selectedJob === job.job_id ? 'active' : ''} onClick={() => setSelectedJob(job.job_id)}><span><b>{job.method}</b><small>{job.dataset} · {job.config?.scope}</small></span><Status tone={jobTone(job.status)}>{job.status}</Status>{liveEvaluation && job.status === 'running' && <i role="button" aria-label={`Cancel ${job.method} on ${job.dataset}`} onClick={event => { event.stopPropagation(); cancel(job.job_id) }}>×</i>}</button>) : <Empty title="No evaluations started" detail="Connect at least two method-dataset pairs to compare them." />}</section><section className="tool-panel evaluation-log"><div className="panel-title"><div><span>Selected run log</span><small>{selectedJob || 'No run selected'}</small></div></div><pre>{log || 'Run logs will appear here during evaluation.'}</pre></section></div>
+    {showAgentHarness && <>
+      <div className="harness-section-head"><div><span>Agent Harness</span><small>GitHub candidate → native integration → reproducible run</small></div><Status tone={candidatePhase === 'running' ? 'running' : githubReady ? 'success' : 'neutral'}>{candidatePhase === 'running' ? 'candidate reader running' : candidatePhase === 'starting' ? 'starting agent' : githubReady ? 'repository ready' : 'GitHub URL required'}</Status></div>
+      <section className="tool-panel github-intake"><label className="field"><span>Candidate GitHub repository</span><input ref={candidateInputRef} type="url" value={candidateUrl} onChange={event => { setCandidateUrl(event.target.value); setCandidateError(''); setCandidatePhase('idle') }} aria-invalid={Boolean(candidateError)} placeholder="https://github.com/owner/repository" />{candidateError && <small className="field-error">{candidateError}</small>}</label><div><code>{githubReady ? `/candidate-reader ${normalizedCandidateUrl}` : '/candidate-reader <github-repository-url>'}</code></div><button className="button primary" disabled={!githubReady || candidatePhase === 'starting'} onClick={startCandidateReader}>{candidatePhase === 'starting' ? 'Starting…' : 'Start candidate reader'}</button></section>
+      <div className="skill-route">{HARNESS_SKILLS.map(([index, skill, purpose]) => <div key={skill}><i>{index}</i><span><b>{skill}</b><small>{purpose}</small></span></div>)}</div>
+      <Suspense fallback={<section className="tool-panel agent-harness-loading"><Empty title="Loading interactive terminals" /></section>}><AgentHarness candidateUrl={githubReady ? normalizedCandidateUrl : ''} onCandidateReaderStart={startCandidateReader} onCandidateUrlRequired={() => { setCandidateError('Enter a valid public GitHub repository URL first.'); candidateInputRef.current?.focus(); candidateInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }} queuedCommand={harnessTask} onQueuedCommandSent={id => { if (id.startsWith('candidate-')) setCandidatePhase('running'); setConfigRequests(current => current.map(item => item.id === id ? { ...item, status: 'sent' } : item)) }} {...{ api, postJson, Status }} /></Suspense>
+    </>}
   </div>
 }
 
@@ -411,6 +413,7 @@ function EvaluationGraph({ configs, methods, datasets, selected, setSelected, on
     const pair = config || { method: activeMethod, dataset }
     const key = keyOf(pair)
     const connected = selected.includes(key)
+    if (!connected && !config && !onMissingConfig) return
     if (!connected && selected.length >= 6) return
     if (!connected && !config) onMissingConfig?.(pair)
     setSelected(current => current.includes(key)
@@ -438,6 +441,7 @@ function EvaluationGraph({ configs, methods, datasets, selected, setSelected, on
       })}</div>
       <div className="relation-nodes dataset-nodes">{datasets.map((dataset, index) => {
         const config = configs.find(item => item.method === activeMethod && item.dataset === dataset)
+        if (!config && !onMissingConfig) return null
         const key = keyOf(config || { method: activeMethod, dataset })
         const connected = selected.includes(key)
         const count = selected.filter(item => item.startsWith(`${dataset}/`)).length
@@ -510,14 +514,16 @@ function App() {
   const [health, setHealth] = useState(null)
   const [capabilities, setCapabilities] = useState(null)
   const [databases, setDatabases] = useState([])
+  const [selectedDb, setSelectedDb] = useState('')
   const [busy, setBusy] = useState(false)
   const hosted = deploymentTarget(capabilities) === 'hf-space'
+  const selectedStudio = studioSurface(capabilities)
   const showProviderConfig = featureEnabled(capabilities, 'provider_configuration')
   const showAgentHarness = featureEnabled(capabilities, 'agent_terminals')
   const liveEvaluation = featureEnabled(capabilities, 'live_evaluation')
   const refresh = async () => { setBusy(true); try { const [healthData, capabilityData, databaseData] = await Promise.all([api('/api/health'), api('/api/capabilities'), api('/api/databases')]); setHealth(healthData); setCapabilities(capabilityData); setDatabases(databaseData.databases) } catch (error) { setHealth({ status: 'error', provider: { configured: false, ready: false, message: error.message } }) } finally { setBusy(false) } }
   useEffect(() => { refresh() }, [])
-  return <div className="app-shell"><ShellNav page={page} setPage={setPage} /><main><Topbar health={health} capabilities={capabilities} refresh={refresh} busy={busy} showProviderConfig={showProviderConfig} />{hosted && <div className="hosted-demo-notice">Hugging Face Live Demo · the LLM and model are configured by SqurveBridge</div>}{page === 'board' ? <ExperimentBoard {...{ capabilities, liveEvaluation, api, postJson, Status, PageHeading, Empty }} /> : page === 'archive' ? <Archive {...{ api, Status, PageHeading, Empty }} /> : <WorkspaceStudio {...{ capabilities, databases, showAgentHarness, liveEvaluation }} />}</main></div>
+  return <div className="app-shell"><ShellNav page={page} setPage={setPage} /><main><Topbar health={health} capabilities={capabilities} refresh={refresh} busy={busy} hosted={hosted} showProviderConfig={showProviderConfig} />{hosted && <div className="hosted-demo-notice">Hugging Face Live Demo · the LLM and model are configured by SqurveBridge</div>}{page === 'board' ? <ExperimentBoard {...{ capabilities, liveEvaluation, api, postJson, Status, PageHeading, Empty }} /> : page === 'archive' ? <Archive {...{ api, Status, PageHeading, Empty }} /> : selectedStudio === 'live-sql' ? <Studio {...{ health, capabilities, databases, selectedDb, setSelectedDb, showAgentHarness }} /> : <WorkspaceStudio {...{ capabilities, databases, showAgentHarness, liveEvaluation }} />}</main></div>
 }
 
 const root = globalThis.__SQURVE_DEMO_ROOT__ || createRoot(document.getElementById('root'))

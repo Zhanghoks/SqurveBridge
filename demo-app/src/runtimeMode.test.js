@@ -1,10 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { deploymentTarget, featureEnabled } from './runtimeMode.js'
+import { deploymentTarget, featureEnabled, studioSurface } from './runtimeMode.js'
 
 test('defaults to the complete local Demo App', () => {
   assert.equal(deploymentTarget(null), 'local')
   assert.equal(featureEnabled(null, 'agent_terminals'), true)
+  assert.equal(studioSurface(null), 'workspace')
 })
 
 test('uses hosted features returned by Flask', () => {
@@ -17,4 +18,5 @@ test('uses hosted features returned by Flask', () => {
   assert.equal(deploymentTarget(capabilities), 'hf-space')
   assert.equal(featureEnabled(capabilities, 'live_sql'), true)
   assert.equal(featureEnabled(capabilities, 'agent_terminals'), false)
+  assert.equal(studioSurface(capabilities), 'live-sql')
 })
