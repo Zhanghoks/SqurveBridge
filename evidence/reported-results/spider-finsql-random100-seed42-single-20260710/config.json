@@ -1,0 +1,75 @@
+{
+  "actors": [
+    {
+      "actor_class": "FINSQLReducer",
+      "actor_params": {
+        "topk_column_num": 7,
+        "topk_table_num": 7,
+        "use_chinese": false
+      },
+      "dataset_save_path": "../files/datasets/spider_finsql_reduce.json",
+      "eval_type": [
+        "reduce_recall",
+        "reduce_precision",
+        "reduce_rate"
+      ],
+      "task_id": "finsql_reduce",
+      "task_type": "ReduceTask"
+    },
+    {
+      "actor_class": "FINSQLGenerator",
+      "actor_params": {
+        "enable_thinking": false,
+        "max_attempt_times": 2,
+        "n_candidates": 2,
+        "temperature": 0.2,
+        "use_chinese": false,
+        "use_cot": true
+      },
+      "dataset_save_path": "../files/datasets/spider_finsql_generate.json",
+      "eval_type": [
+        "execute_accuracy"
+      ],
+      "task_id": "finsql_generate",
+      "task_type": "GenerateTask"
+    },
+    {
+      "actor_class": "FINSQLSelector",
+      "actor_params": {
+        "select_number": 2
+      },
+      "dataset_save_path": "../files/datasets/spider_finsql_select.json",
+      "eval_type": [
+        "execute_accuracy"
+      ],
+      "task_id": "finsql_selector",
+      "task_type": "SelectTask"
+    }
+  ],
+  "exec_process": [
+    "finsql_full"
+  ],
+  "generate_num": 1,
+  "llm": {
+    "max_token": 8000,
+    "model": "deepseek-v4-flash",
+    "provider": "qwen",
+    "temperature": 0,
+    "top_p": 0.9
+  },
+  "sampling": {
+    "limit": 100,
+    "mode": "random",
+    "seed": 42
+  },
+  "workflow": [
+    {
+      "stages": [
+        "finsql_reduce",
+        "finsql_generate",
+        "finsql_selector"
+      ],
+      "task_id": "finsql_full"
+    }
+  ]
+}

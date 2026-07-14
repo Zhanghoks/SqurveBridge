@@ -1,13 +1,47 @@
 cff-version: 1.2.0
 message: "If you use SqurveBridge in research, please cite it using the metadata below."
 title: "SqurveBridge: A Harness-Centered Platform for Cross-Domain Text-to-SQL Evaluation and Metric-Guided Loop Engineering"
+type: software
 authors:
-  - family-names: Zhanghoks
+  - family-names: Zhang
+    given-names: Mingjian
+  - family-names: Chen
+    given-names: Zihan
+  - family-names: Li
+    given-names: Zhe
+  - family-names: Liu
+    given-names: Peiyu
 year: 2026
+version: "0.1.0"
 license: MIT
+repository-code: "https://github.com/Zhanghoks/SqurveBridge"
 preferred-citation:
-  type: article
+  type: generic
   title: "SqurveBridge: A Harness-Centered Platform for Cross-Domain Text-to-SQL Evaluation and Metric-Guided Loop Engineering"
   authors:
-    - family-names: Zhanghoks
+    - family-names: Zhang
+      given-names: Mingjian
+    - family-names: Chen
+      given-names: Zihan
+    - family-names: Li
+      given-names: Zhe
+    - family-names: Liu
+      given-names: Peiyu
   year: 2026
+  notes: "System demonstration manuscript"
+references:
+  - type: article
+    title: "Squrve: A Unified and Modular Framework for Complex Real-World Text-to-SQL Tasks"
+    authors:
+      - family-names: Wang
+        given-names: Yihan
+      - family-names: Liu
+        given-names: Peiyu
+      - family-names: Chen
+        given-names: Runyu
+      - family-names: Pu
+        given-names: Jiaxing
+      - family-names: Xu
+        given-names: Wei
+    year: 2025
+    url: "https://arxiv.org/abs/2510.24102"

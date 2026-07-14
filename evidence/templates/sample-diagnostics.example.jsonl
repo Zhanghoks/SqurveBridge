@@ -1,0 +1,1 @@
+{"error_category":"none","instance_id":"example-1","latency_ms":1250,"metrics":{"ex":1.0},"stage_status":{"generate":"completed"},"token_usage":{"completion":80,"prompt":420}}

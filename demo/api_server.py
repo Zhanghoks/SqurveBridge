@@ -49,6 +49,8 @@ from reproduce.lib.env_config import (
     resolve_api_key,
 )
 from tools.profile_weakness import build_weakness_json
+from tools.evidence import EvidenceError, verify_bundle
+from demo.security import AGENT_TERMINAL_ENV, agent_terminals_enabled
 
 
 app = Flask(__name__)
@@ -206,6 +208,18 @@ def _local_request_error():
     allowed_origins = {"http://127.0.0.1:5173", "http://localhost:5173"}
     if origin and origin not in allowed_origins:
         return _json_error("Agent access is restricted to the local Squrve workspace.", 403)
+    return None
+
+
+def _agent_terminal_access_error():
+    local_error = _local_request_error()
+    if local_error:
+        return local_error
+    if not agent_terminals_enabled():
+        return _json_error(
+            f"Agent terminals are disabled. Set {AGENT_TERMINAL_ENV}=1 only in a trusted local workspace.",
+            403,
+        )
     return None
 
 
@@ -491,12 +505,22 @@ def terminal_catalog():
     local_error = _local_request_error()
     if local_error:
         return local_error
+    enabled = agent_terminals_enabled()
+    if not enabled:
+        return jsonify({
+            "enabled": False,
+            "agents": [],
+            "cwd": str(_project_root),
+            "active_sessions": 0,
+            "max_active": 0,
+        })
     with _terminal_lock:
         active_by_agent = {
             agent: next((session.public_state() for session in _terminal_sessions.values() if session.agent == agent and session.running), None)
             for agent in _agent_commands
         }
     return jsonify({
+        "enabled": True,
         "agents": [
             {
                 "id": agent,
@@ -516,9 +540,9 @@ def terminal_catalog():
 
 @app.post("/api/terminals")
 def start_terminal_session():
-    local_error = _local_request_error()
-    if local_error:
-        return local_error
+    access_error = _agent_terminal_access_error()
+    if access_error:
+        return access_error
     payload = request.get_json(silent=True) or {}
     agent = str(payload.get("agent", "")).strip().lower()
     if agent not in _agent_commands:
@@ -548,9 +572,9 @@ def _terminal_session(session_id: str) -> AgentPtySession | None:
 
 @app.get("/api/terminals/<session_id>/output")
 def terminal_output(session_id: str):
-    local_error = _local_request_error()
-    if local_error:
-        return local_error
+    access_error = _agent_terminal_access_error()
+    if access_error:
+        return access_error
     session = _terminal_session(session_id)
     if not session:
         return _json_error("Agent terminal not found.", 404)
@@ -564,9 +588,9 @@ def terminal_output(session_id: str):
 
 @app.post("/api/terminals/<session_id>/input")
 def terminal_input(session_id: str):
-    local_error = _local_request_error()
-    if local_error:
-        return local_error
+    access_error = _agent_terminal_access_error()
+    if access_error:
+        return access_error
     session = _terminal_session(session_id)
     if not session:
         return _json_error("Agent terminal not found.", 404)
@@ -582,9 +606,9 @@ def terminal_input(session_id: str):
 
 @app.post("/api/terminals/<session_id>/resize")
 def resize_terminal(session_id: str):
-    local_error = _local_request_error()
-    if local_error:
-        return local_error
+    access_error = _agent_terminal_access_error()
+    if access_error:
+        return access_error
     session = _terminal_session(session_id)
     if not session:
         return _json_error("Agent terminal not found.", 404)
@@ -598,9 +622,9 @@ def resize_terminal(session_id: str):
 
 @app.post("/api/terminals/<session_id>/stop")
 def stop_terminal_session(session_id: str):
-    local_error = _local_request_error()
-    if local_error:
-        return local_error
+    access_error = _agent_terminal_access_error()
+    if access_error:
+        return access_error
     session = _terminal_session(session_id)
     if not session:
         return _json_error("Agent terminal not found.", 404)
@@ -610,8 +634,8 @@ def stop_terminal_session(session_id: str):
 
 @sock.route("/api/terminals/<session_id>/ws")
 def terminal_websocket(ws, session_id: str):
-    local_error = _local_request_error()
-    if local_error:
+    access_error = _agent_terminal_access_error()
+    if access_error:
         ws.close()
         return
     session = _terminal_session(session_id)
@@ -1290,6 +1314,7 @@ _ARCHIVE_MAX_BYTES = 2_000_000
 
 def _archive_roots() -> list[tuple[str, Path]]:
     return [
+        ("evidence", _project_root / "evidence" / "reported-results"),
         ("artifacts", _project_root / "artifacts"),
         ("demo-runs", _project_root / "tmp" / "demo-runs"),
     ]
@@ -1304,6 +1329,16 @@ def _safe_archive_run_id(run_id: str) -> str | None:
 
 def _archive_run_dirs() -> list[tuple[str, Path]]:
     found: list[tuple[str, Path]] = []
+    evidence_root = _project_root / "evidence" / "reported-results"
+    if evidence_root.is_dir():
+        for path in sorted(evidence_root.iterdir()):
+            if not path.is_dir():
+                continue
+            try:
+                verify_bundle(path)
+            except EvidenceError:
+                continue
+            found.append(("evidence", path))
     artifacts_root = _project_root / "artifacts"
     if artifacts_root.is_dir():
         for path in sorted(artifacts_root.iterdir()):
@@ -1367,7 +1402,7 @@ def _archive_entry(source: str, run_dir: Path) -> dict | None:
     sampling = _sampling_metadata(scores)
     return {
         "run_id": run_id,
-        "dir_name": run_dir.name if source == "artifacts" else run_dir.parent.name,
+        "dir_name": run_dir.name if source in {"artifacts", "evidence"} else run_dir.parent.name,
         "source": source,
         "dataset": scores.get("dataset"),
         "method": scores.get("method"),
@@ -1458,7 +1493,7 @@ def archive_catalog():
         "filters": {
             "datasets": datasets,
             "methods": methods,
-            "sources": ["artifacts", "demo-runs"],
+            "sources": ["evidence", "artifacts", "demo-runs"],
         },
     })
 

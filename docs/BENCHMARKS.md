@@ -6,13 +6,37 @@ settings, and benchmark-specific evaluation assumptions.
 
 ## Bundled Benchmarks
 
-| Benchmark | Upstream source | Local path | Distribution |
+| Benchmark | Upstream source | Git LFS package | Installed path |
 | --- | --- | --- | --- |
-| Spider | https://github.com/taoyds/spider | `benchmarks/spider/` | Bundled with public examples |
-| BIRD | https://bird-bench.github.io/ | `benchmarks/bird/` | Bundled with public examples |
+| Spider | https://github.com/taoyds/spider | `benchmarks/packages/spider.zip` | `benchmarks/spider/` |
+| BIRD | https://bird-bench.github.io/ | `benchmarks/packages/bird.zip` | `benchmarks/bird/` |
 
-Large SQLite files are stored with Git LFS. Run `git lfs pull` if a clone contains
-pointer files instead of databases.
+The package contract is recorded in `benchmarks/packages/manifest.json`. Each ZIP
+contains exactly one top-level benchmark directory, and the manifest records its
+source, version, checksum, sizes, required files, and sample count. Pull and
+install the archives with:
+
+```bash
+git lfs pull --include="benchmarks/packages/*.zip"
+python tools/benchmarks.py verify-archives
+python tools/benchmarks.py install spider
+python tools/benchmarks.py install bird
+```
+
+The installed directories are ignored by Git. Do not commit expanded databases or
+replace the official packages with archives from unofficial mirrors.
+
+Ordinary pull-request CI validates the manifest and Git LFS pointers without
+downloading the large payloads:
+
+```bash
+python tools/benchmarks.py verify-pointers
+```
+
+Release CI downloads both payloads and runs `verify-archives`. The verifier rejects
+checksum mismatches, path traversal, absolute paths, symbolic links, encrypted
+members, duplicate paths, system metadata, credential files, and abnormal
+compression ratios before extraction.
 
 ## Referenced Benchmarks
 
@@ -38,6 +62,6 @@ benchmarks/<id>/
   database/*.sqlite
 ```
 
-After adding a benchmark, register its split and database behavior in
+After installing or adding a benchmark, register its split and database behavior in
 `config/sys_config.json`, then validate every reproduction configuration that uses
 it. Third-party data remains subject to its upstream license and terms.

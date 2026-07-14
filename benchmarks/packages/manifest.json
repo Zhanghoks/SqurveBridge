@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "benchmarks": {
+    "bird": {
+      "version": "BIRD dev (SqurveBridge paper snapshot)",
+      "archive": "benchmarks/packages/bird.zip",
+      "top_level": "bird",
+      "source": "https://bird-bench.github.io/",
+      "license_notice": "BIRD data remains subject to the terms published by its authors. The archive is provided for research reproducibility; verify the upstream terms before redistribution or commercial use.",
+      "sha256": "f04de2087a7bd7afdeaa17aae48ce76b4992162f41f81899438c8c3f7bbf3ee0",
+      "archive_size": 346123106,
+      "uncompressed_size": 1494761495,
+      "member_count": 26,
+      "allowed_suffixes": [
+        ".csv",
+        ".json",
+        ".sqlite"
+      ],
+      "dataset_counts": {
+        "dev": 1534
+      },
+      "sqlite_count": 11,
+      "required_files": [
+        "bird/dev/dataset.json",
+        "bird/dev/schema.json",
+        "bird/dev/column_meaning.json",
+        "bird/dev/few_shot_examples.json",
+        "bird/dev/database/california_schools.sqlite",
+        "bird/dev/database_description/california_schools/db_description.csv"
+      ]
+    },
+    "spider": {
+      "version": "Spider 1.0 dev/test (SqurveBridge paper snapshot)",
+      "archive": "benchmarks/packages/spider.zip",
+      "top_level": "spider",
+      "source": "https://github.com/taoyds/spider",
+      "license_notice": "Spider data remains subject to the terms published by its authors. The archive is provided for research reproducibility; verify the upstream terms before redistribution or commercial use.",
+      "sha256": "899520ae4ddd5469a0b1d1e324c924c87ca7cc3224ac7970b57e29294ddeaf0d",
+      "archive_size": 59220893,
+      "uncompressed_size": 495247144,
+      "member_count": 210,
+      "allowed_suffixes": [
+        ".json",
+        ".sqlite"
+      ],
+      "dataset_counts": {
+        "dev": 1034,
+        "test": 2147
+      },
+      "sqlite_count": 206,
+      "required_files": [
+        "spider/dev/dataset.json",
+        "spider/dev/schema.json",
+        "spider/test/dataset.json",
+        "spider/test/schema.json",
+        "spider/database/concert_singer.sqlite"
+      ]
+    }
+  }
+}

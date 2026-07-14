@@ -70,6 +70,44 @@ Runtime files are written below ignored `files/` and `artifacts/` directories. A
 paper result is reproducible only when its configuration and concrete run artifacts
 are retained together.
 
+## Run Isolation and Resume
+
+Every invocation receives a run ID and owns one runtime workspace:
+
+```text
+files/runs/<run-id>/
+  config.json
+  checkpoints/
+    state.json
+    state-2.json       # when generate_num > 1
+    datasets/
+  datasets/
+  pred_sql/
+  log/
+```
+
+Checkpoint state and incremental dataset snapshots must remain in the same run
+directory. This prevents two concurrent executions of the same method–benchmark
+pair from overwriting each other and ensures that resumed samples are loaded from
+the workspace in which they were produced.
+
+Resume the newest checkpoint for a configuration with:
+
+```bash
+python reproduce/run.py spider c3sql --resume
+```
+
+Or select a concrete recorded run:
+
+```bash
+python reproduce/run.py spider c3sql \
+  --resume-from files/runs/<run-id>/checkpoints/state.json
+```
+
+An explicit checkpoint outside `files/runs/<run-id>/checkpoints/` is rejected.
+Missing or malformed checkpoint state fails loudly rather than silently starting a
+new run.
+
 ## Sampling
 
 The reproduction configuration controls the dataset source. Optional evaluation

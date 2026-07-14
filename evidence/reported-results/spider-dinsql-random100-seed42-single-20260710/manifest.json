@@ -1,0 +1,35 @@
+{
+  "exporter": {
+    "code_commit": "67b44991e83ddcc2e8aab22bff833b39456a67e7",
+    "name": "SqurveBridge evidence exporter"
+  },
+  "files": {
+    "config.json": "90abe4e9ef72a8caa82d140f537ec26073a053a3734216942f0e6d3bb1696275",
+    "report.md": "1675ad6a7a732f5612d588f7ed0e58d57d67a7ceaa9bbd5bfd3ec5f1da012955",
+    "sample-diagnostics.jsonl": "664225ceb67da44f024eaecefd0ef94a110a8b466e180400b50f969fd31a57db",
+    "scores.json": "7c6f4313657fa537a496d79249739b26a8a72de9b0702b2c28cdea1fc0131f06"
+  },
+  "privacy": {
+    "classification": "public-sanitized",
+    "contains_absolute_paths": false,
+    "contains_credentials": false,
+    "contains_database_rows": false,
+    "contains_provider_payloads": false,
+    "contains_questions": false,
+    "contains_sql_text": false
+  },
+  "provenance": {
+    "benchmark": "spider",
+    "code_commit": "uncommitted Squrve-2.0 working tree snapshot, 2026-07-10",
+    "evaluator_version": "SqurveBridge four-layer evaluator snapshot 2026-07-10",
+    "method": "dinsql",
+    "model": "deepseek-v4-flash",
+    "notes": "Spider dev random-100 sample, seed 42; public reviewer evidence only.",
+    "provider": "qwen",
+    "sample_count": 100,
+    "source_alignment": "demo",
+    "split": "dev"
+  },
+  "run_id": "spider-dinsql-random100-seed42-single-20260710",
+  "schema_version": "1.0"
+}

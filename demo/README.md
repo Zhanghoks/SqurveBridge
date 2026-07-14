@@ -36,6 +36,7 @@
 | `SQURVE_DEMO_API_PORT` | `7861` | API 端口 |
 | `SQURVE_DEMO_WEB_HOST` | `127.0.0.1` | Vite 监听地址 |
 | `SQURVE_DEMO_WEB_PORT` | `5173` | 前端端口 |
+| `SQURVE_ENABLE_AGENT_TERMINALS` | 未设置 | 设为 `1` 后才启用高权限 Codex/Claude 本地终端 |
 
 示例：
 
@@ -98,3 +99,5 @@ lsof -nP -iTCP:5173 -sTCP:LISTEN
 ## 安全边界
 
 API 默认只监听 `127.0.0.1`。这是本地研究界面，不应直接暴露到不受信任的网络。
+Agent Harness 终端默认关闭，因为终端中的 Agent 可以修改当前工作区。仅在可信本地环境中显式运行
+`SQURVE_ENABLE_AGENT_TERMINALS=1 ./demo/start.sh`；不要在共享机器或端口转发场景启用。

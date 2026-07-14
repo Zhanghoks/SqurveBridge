@@ -1,0 +1,11 @@
+{
+  "benchmark": "spider",
+  "code_commit": "0000000000000000000000000000000000000000",
+  "evaluator_version": "squrvebridge-v0.1",
+  "method": "c3sql",
+  "model": "model-name",
+  "provider": "provider-name",
+  "sample_count": 100,
+  "source_alignment": "demo",
+  "split": "dev"
+}

@@ -1,0 +1,74 @@
+{
+  "actors": [
+    {
+      "actor_class": "C3SQLGenerator",
+      "actor_params": {
+        "n_candidates": 20
+      },
+      "dataset_save_path": "../files/datasets/spider_c3sql.json",
+      "eval_type": [
+        "execute_accuracy"
+      ],
+      "task_id": "generate",
+      "task_type": "GenerateTask"
+    },
+    {
+      "actor_class": "C3SQLReducer",
+      "actor_params": {
+        "sc_num": 10,
+        "top_k": 4
+      },
+      "dataset_save_path": "../files/datasets/spider_c3sql_reduce.json",
+      "eval_type": [
+        "reduce_recall",
+        "reduce_precision",
+        "reduce_rate"
+      ],
+      "task_id": "c3sql_reduce",
+      "task_type": "ReduceTask"
+    },
+    {
+      "actor_class": "C3SQLParser",
+      "actor_params": {
+        "add_fk": true,
+        "output_format": "list",
+        "sc_num": 10,
+        "top_k": 5
+      },
+      "dataset_save_path": "../files/datasets/spider_c3sql_parse.json",
+      "eval_type": [
+        "parse_recall",
+        "parse_precision",
+        "parse_exact_matching"
+      ],
+      "task_id": "c3sql_parse",
+      "task_type": "ParseTask"
+    }
+  ],
+  "exec_process": [
+    "c3sql_full"
+  ],
+  "generate_num": 1,
+  "llm": {
+    "max_token": 8000,
+    "model": "deepseek-v4-flash",
+    "provider": "qwen",
+    "temperature": 0.7,
+    "top_p": 0.8
+  },
+  "sampling": {
+    "limit": 100,
+    "mode": "random",
+    "seed": 42
+  },
+  "workflow": [
+    {
+      "stages": [
+        "c3sql_reduce",
+        "c3sql_parse",
+        "generate"
+      ],
+      "task_id": "c3sql_full"
+    }
+  ]
+}

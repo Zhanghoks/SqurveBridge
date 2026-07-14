@@ -36,21 +36,19 @@ from reproduce.metrics.assembly import build_scores
 from reproduce.metrics.diagnostics import extract_unified_log_diagnostics
 from reproduce.metrics.evolution import build_meta_evo_input, compare_scores
 from reproduce.lib.env_config import resolve_config_api_keys
-from reproduce.lib.paths import (
-    REPRODUCE_ROOT,
-    checkpoint_dir,
-    checkpoint_datasets_dir,
-    checkpoint_state_path,
-    config_filename,
-    config_repo_path,
-    run_identifier,
+from reproduce.lib.checkpoints import (
+    checkpoint_run_id,
+    resolve_checkpoint_state_path,
+    select_resume_checkpoint,
 )
+from reproduce.lib.paths import REPRODUCE_ROOT, config_filename, config_repo_path, run_identifier
 from reproduce.metrics.persistence import persist_scores_bundle
 
 
 def main(dataset_name, method, resume=False, resume_from=None):
     identifier = run_identifier(dataset_name, method)
-    run_id = _run_id(identifier)
+    resume_checkpoint = select_resume_checkpoint(identifier, resume_from) if (resume or resume_from) else None
+    run_id = checkpoint_run_id(resume_checkpoint) if resume_checkpoint else _run_id(identifier)
     config_path = config_filename(dataset_name, method)
     eval_mode = os.environ.get("SQURVE_EVAL_MODE", "full").lower()
 
@@ -70,7 +68,7 @@ def main(dataset_name, method, resume=False, resume_from=None):
             config=config,
             generate_num=generate_num,
             resume=resume,
-            resume_from=resume_from,
+            resume_from=str(resume_checkpoint) if resume_checkpoint else None,
         )
 
         router, save_lis = load_router(identifier=identifier, config=config)
@@ -345,8 +343,6 @@ def _attach_checkpoint_states(
     states_by_task_id = {}
     state_paths_by_task_id = {}
     run_id = checkpoint_config["run_id"]
-    dataset_name = checkpoint_config["dataset_name"]
-    method = checkpoint_config["method"]
     now = datetime.now().strftime("%Y%m%d-%H%M%S")
 
     tasks_by_id = {task["task_id"]: task for task in (router.task_meta or [])}
@@ -354,7 +350,11 @@ def _attach_checkpoint_states(
     process_ids = [task_id for task_id in (router.exec_process or []) if task_id != "~p"]
 
     for iteration in range(1, generate_num + 1):
-        state_path = _resolve_resume_path(dataset_name, method, checkpoint_config.get("resume_from"), iteration)
+        state_path = resolve_checkpoint_state_path(
+            checkpoint_config["checkpoint_dir"],
+            checkpoint_config.get("resume_from"),
+            iteration,
+        )
         stage_ids = _stage_ids_for_iteration(iteration, process_ids, tasks_by_id, complex_by_id)
         if resume:
             state = CheckpointState.load(state_path)
@@ -420,17 +420,6 @@ def _flatten_task_lis(task_lis) -> list[str]:
         elif isinstance(item, list):
             flattened.extend(_flatten_task_lis(item))
     return flattened
-
-
-def _resolve_resume_path(dataset: str, method: str, resume_from: str | None, iteration: int = 1) -> Path:
-    if not resume_from:
-        return checkpoint_state_path(dataset, method, iteration)
-    candidate = Path(resume_from)
-    if candidate.exists():
-        return candidate
-    if resume_from.endswith(".json"):
-        return checkpoint_dir(dataset, method) / resume_from
-    return checkpoint_dir(dataset, method) / resume_from
 
 
 def _fill_checkpoint_sample_totals(checkpoint_config: dict | None, engine: Engine) -> None:

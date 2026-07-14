@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "squrvebridge"
+version = "0.1.0"
+description = "Harness-centered Text-to-SQL integration, evaluation, and metric-guided loop engineering built on Squrve"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+  { name = "Mingjian Zhang" },
+  { name = "Zihan Chen" },
+  { name = "Zhe Li" },
+  { name = "Peiyu Liu" },
+]
+dynamic = ["dependencies"]
+
+[project.urls]
+Homepage = "https://github.com/Zhanghoks/SqurveBridge"
+Repository = "https://github.com/Zhanghoks/SqurveBridge"
+"Upstream Squrve" = "https://github.com/Satissss/Squrve"
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+include = ["core*", "reproduce*"]

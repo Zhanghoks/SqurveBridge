@@ -175,7 +175,7 @@ export default function Archive({
         <div className="panel-title">
           <div>
             <span>Find experiment data</span>
-            <small>Search artifacts/ and tmp/demo-runs score bundles</small>
+            <small>Search verified public evidence, local artifacts, and demo-run score bundles</small>
           </div>
           <button className="button compact secondary" disabled={busy} onClick={loadCatalog}>{busy ? 'Scanning…' : 'Refresh'}</button>
         </div>
@@ -239,7 +239,7 @@ export default function Archive({
                   <i>{run.file_count} files</i>
                 </div>
               </button>
-            )) : <Empty title="No archived runs" detail="Reproduce evaluations write into artifacts/; demo jobs also land under tmp/demo-runs." />}
+            )) : <Empty title="No archived runs" detail="Verified reviewer bundles live under evidence/reported-results; local evaluations write into artifacts/ and tmp/demo-runs." />}
           </div>
         </section>
 

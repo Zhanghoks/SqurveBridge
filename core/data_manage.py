@@ -17,6 +17,7 @@ Key Features:
 """
 
 from core.base import Router
+from core.benchmark_requirements import require_benchmark_directory, require_benchmark_file
 
 from llama_index.core.llms.llm import LLM
 from core.LinkAlign.RagPipeline import RagPipeLines
@@ -883,6 +884,8 @@ class DataLoader:
         else:
             origin_data_source = origin_data_source / "dataset.json"
 
+        require_benchmark_file(origin_data_source, id_, "dataset")
+
         if not external_path:
             external_path = Path(meta_data['root_path']) / "external" if meta_data.get("external", False) else None
 
@@ -907,6 +910,7 @@ class DataLoader:
         if update_db_path and data_source_index is not None:
             benchmark_db_path = self.router.get_benchmark_db_path(id_, sub_id_)
             if benchmark_db_path is not None:
+                require_benchmark_directory(benchmark_db_path, id_, "database directory")
                 self.set_db_path(data_source_index, benchmark_db_path)
 
         # Save dataset if requested
@@ -1186,6 +1190,8 @@ class DataLoader:
             origin_schema_source = origin_schema_source / sub_id / "schema.json"
         else:
             origin_schema_source = origin_schema_source / "schema.json"
+
+        require_benchmark_file(origin_schema_source, id_, "schema")
 
         # Load the dataset schema
         schema = load_dataset(origin_schema_source)

@@ -9,11 +9,16 @@ Squrve 的**实验复现入口**：加载 `configs/` 下的 JSON，驱动 `Engin
 ## 快速开始
 
 ```bash
-# 1. 填写 API Key（编辑对应 config 的 api_key 段）
-# 2. 从仓库根目录运行
+# 1. 在仓库根目录创建本地环境文件（.env 已被 gitignore）
+cp .env.example .env
+# 2. 仅在 .env 中填写对应 provider 的 API Key，不要写入 config 或提交到 Git
+# 3. 从仓库根目录运行
 python reproduce/run.py spider c3sql
 python reproduce/run.py BookSQL dinsql
 ```
+
+提交前请运行 `python tools/security_scan.py --history`；若密钥曾进入 Git
+历史，即使当前文件已删除，也必须先轮换密钥并清理历史后再发布。
 
 等价写法（已在 `reproduce/` 下时）：
 
@@ -142,6 +147,21 @@ python reproduce/batch_run.py spider c3sql --dry-run          # 只看 batch 划
 产物目录：`../files/datasets/<dataset>-<method>/batch_run/`（含 `state.json`、累计预测等）。
 
 > `batch_run` 的 `--resume` 与单次 `run.py` 无关，仅恢复 batch 状态。
+
+单次 reproduce run 的 checkpoint 与该 run 的数据快照绑定在同一个目录：
+
+```text
+files/runs/<run-id>/checkpoints/
+```
+
+```bash
+python reproduce/run.py spider c3sql --resume
+python reproduce/run.py spider c3sql --resume-from files/runs/<run-id>/checkpoints/state.json
+```
+
+`--resume` 选择该 dataset-method 最近一次可恢复的 run；`--resume-from` 则恢复
+指定 run。恢复过程复用原 run ID 和原 checkpoint datasets，不会创建一个只继承
+completed IDs、却丢失历史行数据的新 workspace。
 
 ---
 

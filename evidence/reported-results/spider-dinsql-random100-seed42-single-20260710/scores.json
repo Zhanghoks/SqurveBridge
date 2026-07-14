@@ -1,0 +1,46 @@
+{
+  "aggregate": {
+    "em": 0.46,
+    "ex": 0.77,
+    "rves": 0.70505744962994,
+    "sf1": 0.7694410256410257,
+    "ves": 0.774874572917927
+  },
+  "config_snapshot": {
+    "actors": [
+      {
+        "actor_class": "DINSQLGenerator",
+        "actor_params": {},
+        "eval_type": [
+          "execute_accuracy"
+        ],
+        "task_id": "generate",
+        "task_type": "GenerateTask"
+      }
+    ],
+    "exec_process": [
+      "generate"
+    ],
+    "generate_num": 1,
+    "llm": {
+      "max_token": 8000,
+      "model": "deepseek-v4-flash",
+      "provider": "qwen",
+      "temperature": 0,
+      "top_p": 0.9
+    },
+    "sampling": {
+      "limit": 100,
+      "mode": "random",
+      "seed": 42
+    },
+    "workflow": []
+  },
+  "dataset": "spider",
+  "method": "dinsql",
+  "run_id": "spider-dinsql-random100-seed42-single-20260710",
+  "sample_count": 100,
+  "scope": "random-100",
+  "split": "dev",
+  "timestamp": "2026-07-10T11:59:44.039269+00:00"
+}

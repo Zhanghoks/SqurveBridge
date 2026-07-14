@@ -1,0 +1,31 @@
+{
+  "actors": [
+    {
+      "actor_class": "DINSQLGenerator",
+      "actor_params": {},
+      "dataset_save_path": "../files/datasets/spider_dinsql.json",
+      "eval_type": [
+        "execute_accuracy"
+      ],
+      "task_id": "generate",
+      "task_type": "GenerateTask"
+    }
+  ],
+  "exec_process": [
+    "generate"
+  ],
+  "generate_num": 1,
+  "llm": {
+    "max_token": 8000,
+    "model": "deepseek-v4-flash",
+    "provider": "qwen",
+    "temperature": 0,
+    "top_p": 0.9
+  },
+  "sampling": {
+    "limit": 100,
+    "mode": "random",
+    "seed": 42
+  },
+  "workflow": []
+}

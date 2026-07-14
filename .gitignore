@@ -1,7 +1,17 @@
-# Secrets & local env
+# Secrets & local env. Only the placeholder template is public.
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+.envrc
+.direnv/
+*.pem
+*.key
+*.secret
+*.p12
+*.pfx
+credentials.json
+*_credentials.json
+service-account*.json
 
 # Python
 .venv/
@@ -9,6 +19,8 @@ venv/
 __pycache__/
 *.py[cod]
 *.egg-info/
+/*.egg-info/
+/dist/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -16,6 +28,15 @@ __pycache__/
 # Node / demo frontend
 demo-app/node_modules/
 demo-app/dist/
+**/.build/
+**/.playwright-cli/
+playwright-report/
+test-results/
+*.har
+*.zip
+*.mp4
+!benchmarks/packages/spider.zip
+!benchmarks/packages/bird.zip
 npm-debug.log*
 yarn-error.log*
 
@@ -26,19 +47,37 @@ tmp/
 *.log
 *.sqlite-shm
 *.sqlite-wal
+*.dump
+*.bak
 
 # OS / editor
 .DS_Store
 .idea/
 .vscode/
 *.swp
+*.swo
+*~
 
 # Agent runtime symlinks (recreated by harness/install)
 .claude/
 .agents/
 .squrve/
 
+# Local agent guidance (machine/user-specific, not repository SSOT)
+AGENTS.local.md
+
+# Local paper workspace migrated from Squrve 2.0
+paper/
+
+# Installed benchmark payloads are generated from the versioned LFS archives.
+benchmarks/spider/
+benchmarks/bird/
+!benchmarks/packages/
+!benchmarks/packages/manifest.json
+!benchmarks/packages/README.md
+
 # Optional local state
 .omc/
 .omx/
 .gradio/
+.remember/

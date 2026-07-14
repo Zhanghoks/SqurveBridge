@@ -1,7 +1,13 @@
 {
-  "name": "squrve-emnlp-demo-console",
+  "name": "squrvebridge-demo-console",
   "private": true,
   "version": "0.1.0",
+  "description": "Evidence-backed reviewer workspace for SqurveBridge",
+  "license": "MIT",
+  "repository": "https://github.com/Zhanghoks/SqurveBridge",
+  "engines": {
+    "node": ">=20"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -1,0 +1,35 @@
+{
+  "exporter": {
+    "code_commit": "67b44991e83ddcc2e8aab22bff833b39456a67e7",
+    "name": "SqurveBridge evidence exporter"
+  },
+  "files": {
+    "config.json": "cfd7c22c83db42c397a054a75cc02b690d73d42522b9728a5f9d606594535f0c",
+    "report.md": "7080558ad4cc40d971ead5e73603db65404771666ccc74017ce297d35268b5b4",
+    "sample-diagnostics.jsonl": "c53263664476a1e5ca116671ee4e4a2399e7818c9018ed936c84b71dee8cf865",
+    "scores.json": "cd52df284be55336226400e3aa4af8ddcc03471657930d97dc397e9b1c2d81a0"
+  },
+  "privacy": {
+    "classification": "public-sanitized",
+    "contains_absolute_paths": false,
+    "contains_credentials": false,
+    "contains_database_rows": false,
+    "contains_provider_payloads": false,
+    "contains_questions": false,
+    "contains_sql_text": false
+  },
+  "provenance": {
+    "benchmark": "spider",
+    "code_commit": "uncommitted Squrve-2.0 working tree snapshot, 2026-07-10",
+    "evaluator_version": "SqurveBridge four-layer evaluator snapshot 2026-07-10",
+    "method": "c3sql",
+    "model": "deepseek-v4-flash",
+    "notes": "Spider dev random-100 sample, seed 42; public reviewer evidence only.",
+    "provider": "qwen",
+    "sample_count": 100,
+    "source_alignment": "demo",
+    "split": "dev"
+  },
+  "run_id": "spider-c3sql-random100-seed42-single-20260710",
+  "schema_version": "1.0"
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verification helpers used by Squrve2.0 Claude skills."""
+"""Deterministic verification helpers used by SqurveBridge skills."""
 
 from __future__ import annotations
 

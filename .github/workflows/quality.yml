@@ -1,0 +1,143 @@
+name: Repository quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: Python ${{ matrix.python-version }} contracts
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Compile first-party Python
+        run: |
+          python -m compileall -q core demo reproduce tools
+
+      - name: Run dependency-free regressions
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+
+      - name: Scan public tree for secrets
+        run: python tools/security_scan.py
+
+      - name: Validate benchmark manifest and LFS pointers
+        run: python tools/benchmarks.py verify-pointers
+
+      - name: Validate public reproduce configurations
+        run: |
+          python tools/verify.py reproduce-contract --path reproduce/configs/spider/c3sql.json
+          python tools/verify.py reproduce-contract --path reproduce/configs/bird/e-sql-smoke.json
+
+      - name: Validate release metadata and documentation links
+        run: |
+          python - <<'PY'
+          from tools.release_check import validate_document_links, validate_release_metadata
+          from pathlib import Path
+
+          errors = validate_release_metadata(Path.cwd()) + validate_document_links(Path.cwd())
+          if errors:
+              raise SystemExit("\n".join(errors))
+          PY
+
+  package:
+    name: Python ${{ matrix.python-version }} package
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Build source and wheel distributions
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+
+  frontend:
+    name: Reviewer workspace
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: demo-app
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: demo-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build reviewer workspace
+        run: npm run build
+
+  history-security:
+    name: Reachable history security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Scan history without printing matched values
+        run: python tools/security_scan.py --history
+
+  data-integrity:
+    name: Full benchmark package integrity
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository and LFS payloads
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify archive checksums, structure, and safety
+        run: python tools/benchmarks.py verify-archives
