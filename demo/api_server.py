@@ -33,6 +33,7 @@ _project_root = Path(__file__).resolve().parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
+from demo.deployment import deployment_features, deployment_target, hosted_route_allowed
 from demo.file_to_db import process_uploaded_files, sqlite_to_schema
 from demo.gradio_demo import (
     ACTOR_BY_TYPE,
@@ -55,6 +56,18 @@ from demo.security import AGENT_TERMINAL_ENV, agent_terminals_enabled
 
 app = Flask(__name__)
 sock = Sock(app)
+
+
+@app.before_request
+def enforce_deployment_policy():
+    if request.path.startswith("/api/") and not hosted_route_allowed(request.method, request.path):
+        return jsonify({
+            "message": "This operation is available only in the trusted local Demo App.",
+            "reason": "local_only",
+        }), 403
+    return None
+
+
 _demo_instances: dict[tuple[str, str], SqurveDemo] = {}
 _demo_lock = threading.Lock()
 _jobs: dict[str, dict] = {}
@@ -447,6 +460,19 @@ def _provider_status() -> dict:
 
 def _llm_provider_catalog() -> list[dict]:
     load_dotenv(_project_root / ".env")
+    if deployment_target() == "hf-space":
+        provider = os.environ.get("SQURVE_LLM_PROVIDER", "qwen").strip()
+        models = _provider_models.get(provider) or []
+        model = os.environ.get("SQURVE_LLM_MODEL", models[0] if models else "").strip()
+        if provider not in _provider_models or model not in models:
+            return []
+        return [{
+            "id": provider,
+            "configured": bool(resolve_api_key(provider, None)),
+            "models": [model],
+            "default_model": model,
+            "env_var": PROVIDER_ENV_VARS[provider],
+        }]
     default = _provider_status()
     return [
         {
@@ -497,6 +523,10 @@ def capabilities():
         "llm_providers": _llm_provider_catalog(),
         "benchmarks": _benchmark_catalog(),
         "reproduce_configs": _config_catalog(),
+        "deployment": {
+            "target": deployment_target(),
+            "features": deployment_features(),
+        },
     })
 
 
