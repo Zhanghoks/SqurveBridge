@@ -855,8 +855,16 @@ function LeaderboardTable({ runs }) {
   )
 }
 
+function HostedEvaluationControls({ enabled, children }) {
+  if (enabled) return children
+  return <div className="hosted-readonly-note">
+    Recorded benchmark evidence is available here. Start new reproduce evaluations from a local SqurveBridge checkout.
+  </div>
+}
+
 export default function ExperimentBoard({
   capabilities,
+  liveEvaluation = true,
   api,
   postJson,
   Status,
@@ -1058,9 +1066,11 @@ export default function ExperimentBoard({
 
           <div className="board-actions">
             <button className="button secondary compact" disabled={busy} onClick={load}>{busy ? 'Refreshing…' : 'Refresh artifacts'}</button>
-            <button className="button primary compact" disabled={running || runnablePairs.length < 2} onClick={runComparison}>
-              {running ? 'Starting evaluation…' : `Run ${runnablePairs.length} methods on ${dataset}`}
-            </button>
+            <HostedEvaluationControls enabled={liveEvaluation}>
+              <button className="button primary compact" disabled={running || runnablePairs.length < 2} onClick={runComparison}>
+                {running ? 'Starting evaluation…' : `Run ${runnablePairs.length} methods on ${dataset}`}
+              </button>
+            </HostedEvaluationControls>
           </div>
         </div>
         {error && <p className="error-banner">{error}</p>}
