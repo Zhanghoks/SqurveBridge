@@ -1,7 +1,7 @@
 # Getting Started
 
-This guide takes a fresh SqurveBridge clone to a validated configuration, a live
-Text-to-SQL run, and the interactive reviewer workspace.
+This guide takes a local SqurveBridge checkout to a validated configuration, a
+live Text-to-SQL run, and the interactive workspace.
 
 ## Prerequisites
 
@@ -14,8 +14,7 @@ Text-to-SQL run, and the interactive reviewer workspace.
 
 ```bash
 git lfs install
-git clone https://github.com/Zhanghoks/SqurveBridge.git
-cd SqurveBridge
+# Run the remaining commands from the SqurveBridge repository root.
 git lfs pull --include="benchmarks/packages/*.zip"
 python3 -m venv .venv
 source .venv/bin/activate

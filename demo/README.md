@@ -1,7 +1,7 @@
 # SqurveBridge Interactive Demo
 
-本地交互工作台：React 前端（`demo-app/`）+ Flask API（`demo/api_server.py`）。  
-对应 EMNLP System Demonstration 中的可运行系统，不是静态幻灯片。
+本地交互工作台：React 前端（`demo-app/`）+ Flask API（`demo/api_server.py`）+ 内嵌 Pi Agent（`pi/`）。
+它用于运行 Text-to-SQL 工作流、查看实验结果和检查持久化证据。
 
 ## 一键启动 / 关闭
 
@@ -36,7 +36,8 @@
 | `SQURVE_DEMO_API_PORT` | `7861` | API 端口 |
 | `SQURVE_DEMO_WEB_HOST` | `127.0.0.1` | Vite 监听地址 |
 | `SQURVE_DEMO_WEB_PORT` | `5173` | 前端端口 |
-| `SQURVE_ENABLE_AGENT_TERMINALS` | 未设置 | 设为 `1` 后才启用高权限 Codex/Claude 本地终端 |
+| `PI_AGENT_PROVIDER` | 跟随 `SQURVE_LLM_PROVIDER` | Pi 使用的模型服务 |
+| `PI_AGENT_MODEL` | 跟随 `SQURVE_LLM_MODEL` | Pi 使用的模型 |
 
 示例：
 
@@ -47,8 +48,8 @@ SQURVE_DEMO_WEB_PORT=5174 ./demo/start.sh
 ## 前置依赖
 
 1. 仓库根目录已有可用的 Python 虚拟环境 `.venv/`（含 demo API 依赖）
-2. 已安装 Node.js / npm
-3. 首次启动若缺少 `demo-app/node_modules`，脚本会自动执行 `npm ci`
+2. 已安装 Node.js 22.19+ / npm
+3. 首次启动会按需构建 `pi/`，并在缺少 `demo-app/node_modules` 时执行 `npm ci`
 4. LLM 凭据：复制 `.env.example` → `.env`，或在页面右上角 **Configure LLM** 配置
 
 ```bash
@@ -98,6 +99,4 @@ lsof -nP -iTCP:5173 -sTCP:LISTEN
 
 ## 安全边界
 
-API 默认只监听 `127.0.0.1`。这是本地研究界面，不应直接暴露到不受信任的网络。
-Agent Harness 终端默认关闭，因为终端中的 Agent 可以修改当前工作区。仅在可信本地环境中显式运行
-`SQURVE_ENABLE_AGENT_TERMINALS=1 ./demo/start.sh`；不要在共享机器或端口转发场景启用。
+API 默认只监听 `127.0.0.1`。本地 Pi 会话可使用读写和命令工具，因此不应把本地服务暴露到不受信任的网络。Hugging Face 部署自动切换为 `hosted-readonly`，只向 Pi 开放 `read`、`grep`、`find` 和 `ls`。

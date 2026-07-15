@@ -1,6 +1,6 @@
 # Packaged benchmarks
 
-SqurveBridge versions its paper-aligned Spider and BIRD snapshots as two Git LFS archives:
+SqurveBridge versions its normalized Spider and BIRD snapshots as two Git LFS archives:
 
 - `spider.zip`
 - `bird.zip`

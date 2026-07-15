@@ -69,6 +69,28 @@ AGENTS.local.md
 # Local paper workspace migrated from Squrve 2.0
 paper/
 
+# Anonymous-submission private and generated surfaces
+manuscript/
+submission/
+submissions/
+rebuttal/
+reviews/
+camera-ready/
+private/
+private-notes/
+docs/superpowers/
+.superpowers/
+.anonymity-denylist
+build/
+anonymous-release/
+anonymous-release-*/
+submission*.pdf
+rebuttal*.pdf
+review*.pdf
+camera-ready*.pdf
+author-info.*
+affiliations.*
+
 # Installed benchmark payloads are generated from the versioned LFS archives.
 benchmarks/spider/
 benchmarks/bird/

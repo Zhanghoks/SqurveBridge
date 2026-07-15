@@ -4,7 +4,7 @@ import { deploymentTarget, featureEnabled, studioSurface } from './runtimeMode.j
 
 test('defaults to the complete local Demo App', () => {
   assert.equal(deploymentTarget(null), 'local')
-  assert.equal(featureEnabled(null, 'agent_terminals'), true)
+  assert.equal(featureEnabled(null, 'agent_chat'), true)
   assert.equal(studioSurface(null), 'workspace')
 })
 
@@ -12,11 +12,11 @@ test('uses hosted features returned by Flask', () => {
   const capabilities = {
     deployment: {
       target: 'hf-space',
-      features: { live_sql: true, agent_terminals: false, live_evaluation: false },
+      features: { live_sql: true, agent_chat: true, live_evaluation: false },
     },
   }
   assert.equal(deploymentTarget(capabilities), 'hf-space')
   assert.equal(featureEnabled(capabilities, 'live_sql'), true)
-  assert.equal(featureEnabled(capabilities, 'agent_terminals'), false)
+  assert.equal(featureEnabled(capabilities, 'agent_chat'), true)
   assert.equal(studioSurface(capabilities), 'live-sql')
 })

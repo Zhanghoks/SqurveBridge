@@ -239,7 +239,7 @@ export default function Archive({
                   <i>{run.file_count} files</i>
                 </div>
               </button>
-            )) : <Empty title="No archived runs" detail="Verified reviewer bundles live under evidence/reported-results; local evaluations write into artifacts/ and tmp/demo-runs." />}
+            )) : <Empty title="No archived runs" detail="Verified public bundles live under evidence/reported-results; local evaluations write into artifacts/ and tmp/demo-runs." />}
           </div>
         </section>
 

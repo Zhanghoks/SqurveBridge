@@ -37,6 +37,27 @@ class SecurityScanTests(unittest.TestCase):
 
         self.assertTrue(findings)
 
+    def test_vendored_pi_ignores_fixture_heuristics_but_scans_real_tokens(self) -> None:
+        token = "sk-" + "C" * 48
+        fixture_value = "upstream-" + "fixture-value"
+        credential_name = "api_" + "key"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            store = root / "pi" / "src" / "credential-store.ts"
+            store.parent.mkdir(parents=True)
+            store.write_text(
+                f'const {credential_name} = "{fixture_value}"\n',
+                encoding="utf-8",
+            )
+            leak = root / "pi" / "src" / "leak.ts"
+            leak.write_text(f'const value = "{token}"\n', encoding="utf-8")
+
+            findings = security_scan.scan_paths([store, leak], root)
+
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].path, "pi/src/leak.ts")
+        self.assertEqual(findings[0].category, "openai-style-token")
+
     def test_archive_path_traversal_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

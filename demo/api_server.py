@@ -2,23 +2,15 @@
 
 from __future__ import annotations
 
-import atexit
-import codecs
-import fcntl
 import hashlib
 import ipaddress
 import json
 import os
-import pty
 import re
-import shutil
-import signal
 import sqlite3
-import struct
 import subprocess
 import sys
 import tempfile
-import termios
 import threading
 import time
 import uuid
@@ -51,21 +43,31 @@ from reproduce.lib.env_config import (
 )
 from tools.profile_weakness import build_weakness_json
 from tools.evidence import EvidenceError, verify_bundle
-from demo.security import AGENT_TERMINAL_ENV, agent_terminals_enabled
+from demo.pi_api import register_pi_routes
 
 
 app = Flask(__name__)
 sock = Sock(app)
+_pi_sessions = register_pi_routes(app, sock, _project_root)
 
 
 @app.before_request
 def enforce_deployment_policy():
-    if request.path.startswith("/api/") and not hosted_route_allowed(request.method, request.path):
+    if (
+        request.url_rule is not None
+        and request.path.startswith("/api/")
+        and not hosted_route_allowed(request.method, request.path)
+    ):
         return jsonify({
             "message": "This operation is available only in the trusted local Demo App.",
             "reason": "local_only",
         }), 403
     return None
+
+
+@app.errorhandler(404)
+def api_route_not_found(_error):
+    return jsonify({"message": "API route not found."}), 404
 
 
 _demo_instances: dict[tuple[str, str], SqurveDemo] = {}
@@ -85,166 +87,29 @@ _provider_models = {
     "claude": ["claude-3-5-sonnet-latest"],
     "gemini": ["gemini-2.0-flash"],
 }
-_terminal_sessions: dict[str, "AgentPtySession"] = {}
-_terminal_lock = threading.Lock()
-_agent_commands = {"codex": "codex", "claude": "claude"}
-
-
-class AgentPtySession:
-    """One interactive coding agent attached to a pseudo-terminal."""
-
-    def __init__(self, agent: str, command: str, cols: int = 110, rows: int = 34):
-        self.session_id = uuid.uuid4().hex[:12]
-        self.agent = agent
-        self._lock = threading.RLock()
-        self._condition = threading.Condition(self._lock)
-        self._output = ""
-        self._output_base = 0
-        self._decoder = codecs.getincrementaldecoder("utf-8")("replace")
-        self.exit_code = None
-        env = os.environ.copy()
-        env.update({"TERM": "xterm-256color", "COLORTERM": "truecolor"})
-        argv = [command, "--no-alt-screen", "--sandbox", "workspace-write", "--ask-for-approval", "on-request", "-C", str(_project_root)] if agent == "codex" else [command, "--permission-mode", "manual"]
-        pid, master_fd = pty.fork()
-        if pid == 0:
-            os.chdir(_project_root)
-            os.execvpe(command, argv, env)
-        self.pid = pid
-        self.master_fd = master_fd
-        self.resize(cols, rows)
-        threading.Thread(target=self._read_output, daemon=True).start()
-
-    @property
-    def running(self) -> bool:
-        with self._lock:
-            if self.exit_code is not None:
-                return False
-        try:
-            waited_pid, status = os.waitpid(self.pid, os.WNOHANG)
-        except ChildProcessError:
-            return False
-        if waited_pid == 0:
-            return True
-        with self._lock:
-            self.exit_code = os.waitstatus_to_exitcode(status)
-        return False
-
-    def _read_output(self) -> None:
-        try:
-            while True:
-                try:
-                    chunk = os.read(self.master_fd, 32768)
-                except OSError:
-                    break
-                if not chunk:
-                    break
-                self._append(self._decoder.decode(chunk))
-        finally:
-            try:
-                _, status = os.waitpid(self.pid, 0)
-                with self._lock:
-                    self.exit_code = os.waitstatus_to_exitcode(status)
-            except ChildProcessError:
-                pass
-            self._append(self._decoder.decode(b"", final=True))
-
-    def _append(self, text: str) -> None:
-        with self._condition:
-            self._output += text
-            if len(self._output) > 2_000_000:
-                trim = len(self._output) - 1_500_000
-                self._output = self._output[trim:]
-                self._output_base += trim
-            self._condition.notify_all()
-
-    def read(self, cursor: int) -> tuple[str, int]:
-        with self._lock:
-            cursor = max(cursor, self._output_base)
-            start = cursor - self._output_base
-            return self._output[start:], self._output_base + len(self._output)
-
-    def wait_read(self, cursor: int, timeout: float = .25) -> tuple[str, int]:
-        with self._condition:
-            if cursor >= self._output_base + len(self._output) and self.running:
-                self._condition.wait(timeout)
-            cursor = max(cursor, self._output_base)
-            start = cursor - self._output_base
-            return self._output[start:], self._output_base + len(self._output)
-
-    def write(self, data: str) -> None:
-        if not self.running:
-            raise RuntimeError(f"{self.agent} terminal has exited.")
-        os.write(self.master_fd, data.encode("utf-8"))
-
-    def resize(self, cols: int, rows: int) -> None:
-        cols = max(40, min(int(cols), 300))
-        rows = max(12, min(int(rows), 100))
-        fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
-
-    def stop(self) -> None:
-        if self.running:
-            try:
-                os.killpg(self.pid, signal.SIGTERM)
-                deadline = time.monotonic() + 2
-                while self.running and time.monotonic() < deadline:
-                    time.sleep(.05)
-            except ProcessLookupError:
-                pass
-            if self.running:
-                try:
-                    os.killpg(self.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-        try:
-            os.close(self.master_fd)
-        except OSError:
-            pass
-
-    def public_state(self) -> dict:
-        return {
-            "session_id": self.session_id,
-            "agent": self.agent,
-            "running": self.running,
-            "exit_code": self.exit_code,
-            "cwd": str(_project_root),
-        }
 
 
 def _local_request_error():
+    """Restrict local configuration mutations to the trusted Demo App."""
     try:
         is_local = ipaddress.ip_address(request.remote_addr or "").is_loopback
     except ValueError:
         is_local = False
     if not is_local:
-        return _json_error("Agent access is restricted to localhost.", 403)
+        return _json_error("Configuration access is restricted to localhost.", 403)
     origin = request.headers.get("Origin")
-    allowed_origins = {"http://127.0.0.1:5173", "http://localhost:5173"}
+    allowed_origins = {
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:7860",
+        "http://localhost:7860",
+    }
     if origin and origin not in allowed_origins:
-        return _json_error("Agent access is restricted to the local Squrve workspace.", 403)
-    return None
-
-
-def _agent_terminal_access_error():
-    local_error = _local_request_error()
-    if local_error:
-        return local_error
-    if not agent_terminals_enabled():
         return _json_error(
-            f"Agent terminals are disabled. Set {AGENT_TERMINAL_ENV}=1 only in a trusted local workspace.",
+            "Configuration access is restricted to the local Squrve workspace.",
             403,
         )
     return None
-
-
-def _stop_terminal_sessions() -> None:
-    with _terminal_lock:
-        sessions = list(_terminal_sessions.values())
-        _terminal_sessions.clear()
-    for session in sessions:
-        session.stop()
-
-
-atexit.register(_stop_terminal_sessions)
 
 
 def _json_error(message: str, status: int = 400):
@@ -528,191 +393,6 @@ def capabilities():
             "features": deployment_features(),
         },
     })
-
-
-@app.get("/api/terminals")
-def terminal_catalog():
-    local_error = _local_request_error()
-    if local_error:
-        return local_error
-    enabled = agent_terminals_enabled()
-    if not enabled:
-        return jsonify({
-            "enabled": False,
-            "agents": [],
-            "cwd": str(_project_root),
-            "active_sessions": 0,
-            "max_active": 0,
-        })
-    with _terminal_lock:
-        active_by_agent = {
-            agent: next((session.public_state() for session in _terminal_sessions.values() if session.agent == agent and session.running), None)
-            for agent in _agent_commands
-        }
-    return jsonify({
-        "enabled": True,
-        "agents": [
-            {
-                "id": agent,
-                "name": "Claude Code" if agent == "claude" else "Codex",
-                "available": bool(command := shutil.which(executable)),
-                "command": Path(command).name if command else None,
-                "mode": "pty",
-                "session": active_by_agent[agent],
-            }
-            for agent, executable in _agent_commands.items()
-        ],
-        "cwd": str(_project_root),
-        "active_sessions": sum(bool(session) for session in active_by_agent.values()),
-        "max_active": 2,
-    })
-
-
-@app.post("/api/terminals")
-def start_terminal_session():
-    access_error = _agent_terminal_access_error()
-    if access_error:
-        return access_error
-    payload = request.get_json(silent=True) or {}
-    agent = str(payload.get("agent", "")).strip().lower()
-    if agent not in _agent_commands:
-        return _json_error("Agent must be either codex or claude.")
-    try:
-        cols = int(payload.get("cols", 110))
-        rows = int(payload.get("rows", 34))
-    except (TypeError, ValueError):
-        return _json_error("Terminal rows and columns must be integers.")
-    command = shutil.which(_agent_commands[agent])
-    if not command:
-        return _json_error(f"{agent} executable was not found.", 503)
-    with _terminal_lock:
-        if any(session.agent == agent and session.running for session in _terminal_sessions.values()):
-            return _json_error(f"A {agent} terminal is already running.", 409)
-        if sum(session.running for session in _terminal_sessions.values()) >= 2:
-            return _json_error("At most two agent terminals may be active at once.", 409)
-        session = AgentPtySession(agent, command, cols=cols, rows=rows)
-        _terminal_sessions[session.session_id] = session
-    return jsonify(session.public_state()), 201
-
-
-def _terminal_session(session_id: str) -> AgentPtySession | None:
-    with _terminal_lock:
-        return _terminal_sessions.get(session_id)
-
-
-@app.get("/api/terminals/<session_id>/output")
-def terminal_output(session_id: str):
-    access_error = _agent_terminal_access_error()
-    if access_error:
-        return access_error
-    session = _terminal_session(session_id)
-    if not session:
-        return _json_error("Agent terminal not found.", 404)
-    try:
-        cursor = max(0, int(request.args.get("cursor", 0)))
-    except ValueError:
-        return _json_error("Terminal output cursor must be an integer.")
-    output, next_cursor = session.read(cursor)
-    return jsonify({**session.public_state(), "output": output, "cursor": next_cursor})
-
-
-@app.post("/api/terminals/<session_id>/input")
-def terminal_input(session_id: str):
-    access_error = _agent_terminal_access_error()
-    if access_error:
-        return access_error
-    session = _terminal_session(session_id)
-    if not session:
-        return _json_error("Agent terminal not found.", 404)
-    data = str((request.get_json(silent=True) or {}).get("data", ""))
-    if not data or len(data) > 65536:
-        return _json_error("Terminal input must contain between 1 and 65536 characters.")
-    try:
-        session.write(data)
-    except RuntimeError as exc:
-        return _json_error(str(exc), 409)
-    return jsonify({"status": "accepted"})
-
-
-@app.post("/api/terminals/<session_id>/resize")
-def resize_terminal(session_id: str):
-    access_error = _agent_terminal_access_error()
-    if access_error:
-        return access_error
-    session = _terminal_session(session_id)
-    if not session:
-        return _json_error("Agent terminal not found.", 404)
-    payload = request.get_json(silent=True) or {}
-    try:
-        session.resize(int(payload.get("cols")), int(payload.get("rows")))
-    except (TypeError, ValueError):
-        return _json_error("Terminal rows and columns must be integers.")
-    return jsonify({"status": "resized"})
-
-
-@app.post("/api/terminals/<session_id>/stop")
-def stop_terminal_session(session_id: str):
-    access_error = _agent_terminal_access_error()
-    if access_error:
-        return access_error
-    session = _terminal_session(session_id)
-    if not session:
-        return _json_error("Agent terminal not found.", 404)
-    session.stop()
-    return jsonify(session.public_state())
-
-
-@sock.route("/api/terminals/<session_id>/ws")
-def terminal_websocket(ws, session_id: str):
-    access_error = _agent_terminal_access_error()
-    if access_error:
-        ws.close()
-        return
-    session = _terminal_session(session_id)
-    if not session:
-        ws.close()
-        return
-
-    closed = threading.Event()
-
-    def receive_input():
-        while not closed.is_set() and session.running:
-            try:
-                raw = ws.receive(timeout=1)
-            except TimeoutError:
-                continue
-            except Exception:
-                break
-            if raw is None:
-                continue
-            try:
-                message = json.loads(raw)
-                if message.get("type") == "input":
-                    data = str(message.get("data", ""))
-                    if 0 < len(data) <= 65536:
-                        session.write(data)
-                elif message.get("type") == "resize":
-                    session.resize(int(message.get("cols")), int(message.get("rows")))
-            except (ValueError, TypeError, RuntimeError):
-                continue
-        closed.set()
-
-    receiver = threading.Thread(target=receive_input, daemon=True)
-    receiver.start()
-    cursor = 0
-    try:
-        ws.send(json.dumps({"type": "ready", **session.public_state()}))
-        while not closed.is_set():
-            output, cursor = session.wait_read(cursor)
-            if output:
-                ws.send(json.dumps({"type": "output", "data": output, "cursor": cursor}))
-            if not session.running:
-                ws.send(json.dumps({"type": "exit", **session.public_state()}))
-                break
-    except Exception:
-        pass
-    finally:
-        closed.set()
 
 
 @app.get("/api/databases")

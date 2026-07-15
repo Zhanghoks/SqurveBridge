@@ -53,13 +53,6 @@ python tools/verify.py reproduce-contract --path reproduce/configs/spider/c3sql.
 The harness preserves intermediate manifests and decisions so integration evidence
 can be reviewed independently of an agent session.
 
-## Local Skill Installation
+## Pi Skill Loading
 
-The repository can expose the same contracts to compatible coding agents through
-local symlinks:
-
-```bash
-bash harness/install_squrve_harness.sh .
-```
-
-This installation helper is not required to run an existing reproduction config.
+The embedded Pi backend loads `skills/` directly through Pi's `DefaultResourceLoader`; no Claude Code or Codex installation is required. In the Demo chat, invoke a contract with Pi syntax such as `/skill:candidate-reader` or `/skill:run`. The legacy symlink installer remains only for compatibility with older local checkouts and is not part of the Live Demo runtime.

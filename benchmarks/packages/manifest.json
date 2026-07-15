@@ -2,7 +2,7 @@
   "schema_version": 1,
   "benchmarks": {
     "bird": {
-      "version": "BIRD dev (SqurveBridge paper snapshot)",
+      "version": "BIRD dev (SqurveBridge normalized snapshot)",
       "archive": "benchmarks/packages/bird.zip",
       "top_level": "bird",
       "source": "https://bird-bench.github.io/",
@@ -30,7 +30,7 @@
       ]
     },
     "spider": {
-      "version": "Spider 1.0 dev/test (SqurveBridge paper snapshot)",
+      "version": "Spider 1.0 dev/test (SqurveBridge normalized snapshot)",
       "archive": "benchmarks/packages/spider.zip",
       "top_level": "spider",
       "source": "https://github.com/taoyds/spider",

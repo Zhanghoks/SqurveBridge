@@ -41,7 +41,10 @@ def discover_evidence_checks(root: Path) -> list[Check]:
 
 
 def build_checks(root: Path, *, full: bool, history: bool, tests: bool) -> list[Check]:
-    checks = [Check("public-tree security", _python("tools/security_scan.py"), root)]
+    checks = [
+        Check("anonymous submission surface", _python("tools/anonymity_scan.py"), root),
+        Check("public-tree security", _python("tools/security_scan.py"), root),
+    ]
     if history:
         checks.append(
             Check("reachable-history security", _python("tools/security_scan.py", "--history"), root)
@@ -80,8 +83,8 @@ def build_checks(root: Path, *, full: bool, history: bool, tests: bool) -> list[
         checks.extend(
             [
                 Check("Python package build", _python("-m", "build"), root),
-                Check("reviewer workspace install", ("npm", "ci"), root / "demo-app"),
-                Check("reviewer workspace build", ("npm", "run", "build"), root / "demo-app"),
+                Check("demo workspace install", ("npm", "ci"), root / "demo-app"),
+                Check("demo workspace build", ("npm", "run", "build"), root / "demo-app"),
             ]
         )
     return checks
@@ -126,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--full",
         action="store_true",
-        help="also verify LFS payloads and build the Python package and reviewer workspace",
+        help="also verify LFS payloads and build the Python package and demo workspace",
     )
     parser.add_argument(
         "--skip-history",

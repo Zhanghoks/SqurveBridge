@@ -1,0 +1,95 @@
+# Version control and local configuration
+.git
+.env
+.env.*
+.envrc
+.direnv
+*.pem
+*.key
+*.secret
+*.p12
+*.pfx
+credentials.json
+*_credentials.json
+service-account*.json
+.venv
+venv
+*.egg-info
+
+# JavaScript dependencies and generated frontend assets
+node_modules
+**/node_modules
+demo-app/node_modules
+demo-app/dist
+**/.build
+**/.playwright-cli
+playwright-report
+test-results
+*.har
+*.zip
+*.mp4
+npm-debug.log*
+yarn-error.log*
+
+# Runtime and build outputs
+tmp
+artifacts
+build
+dist
+files
+*.log
+*.sqlite-shm
+*.sqlite-wal
+*.dump
+*.bak
+
+# Python and tool caches
+*.pyc
+*.pyo
+*.pyd
+__pycache__
+**/__pycache__
+.pytest_cache
+**/.pytest_cache
+.mypy_cache
+**/.mypy_cache
+.ruff_cache
+**/.ruff_cache
+.cache
+**/.cache
+
+# Local agent, planning, and generated documentation state
+.superpowers
+docs/superpowers
+.omc
+.omx
+.gradio
+.remember
+paper
+.claude
+.agents
+.squrve
+AGENTS.local.md
+
+# Downloadable benchmark packages are not runtime inputs
+benchmarks/packages/*.zip
+benchmarks/packages/*.tar
+benchmarks/packages/*.tar.gz
+benchmarks/packages/*.tgz
+benchmarks/packages/*.7z
+benchmarks/packages/*.rar
+
+# OS metadata
+.DS_Store
+**/.DS_Store
+Thumbs.db
+**/Thumbs.db
+._*
+**/._*
+
+# Editor state and swap files
+.idea
+.vscode
+*.swp
+*.swo
+*~

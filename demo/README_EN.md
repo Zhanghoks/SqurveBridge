@@ -1,6 +1,6 @@
-# SqurveBridge Interactive System
+# SqurveBridge Interactive Demo
 
-The reviewer workspace pairs the React application in `demo-app/` with the local
+The local workspace pairs the React application in `demo-app/` with the local
 Flask API in `demo/api_server.py`.
 
 ## Start

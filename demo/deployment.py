@@ -12,7 +12,6 @@ _HOSTED_FORBIDDEN = (
     ("POST", "/api/comparisons"),
 )
 _HOSTED_FORBIDDEN_PREFIXES = (
-    "/api/terminals",
     "/api/evaluations/",
 )
 
@@ -35,7 +34,7 @@ def deployment_features(environment: Mapping[str, str] | None = None) -> dict[st
         "recorded_evidence": True,
         "provider_configuration": not hosted,
         "database_upload": not hosted,
-        "agent_terminals": not hosted,
+        "agent_chat": True,
         "live_evaluation": not hosted,
     }
 

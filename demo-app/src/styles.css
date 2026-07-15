@@ -1201,7 +1201,7 @@ td em { color: #737d73; }
 .error-table { margin-top: 14px; }
 .error-table tbody th { text-transform: capitalize; }
 
-/* Interactive coding agent terminals */
+/* Embedded Pi Agent chat */
 .agent-harness { overflow: hidden; margin-top: 13px; }
 .agent-harness-loading { margin-top: 13px; }
 .agent-harness-head { display: flex; min-height: 58px; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid #303630; padding: 10px 12px; background: #171b17; }
@@ -1227,6 +1227,23 @@ td em { color: #737d73; }
 .agent-terminal-panel[hidden] { display: none; }
 .agent-terminal-host, .agent-terminal-host > .xterm { width: 100%; height: 100%; }
 .agent-terminal-host .xterm-viewport { scrollbar-color: #3d473e #101310; }
+.pi-chat-log { display: grid; align-content: start; gap: 10px; min-height: 360px; max-height: 560px; overflow-y: auto; padding: 14px; background: #101310; scrollbar-color: #3d473e #101310; }
+.pi-chat-empty { display: grid; place-content: center; gap: 8px; min-height: 300px; color: #748077; text-align: center; }
+.pi-chat-empty b { color: #c9d4cb; font-size: 12px; }
+.pi-chat-empty span { max-width: 620px; font-size: 9px; line-height: 1.7; }
+.pi-message { max-width: min(82%, 760px); border: 1px solid #313a32; border-radius: 7px; padding: 10px 12px; background: #171c18; }
+.pi-message.user { justify-self: end; border-color: #3e6049; background: #1a271e; }
+.pi-message.assistant { justify-self: start; }
+.pi-message header { margin-bottom: 6px; color: #72c992; font: 700 8px ui-monospace, monospace; text-transform: uppercase; }
+.pi-message p, .pi-message pre { margin: 0; color: #d4dbd5; font-size: 10px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pi-message details { margin-bottom: 8px; color: #7f8a81; font-size: 8px; }
+.pi-message details pre { margin-top: 6px; color: #89958b; font-size: 8px; }
+.pi-tool { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 9px; border: 1px solid #303830; border-radius: 5px; padding: 7px 9px; background: #141814; }
+.pi-tool > span { color: #8ed6a6; font: 700 8px ui-monospace, monospace; }
+.pi-tool > code { overflow: hidden; color: #727d74; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.pi-chat-composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; border-top: 1px solid #303630; padding: 10px 12px; background: #151915; }
+.pi-chat-composer textarea { min-height: 62px; resize: vertical; border: 1px solid #3a433b; border-radius: 5px; padding: 9px 10px; color: #dde4de; background: #0f130f; font: 10px/1.5 ui-monospace, monospace; }
+.pi-chat-composer .button { align-self: end; min-width: 76px; }
 
 /* Adapt */
 .adapt-empty { border: 1px solid #343a34; border-radius: 6px; background: #181c18; }
@@ -1314,7 +1331,8 @@ td em { color: #737d73; }
   .config-generation-list > div > .button { grid-column: 1 / -1; }
   .agent-harness-head { align-items: flex-start; flex-direction: column; }
   .agent-harness-head > div:last-child { width: 100%; justify-content: space-between; }
-  .agent-terminal-panel { height: 520px; }
+  .agent-terminal-panel, .pi-chat-log { height: 520px; }
+  .pi-chat-composer { grid-template-columns: 1fr; }
   .command-row .button { width: 100%; }
   .output-tabs { width: 100%; }
   .config-row { grid-template-columns: 1fr; }

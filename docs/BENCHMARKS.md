@@ -38,9 +38,10 @@ checksum mismatches, path traversal, absolute paths, symbolic links, encrypted
 members, duplicate paths, system metadata, credential files, and abnormal
 compression ratios before extraction.
 
-## Referenced Benchmarks
+## External Benchmarks
 
-The paper evaluates additional domain-specific settings. Their data is not
+SqurveBridge can normalize additional domain-specific settings when their data is
+obtained under the upstream distribution terms. These datasets are not
 redistributed in this repository.
 
 | Benchmark | Source | Expected local ID |
@@ -49,9 +50,8 @@ redistributed in this repository.
 | BookSQL | https://github.com/Exploration-Lab/BookSQL | `BookSQL` |
 | BookSQL dataset mirror | https://huggingface.co/datasets/Exploration-Lab/BookSQL | `BookSQL` |
 
-BULL-en is referenced by the paper's financial-domain experiments, but the current
-source evidence does not provide a public redistribution URL. SqurveBridge therefore
-does not redistribute it or invent an unofficial download location.
+Additional datasets without a verified public redistribution URL are intentionally
+not mirrored. SqurveBridge does not invent unofficial download locations.
 
 ## Normalized Layout
 

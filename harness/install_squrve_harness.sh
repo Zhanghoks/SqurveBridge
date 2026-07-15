@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install_squrve_harness.sh — Squrve 2.0 workbench skill harness.
+# install_squrve_harness.sh — SqurveBridge workbench skill harness.
 #
 # Squrve is a complete workbench. This script runs inside the Squrve repo and
 # creates ARIS-style flat skill symlinks:

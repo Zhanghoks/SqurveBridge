@@ -67,8 +67,8 @@ Depending on the run mode and configuration, outputs include:
 | evaluation store | Queryable sample- and run-level records |
 
 Runtime files are written below ignored `files/` and `artifacts/` directories. A
-paper result is reproducible only when its configuration and concrete run artifacts
-are retained together.
+reported result is reproducible only when its configuration and concrete run
+artifacts are retained together.
 
 ## Run Isolation and Resume
 

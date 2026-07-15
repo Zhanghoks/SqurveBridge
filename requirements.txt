@@ -126,5 +126,5 @@ jieba
 rank_bm25
 func-timeout
 sqlglot>=25.0.0
-gradio>=4.0.0
+gradio>=4.0.0,<5.0.0
 openpyxl>=3.0.0

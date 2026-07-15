@@ -17,6 +17,7 @@ class SpaceApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["deployment"]["target"], "hf-space")
         self.assertTrue(response.json["deployment"]["features"]["live_sql"])
+        self.assertTrue(response.json["deployment"]["features"]["agent_chat"])
 
     def test_hosted_space_rejects_local_only_mutations(self):
         with patch.dict(os.environ, {"SQURVE_DEPLOYMENT_TARGET": "hf-space"}, clear=False):
@@ -25,7 +26,6 @@ class SpaceApiTests(unittest.TestCase):
                 ("post", "/api/databases/upload"),
                 ("post", "/api/evaluations"),
                 ("post", "/api/comparisons"),
-                ("get", "/api/terminals"),
             ):
                 response = getattr(self.client, method)(path, json={})
                 self.assertEqual(response.status_code, 403, path)
@@ -50,6 +50,31 @@ class SpaceApiTests(unittest.TestCase):
             self.assertNotEqual(self.client.post("/api/query", json={}).status_code, 403)
             self.assertNotEqual(self.client.post("/api/execute", json={}).status_code, 403)
             self.assertEqual(self.client.get("/api/archive").status_code, 200)
+
+    def test_localhost_7860_provider_request_reaches_business_validation(self):
+        with patch.dict(os.environ, {"SQURVE_DEPLOYMENT_TARGET": "local"}, clear=False):
+            response = self.client.post(
+                "/api/provider",
+                json={},
+                headers={"Origin": "http://localhost:7860"},
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json["message"], "provider is required")
+
+    def test_hosted_policy_still_rejects_local_routes_from_port_7860(self):
+        headers = {"Origin": "http://localhost:7860"}
+        with patch.dict(os.environ, {"SQURVE_DEPLOYMENT_TARGET": "hf-space"}, clear=False):
+            provider = self.client.post("/api/provider", json={}, headers=headers)
+        self.assertEqual(provider.status_code, 403)
+        self.assertEqual(provider.json["reason"], "local_only")
+
+    def test_removed_coding_agent_terminal_api_is_not_exposed(self):
+        for target in ("local", "hf-space"):
+            with self.subTest(target=target):
+                with patch.dict(os.environ, {"SQURVE_DEPLOYMENT_TARGET": target}, clear=False):
+                    response = self.client.get("/api/terminals")
+                self.assertEqual(response.status_code, 404)
+                self.assertEqual(response.json, {"message": "API route not found."})
 
 
 if __name__ == "__main__":

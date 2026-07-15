@@ -6,6 +6,17 @@ from tools import release_check
 
 
 class ReleaseCheckTests(unittest.TestCase):
+    def test_build_checks_includes_anonymity_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            checks = release_check.build_checks(
+                root, full=False, history=False, tests=False
+            )
+
+        self.assertTrue(
+            any(check.name == "anonymous submission surface" for check in checks)
+        )
+
     def test_build_checks_separates_pointer_and_full_archive_validation(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

@@ -1,7 +1,7 @@
-# Squrve 2.0 Evaluation System — Reference
+# SqurveBridge Evaluation System — Reference
 
 > Single-source reference for every metric, dimension, slice, and artifact the
-> Squrve 2.0 evaluation system produces. Verified against
+> SqurveBridge evaluation system produces. Verified against
 > `reproduce/eval/`, `reproduce/metrics/`, and `core/evaluate.py`.
 
 ---

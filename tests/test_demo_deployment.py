@@ -25,7 +25,7 @@ class DemoDeploymentTests(unittest.TestCase):
                 "recorded_evidence": True,
                 "provider_configuration": False,
                 "database_upload": False,
-                "agent_terminals": False,
+                "agent_chat": True,
                 "live_evaluation": False,
             },
         )
@@ -34,12 +34,13 @@ class DemoDeploymentTests(unittest.TestCase):
         env = {"SQURVE_DEPLOYMENT_TARGET": "hf-space"}
         self.assertTrue(hosted_route_allowed("POST", "/api/query", env))
         self.assertTrue(hosted_route_allowed("POST", "/api/execute", env))
+        self.assertTrue(hosted_route_allowed("POST", "/api/agent/sessions", env))
         self.assertTrue(hosted_route_allowed("GET", "/api/archive", env))
         self.assertFalse(hosted_route_allowed("POST", "/api/provider", env))
         self.assertFalse(hosted_route_allowed("POST", "/api/databases/upload", env))
         self.assertFalse(hosted_route_allowed("POST", "/api/evaluations", env))
         self.assertFalse(hosted_route_allowed("POST", "/api/comparisons", env))
-        self.assertFalse(hosted_route_allowed("GET", "/api/terminals", env))
+        self.assertTrue(hosted_route_allowed("GET", "/api/terminals", env))
 
 
 if __name__ == "__main__":

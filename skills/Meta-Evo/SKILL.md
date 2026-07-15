@@ -1,12 +1,12 @@
 ---
 name: meta-evo
-description: Squrve2.0 evolution-controller 正式入口；从 reproduce scores 诊断弱点，调用 reproduce/metrics 下的 MCTS/evolution engine 搜索 Actor/config 改进，并把全过程写入 artifacts/evolve。
+description: SqurveBridge evolution-controller 正式入口；从 reproduce scores 诊断弱点，调用 reproduce/metrics 下的 MCTS/evolution engine 搜索 Actor/config 改进，并把全过程写入 artifacts/evolve。
 disable-model-invocation: true
 ---
 
 # Meta-Evo
 
-Meta-Evo 是 Squrve2.0 自进化 harness 的正式入口。它不是新根目录系统，也不是第二套 runner；它顺着现有结构组织：
+Meta-Evo 是 SqurveBridge 自进化 harness 的正式入口。它不是新根目录系统，也不是第二套 runner；它顺着现有结构组织：
 
 - `skills/`、`tools/`、`templates/`（SSOT）：`SKILL.md` frontmatter 注册命令入口，正文描述流程；`tools/` 放确定性工具；`templates/` 放可复制产物骨架。
 - `.claude/` 与 `.agents/`：symlink 镜像，共享同一套 SSOT 源文件。

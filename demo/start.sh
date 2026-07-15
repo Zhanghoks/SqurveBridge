@@ -86,6 +86,14 @@ PYTHON="$(resolve_python)"
 command -v npm >/dev/null 2>&1 || die "npm not found. Install Node.js first."
 command -v curl >/dev/null 2>&1 || die "curl not found."
 
+node_major="$(node -p 'process.versions.node.split(".")[0]')"
+[[ "${node_major}" -ge 22 ]] || die "Embedded Pi requires Node.js 22.19 or newer."
+
+if [[ ! -f "${ROOT}/pi/packages/coding-agent/dist/index.js" ]]; then
+  log "Building embedded Pi Agent runtime…"
+  bash "${ROOT}/demo/build_embedded_pi.sh"
+fi
+
 if [[ ! -d "${ROOT}/demo-app/node_modules" ]]; then
   log "Installing frontend dependencies (npm ci)…"
   (cd "${ROOT}/demo-app" && npm ci)
@@ -122,5 +130,6 @@ trap - EXIT
 log "SqurveBridge demo is up."
 log "  Workspace: http://${WEB_HOST}:${WEB_PORT}"
 log "  API:       http://${API_HOST}:${API_PORT}"
+log "  Agent:     embedded Pi (${PI_AGENT_PROVIDER:-${SQURVE_LLM_PROVIDER:-auto}}/${PI_AGENT_MODEL:-${SQURVE_LLM_MODEL:-auto}})"
 log "  Logs:      ${RUNTIME_DIR}/api.log , ${RUNTIME_DIR}/web.log"
 log "Stop with:   demo/stop.sh"

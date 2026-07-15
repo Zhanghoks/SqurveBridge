@@ -34,8 +34,14 @@ jobs:
         run: |
           python -m compileall -q core demo reproduce tools
 
+      - name: Install tested runtime dependencies
+        run: python -m pip install -r requirements.txt -r demo/requirements.txt
+
       - name: Run dependency-free regressions
         run: python -m unittest discover -s tests -p 'test_*.py' -v
+
+      - name: Scan public tree for anonymous-submission leaks
+        run: python tools/anonymity_scan.py
 
       - name: Scan public tree for secrets
         run: python tools/security_scan.py
@@ -83,7 +89,7 @@ jobs:
           python -m build
 
   frontend:
-    name: Reviewer workspace
+    name: Demo workspace
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -102,8 +108,46 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build reviewer workspace
+      - name: Build demo workspace
         run: npm run build
+
+  pi-runtime:
+    name: Embedded Pi runtime
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.19"
+
+      - name: Test the Pi bridge security contract
+        run: node --test tests/pi_agent_bridge.test.mjs
+
+      - name: Build the vendored Pi runtime
+        run: bash demo/build_embedded_pi.sh
+
+  hosted-space-image:
+    name: Hugging Face Space image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Verify and install the packaged Spider benchmark
+        run: |
+          python tools/benchmarks.py verify-archives
+          python tools/benchmarks.py install spider
+
+      - name: Build the allowlisted Space context
+        run: python tools/build_hf_space.py
+
+      - name: Build the deployable Docker image
+        run: docker build --tag squrvebridge-space:test build/hf-space
 
   history-security:
     name: Reachable history security

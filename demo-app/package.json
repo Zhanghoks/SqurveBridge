@@ -2,9 +2,8 @@
   "name": "squrvebridge-demo-console",
   "private": true,
   "version": "0.1.0",
-  "description": "Evidence-backed reviewer workspace for SqurveBridge",
+  "description": "Evidence-backed interactive workspace for SqurveBridge",
   "license": "MIT",
-  "repository": "https://github.com/Zhanghoks/SqurveBridge",
   "engines": {
     "node": ">=20"
   },
@@ -18,8 +17,6 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "6.0.3",
-    "@xterm/addon-fit": "^0.11.0",
-    "@xterm/xterm": "^6.0.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "vite": "8.1.4"

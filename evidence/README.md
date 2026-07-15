@@ -5,9 +5,10 @@ preserve aggregate scores and stage-localizable diagnostics without redistributi
 benchmark questions, database rows, SQL text, provider payloads, credentials, or local
 filesystem paths.
 
-The `reported-results/` directory contains three reviewer snapshots for Spider dev:
+The `reported-results/` directory contains three sanitized snapshots for Spider dev:
 C3SQL, DINSQL, and FinSQL, each using deterministic random-100 sampling with seed 42.
-These are demo-aligned snapshots rather than the paper's full-split result tables.
+They demonstrate the public evidence contract and are not claims about another
+provider, prompt, sample scope, or evaluator.
 
 ## Export
 
@@ -23,7 +24,7 @@ Then run:
 
 ```bash
 python tools/evidence.py export \
-  --run-id spider-c3sql-paper \
+  --run-id spider-c3sql-demo \
   --metadata metadata.json \
   --config private-run/config.json \
   --scores private-run/scores.json \
@@ -43,7 +44,7 @@ directory and is published atomically only after self-verification.
 ## Verify
 
 ```bash
-python tools/evidence.py verify evidence/reported-results/spider-c3sql-paper
+python tools/evidence.py verify evidence/reported-results/<bundle-id>
 ```
 
 Verification rejects unknown files or directories, schema drift, invalid privacy

@@ -1,11 +1,11 @@
-# Squrve 2.0
+# SqurveBridge
 
 Text2SQL 研究框架。通过 ARIS 风格 SKILL.md 合约接入社区方法和数据集，自动复现评估。
 
-Pipeline: `/candidate-reader` → `/integration-pipeline`（细粒度 adapters）→ `/run`（**debug 运行问题、跑通整条 reproduce config**，再评估出分）→ 可选 `/meta-evo`（基于 reproduce artifacts 的自进化 loop engineering）。
+Pipeline: `/skill:candidate-reader` → `/skill:integration-pipeline`（细粒度 adapters）→ `/skill:run`（**debug 运行问题、跑通整条 reproduce config**，再评估出分）→ 可选 `/skill:meta-evo`（基于 reproduce artifacts 的自进化 loop engineering）。
 `/method-adapter` 与 `/database-adapter` 仅为对应分支的兼容薄封装。
 
-**双 Agent（共享 SSOT）**：`skills/`、`tools/`、`templates/` 为单源真相；`.claude/skills/` 与 `.agents/skills/` 通过扁平 symlink 暴露同一套 SKILL.md。Claude Code 读本文件 + `.claude/`；Codex 读 [AGENTS.md](./AGENTS.md) + `.agents/`。详见 [harness/README.md](./harness/README.md)。
+**内嵌 Pi Agent（共享 SSOT）**：`pi/` 是经过固定版本审查的开源 Agent 源码，`skills/`、`tools/`、`templates/` 是 SqurveBridge 能力单源真相。`demo/pi_agent_bridge.mjs` 通过 Pi `DefaultResourceLoader` 直接加载项目 Skills，不调用 Claude Code 或 Codex。详见 [harness/README.md](./harness/README.md)。
 
 ## 核心原则
 

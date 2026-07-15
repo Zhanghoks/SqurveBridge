@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Manage Squrve2.0 Claude artifact state from skill workflows.
+"""Manage SqurveBridge Claude artifact state from skill workflows.
 
 This tool intentionally keeps deterministic bookkeeping out of SKILL.md files.
 Run all commands from the Squrve repository root.

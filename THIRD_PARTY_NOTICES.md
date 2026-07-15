@@ -13,3 +13,9 @@ modified compatibility fragments must retain their original notices.
 The original Squrve copyright line remains in `LICENSE`. Spider, BIRD, and every
 other benchmark remain governed by their upstream distribution terms; see
 [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+
+The embedded Pi Agent runtime under `pi/` was acquired from the
+[`earendil-works/pi`](https://github.com/earendil-works/pi) distribution at the
+revision recorded in `pi/SQURVEBRIDGE_UPSTREAM.md`; that distribution derives
+from the open-source Pi project. Pi is distributed under its upstream MIT
+license in `pi/LICENSE`; those notices remain authoritative for vendored files.
