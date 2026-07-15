@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import PiAuthDialog from './PiAuthDialog.jsx'
 import { appendUserMessage, applyPiEvent, createPiChatState, skillPrompt } from './piChat.js'
+import { applyPiAuthEvent, createPiAuthState } from './piAuth.js'
 
 const DEFAULT_SKILLS = ['candidate-reader', 'integration-pipeline', 'config-adapter', 'run', 'meta-evo']
 
@@ -10,12 +12,19 @@ export default function AgentHarness({ api, postJson, Status, candidateUrl = '',
   const endRef = useRef(null)
   const [catalog, setCatalog] = useState(null)
   const [chat, setChat] = useState(createPiChatState)
+  const [auth, setAuth] = useState(createPiAuthState)
+  const [authOpen, setAuthOpen] = useState(false)
   const [draft, setDraft] = useState('')
 
   const receive = event => {
     try {
       const payload = JSON.parse(event.data)
       setChat(current => applyPiEvent(current, payload))
+      setAuth(current => applyPiAuthEvent(current, payload))
+      if (payload.type === 'model_catalog') {
+        const selected = payload.models?.find(model => model.selected)
+        if (selected) setChat(current => ({ ...current, provider: selected.provider, model: selected.id }))
+      }
     } catch {
       setChat(current => ({ ...current, status: 'error', error: 'Pi returned an invalid event.' }))
     }
@@ -38,6 +47,8 @@ export default function AgentHarness({ api, postJson, Status, candidateUrl = '',
       if (socketRef.current === socket) {
         socketRef.current = null
         setChat(current => current.status === 'stopped' ? current : { ...current, status: 'stopped' })
+        setAuth(createPiAuthState())
+        setAuthOpen(false)
       }
     }
     return new Promise((resolve, reject) => {
@@ -60,9 +71,26 @@ export default function AgentHarness({ api, postJson, Status, candidateUrl = '',
     }
   }
 
+  const sendCommand = command => {
+    const socket = socketRef.current
+    if (socket?.readyState !== WebSocket.OPEN) throw new Error('Pi chat connection is not ready.')
+    socket.send(JSON.stringify(command))
+  }
+
+  const openAuth = async () => {
+    let session = sessionRef.current
+    if (!session?.running || socketRef.current?.readyState !== WebSocket.OPEN) session = await start()
+    if (!session) return
+    setAuthOpen(true)
+  }
+
   const sendMessage = async (message, taskId = '') => {
     const normalized = message.trim()
     if (!normalized) return
+    if (!auth.selectedModel) {
+      await openAuth()
+      return
+    }
     let session = sessionRef.current
     if (!session?.running || socketRef.current?.readyState !== WebSocket.OPEN) session = await start()
     if (!session) return
@@ -85,6 +113,8 @@ export default function AgentHarness({ api, postJson, Status, candidateUrl = '',
       sessionRef.current = null
       socketRef.current?.close()
       setChat(current => ({ ...current, status: 'stopped' }))
+      setAuth(createPiAuthState())
+      setAuthOpen(false)
     }
   }
 
@@ -119,18 +149,20 @@ export default function AgentHarness({ api, postJson, Status, candidateUrl = '',
   useEffect(() => {
     if (!queuedCommand?.id || handledCommandRef.current === queuedCommand.id) return
     sendMessage(queuedCommand.command, queuedCommand.id).catch(error => setChat(current => ({ ...current, error: error.message })))
-  }, [queuedCommand?.id])
+  }, [queuedCommand?.id, auth.selectedModel?.provider, auth.selectedModel?.id])
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [chat.messages, chat.tools])
+  useEffect(() => { endRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' }) }, [chat.messages, chat.tools])
 
   const skills = chat.skills.length ? chat.skills.filter(name => DEFAULT_SKILLS.includes(name)) : DEFAULT_SKILLS
   const running = ['starting', 'thinking', 'ready'].includes(chat.status) && Boolean(sessionRef.current)
   const busy = chat.status === 'thinking'
+  const authenticated = Boolean(auth.selectedModel)
+  const modelLabel = authenticated ? `${auth.selectedModel.provider}/${auth.selectedModel.id}` : ''
 
   return <section className="tool-panel agent-harness pi-chat">
     <div className="agent-harness-head">
-      <div><strong>Pi Agent · Native SqurveBridge backend</strong><span>{chat.provider && chat.model ? `${chat.provider}/${chat.model}` : catalog?.available ? 'Embedded Pi ready' : 'Embedded Pi build required'} · {chat.profile || 'checking profile'}</span></div>
-      <div><Status tone={chat.error ? 'danger' : busy ? 'running' : running ? 'success' : 'neutral'}>{busy ? 'Pi working' : chat.status}</Status>{busy && <button className="button agent-cancel" onClick={abort}>Stop response</button>}{running ? <button className="button secondary" onClick={stop}>End session</button> : <button className="button primary" disabled={catalog?.available === false} onClick={start}>Start Pi</button>}</div>
+      <div><strong>Pi Agent · Native SqurveBridge backend</strong><span>{modelLabel || (catalog?.available ? 'Authentication required' : 'Embedded Pi build required')} · {chat.profile || 'checking profile'}</span></div>
+      <div><Status tone={chat.error || auth.error ? 'danger' : busy ? 'running' : authenticated ? 'success' : 'neutral'}>{busy ? 'Pi working' : authenticated ? 'authenticated' : chat.status}</Status>{busy && <button className="button agent-cancel" onClick={abort}>Stop response</button>}<button className="button primary" disabled={catalog?.available === false} onClick={openAuth}>{authenticated ? 'Switch model' : 'Login to Pi'}</button>{running && <button className="button secondary" onClick={stop}>End session</button>}</div>
     </div>
     <div className="harness-shortcuts">{skills.map(name => <button key={name} className={name === 'candidate-reader' && !candidateUrl ? 'needs-input' : ''} onClick={() => useSkill(name)}>{`/skill:${name}`}</button>)}</div>
     <div className="pi-chat-log" aria-live="polite">
@@ -140,9 +172,10 @@ export default function AgentHarness({ api, postJson, Status, candidateUrl = '',
       <div ref={endRef} />
     </div>
     <form className="pi-chat-composer" onSubmit={event => { event.preventDefault(); sendMessage(draft).catch(error => setChat(current => ({ ...current, error: error.message }))) }}>
-      <textarea value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(draft).catch(error => setChat(current => ({ ...current, error: error.message }))) } }} placeholder="Message Pi or use a Skill…" rows="3" />
-      <button className="button primary" disabled={!draft.trim() || busy} type="submit">Send</button>
+      <textarea value={draft} disabled={!authenticated || busy} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(draft).catch(error => setChat(current => ({ ...current, error: error.message }))) } }} placeholder="Message Pi or use a Skill…" rows="3" />
+      <button className="button primary" disabled={!authenticated || !draft.trim() || busy} type="submit">Send</button>
     </form>
     {chat.error && <p className="error-banner">{chat.error}</p>}
+    <PiAuthDialog open={authOpen} state={auth} send={sendCommand} onClose={() => setAuthOpen(false)} />
   </section>
 }

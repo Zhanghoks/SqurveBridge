@@ -1275,7 +1275,46 @@ td em { color: #737d73; }
 .pi-tool > code { overflow: hidden; color: #727d74; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .pi-chat-composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; border-top: 1px solid #303630; padding: 10px 12px; background: #151915; }
 .pi-chat-composer textarea { min-height: 62px; resize: vertical; border: 1px solid #3a433b; border-radius: 5px; padding: 9px 10px; color: #dde4de; background: #0f130f; font: 10px/1.5 ui-monospace, monospace; }
+.pi-chat-composer textarea:disabled { color: #667068; background: #111411; cursor: not-allowed; }
 .pi-chat-composer .button { align-self: end; min-width: 76px; }
+
+/* Pi native login, adapted from the terminal-first provider flow */
+.pi-auth-dialog { width: min(920px, 100%); padding: 0; overflow: hidden; }
+.pi-auth-header { padding: 17px 18px 13px; }
+.pi-tui-frame { display: grid; grid-template-columns: minmax(220px, .72fr) minmax(360px, 1.28fr); min-height: 430px; background: #0f130f; }
+.pi-auth-providers { min-width: 0; border-right: 1px solid #303630; padding: 13px; background: #141814; }
+.pi-auth-providers .field { margin: 0 0 10px; }
+.pi-auth-providers input { width: 100%; border: 1px solid #353d36; border-radius: 4px; padding: 8px 9px; color: #dbe2dc; background: #0e120e; font: 9px ui-monospace, monospace; }
+.pi-auth-provider-list { display: grid; gap: 4px; max-height: 340px; overflow-y: auto; }
+.pi-auth-provider-list > button { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid transparent; border-radius: 4px; padding: 9px; color: #8b958c; background: transparent; text-align: left; }
+.pi-auth-provider-list > button:hover, .pi-auth-provider-list > button.active { border-color: #416149; color: #dce6de; background: #19231b; }
+.pi-auth-provider-list span, .pi-auth-provider-list strong, .pi-auth-provider-list code { display: block; }
+.pi-auth-provider-list strong { font-size: 9px; }
+.pi-auth-provider-list code, .pi-auth-provider-list small { color: #6d786f; font-size: 7px; }
+.pi-auth-stage { display: grid; align-content: start; gap: 13px; min-width: 0; padding: 18px; }
+.pi-auth-stage-title, .pi-auth-footer, .pi-auth-prompt-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pi-auth-stage-title span, .pi-model-picker > div > span { display: block; color: #e3e9e4; font-size: 11px; font-weight: 720; }
+.pi-auth-stage-title small, .pi-model-picker > div > small { display: block; margin-top: 4px; color: #758078; font: 8px ui-monospace, monospace; }
+.pi-auth-methods { display: flex; flex-wrap: wrap; gap: 7px; }
+.pi-auth-events { display: grid; gap: 6px; border: 1px solid #303a31; border-radius: 5px; padding: 10px; background: #121712; }
+.pi-auth-events > div { display: grid; gap: 4px; color: #98a39a; font: 8px/1.5 ui-monospace, monospace; overflow-wrap: anywhere; }
+.pi-auth-events span { color: #72c992; text-transform: uppercase; }
+.pi-auth-events a { color: #85cda0; }
+.pi-auth-events p { margin: 0; }
+.pi-auth-prompt { display: grid; gap: 12px; border: 1px solid #3d5945; border-radius: 6px; padding: 13px; background: #172019; }
+.pi-auth-prompt-field > span { display: block; margin-bottom: 8px; color: #dbe5dd; font-size: 9px; font-weight: 700; }
+.pi-auth-input { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.pi-auth-input input { min-width: 0; border: 1px solid #3a463c; border-radius: 4px 0 0 4px; padding: 9px; color: #e6ebe7; background: #0d110e; font: 9px ui-monospace, monospace; }
+.pi-auth-input button { border: 1px solid #3a463c; border-left: 0; border-radius: 0 4px 4px 0; padding-inline: 10px; color: #9ac4a7; background: #19211a; font-size: 8px; }
+.pi-auth-options { display: grid; gap: 5px; }
+.pi-auth-options label { border: 1px solid #354038; border-radius: 4px; padding: 8px; color: #aab4ac; font-size: 9px; }
+.pi-model-picker { display: grid; gap: 9px; border-top: 1px solid #303630; padding-top: 14px; }
+.pi-model-picker > div:last-child { display: grid; gap: 5px; }
+.pi-model-picker button { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; border: 1px solid #303a32; border-radius: 4px; padding: 9px 10px; color: #cfd8d1; background: #141914; text-align: left; }
+.pi-model-picker button:hover, .pi-model-picker button.active { border-color: #4e775b; background: #1a241c; }
+.pi-model-picker button code { color: #738078; font-size: 8px; }
+.pi-model-picker button small { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: #7fd49a; font-size: 7px; text-transform: uppercase; }
+.pi-auth-footer { border-top: 1px solid #303630; padding: 11px 18px; color: #6f7971; background: #141814; font: 8px ui-monospace, monospace; }
 
 /* Adapt */
 .adapt-empty { border: 1px solid #343a34; border-radius: 6px; background: #181c18; }
@@ -1341,6 +1380,10 @@ td em { color: #737d73; }
   .runtime-state > .status { display: none; }
   .auth-dialog-backdrop { align-items: end; padding: 0; }
   .auth-dialog { max-height: 92vh; border-radius: 12px 12px 0 0; padding: 14px; }
+  .pi-auth-dialog { padding: 0; }
+  .pi-tui-frame { grid-template-columns: 1fr; max-height: 70vh; overflow-y: auto; }
+  .pi-auth-providers { border-right: 0; border-bottom: 1px solid #303630; }
+  .pi-auth-provider-list { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 150px; }
   .auth-provider-list { grid-template-columns: 1fr; }
   .auth-dialog-actions .button { width: 100%; }
   .page-heading { align-items: flex-start; flex-direction: column; }
