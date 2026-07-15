@@ -210,6 +210,10 @@ class HuggingFaceBundleTests(unittest.TestCase):
         requirements = (self.root / "requirements.txt").read_text(encoding="utf-8")
         self.assertIn("MarkupSafe==2.1.5", requirements)
         self.assertNotIn("MarkupSafe==3.0.2", requirements)
+        self.assertIn("pillow==10.4.0", requirements)
+        self.assertNotIn("pillow==11.2.1", requirements)
+        self.assertIn("tomlkit==0.12.0", requirements)
+        self.assertNotIn("tomlkit==0.13.3", requirements)
 
     def test_runtime_reuses_the_node_images_uid_1000_user(self) -> None:
         dockerfile = (self.root / "deploy/huggingface/Dockerfile").read_text(
