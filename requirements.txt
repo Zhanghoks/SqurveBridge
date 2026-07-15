@@ -59,7 +59,7 @@ llama-index-readers-file==0.1.33
 llama-index-readers-llama-parse==0.1.6
 llama-parse==0.4.9
 loguru==0.7.3
-MarkupSafe==3.0.2
+MarkupSafe==2.1.5
 marshmallow==3.26.1
 mpmath==1.3.0
 multidict==6.6.2

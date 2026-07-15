@@ -206,6 +206,19 @@ class HuggingFaceBundleTests(unittest.TestCase):
         requirements = (self.root / "requirements.txt").read_text(encoding="utf-8")
         self.assertIn("gradio>=4.0.0,<5.0.0", requirements)
 
+    def test_gradio_and_markupsafe_constraints_are_compatible(self) -> None:
+        requirements = (self.root / "requirements.txt").read_text(encoding="utf-8")
+        self.assertIn("MarkupSafe==2.1.5", requirements)
+        self.assertNotIn("MarkupSafe==3.0.2", requirements)
+
+    def test_runtime_reuses_the_node_images_uid_1000_user(self) -> None:
+        dockerfile = (self.root / "deploy/huggingface/Dockerfile").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("useradd --create-home --uid 1000", dockerfile)
+        self.assertIn("chown -R node:node /app", dockerfile)
+        self.assertIn("USER node", dockerfile)
+
     def test_small_bundle_rebuild_is_deterministic_and_removes_stale_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "root"

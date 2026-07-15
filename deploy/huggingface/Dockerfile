@@ -24,8 +24,7 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential curl python3 python3-venv \
     && rm -rf /var/lib/apt/lists/* \
-    && python3 -m venv /opt/venv \
-    && useradd --create-home --uid 1000 user
+    && python3 -m venv /opt/venv
 COPY . /app
 COPY --from=frontend /build/dist /app/demo-app/dist
 COPY --from=pi-builder /build/pi /app/pi
@@ -33,8 +32,8 @@ RUN python -m pip install --upgrade pip \
     && python -m pip install -r deploy/huggingface/requirements.txt \
     && chmod +x deploy/huggingface/entrypoint.sh \
     && mkdir -p /app/tmp /app/artifacts \
-    && chown -R user:user /app
-USER user
+    && chown -R node:node /app
+USER node
 EXPOSE 7860
 RUN node --version && python --version
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
