@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './styles.css'
 import ExperimentBoard from './ExperimentBoard.jsx'
 import Archive from './Archive.jsx'
+import SqlAuthDialog from './SqlAuthDialog.jsx'
 import { deploymentTarget, featureEnabled, studioSurface } from './runtimeMode.js'
 
 const AgentHarness = lazy(() => import('./AgentHarness.jsx'))
@@ -52,11 +53,14 @@ function ShellNav({ page, setPage }) {
   </aside>
 }
 
-function Topbar({ health, capabilities, refresh, busy, hosted = false, showProviderConfig = true }) {
+function Topbar({ health, capabilities, refresh, busy, hosted = false, showProviderConfig = true, sessionSqlAuth = false, sqlAuth, onSqlAuthChange }) {
+  const [sqlAuthOpen, setSqlAuthOpen] = useState(false)
   const provider = health?.provider
-  const tone = !health ? 'neutral' : provider?.message && !provider?.ready ? 'danger' : provider?.verified ? 'success' : 'warning'
-  const label = !health ? 'Connecting' : provider?.verified ? `${provider.provider} credential verified` : provider?.configured ? `${provider.provider} · ${provider.model || 'model'}` : 'Provider setup required'
-  return <header className="topbar"><div><strong>Squrve-native runtime</strong><span>{hosted ? 'Hugging Face Space' : 'Local demo session'}</span></div><div className="runtime-state"><Status tone={tone}>{label}</Status>{showProviderConfig && <ProviderConfig health={health} capabilities={capabilities} refresh={refresh} />}<button className="icon-button" onClick={refresh} disabled={busy} title="Refresh runtime" aria-label="Refresh runtime">↻</button></div></header>
+  const localTone = !health ? 'neutral' : provider?.message && !provider?.ready ? 'danger' : provider?.verified ? 'success' : 'warning'
+  const localLabel = !health ? 'Connecting' : provider?.verified ? `${provider.provider} credential verified` : provider?.configured ? `${provider.provider} · ${provider.model || 'model'}` : 'Provider setup required'
+  const tone = hosted ? sqlAuth?.configured ? 'success' : 'warning' : localTone
+  const label = hosted ? sqlAuth?.configured ? `${sqlAuth.provider} / ${sqlAuth.model} · Connected` : 'SQL API not connected' : localLabel
+  return <header className="topbar"><div><strong>Squrve-native runtime</strong><span>{hosted ? 'Hugging Face Space' : 'Local demo session'}</span></div><div className="runtime-state"><Status tone={tone}>{label}</Status>{sessionSqlAuth && <button className="button compact secondary" type="button" onClick={() => setSqlAuthOpen(true)}>Configure SQL API</button>}{showProviderConfig && <ProviderConfig health={health} capabilities={capabilities} refresh={refresh} />}<button className="icon-button" onClick={refresh} disabled={busy} title="Refresh runtime" aria-label="Refresh runtime">↻</button></div>{sessionSqlAuth && <SqlAuthDialog open={sqlAuthOpen} api={api} status={sqlAuth} onStatusChange={onSqlAuthChange} onClose={() => setSqlAuthOpen(false)} />}</header>
 }
 
 function ProviderConfig({ health, capabilities, refresh }) {
@@ -150,7 +154,7 @@ function ResultTable({ result }) {
   return <div className="table-wrap"><table><thead><tr>{result.columns.map(column => <th key={column}>{column}</th>)}</tr></thead><tbody>{result.rows.map((row, index) => <tr key={index}>{row.map((value, cell) => <td key={cell}>{value == null ? <em>NULL</em> : String(value)}</td>)}</tr>)}</tbody></table></div>
 }
 
-function Studio({ health, capabilities, databases, selectedDb, setSelectedDb, showAgentHarness = true }) {
+function Studio({ health, capabilities, databases, selectedDb, setSelectedDb, showAgentHarness = true, hosted = false, sqlAuth }) {
   const [workflowIndex, setWorkflowIndex] = useState(1)
   const [actorSelections, setActorSelections] = useState({})
   const [provider, setProvider] = useState('')
@@ -166,6 +170,7 @@ function Studio({ health, capabilities, databases, selectedDb, setSelectedDb, sh
   const workflow = capabilities?.workflows?.[workflowIndex] || []
   const providers = capabilities?.llm_providers || []
   const providerConfig = providers.find(item => item.id === provider)
+  const sqlReady = hosted ? Boolean(sqlAuth?.configured) : Boolean(providerConfig?.configured)
   const selectedActors = workflow.map(type => actorSelections[type]).filter(Boolean)
 
   useEffect(() => {
@@ -175,13 +180,18 @@ function Studio({ health, capabilities, databases, selectedDb, setSelectedDb, sh
   }, [capabilities])
 
   useEffect(() => {
+    if (hosted) {
+      setProvider(sqlAuth?.provider || '')
+      setModel(sqlAuth?.model || '')
+      return
+    }
     if (!providers.some(item => item.id === provider)) {
       setProvider(providers.find(item => item.id === health?.provider?.provider)?.id || providers.find(item => item.configured)?.id || providers[0]?.id || '')
     }
-  }, [providers.map(item => item.id).join('|'), provider, health?.provider?.provider])
+  }, [hosted, sqlAuth?.provider, sqlAuth?.model, providers.map(item => item.id).join('|'), provider, health?.provider?.provider])
   useEffect(() => {
-    if (providerConfig && !providerConfig.models.includes(model)) setModel(providerConfig.default_model)
-  }, [provider, providerConfig?.models?.join('|'), model])
+    if (!hosted && providerConfig && !providerConfig.models.includes(model)) setModel(providerConfig.default_model)
+  }, [hosted, provider, providerConfig?.models?.join('|'), model])
 
   const configPreview = useMemo(() => ({
     database: selectedDb || null,
@@ -202,9 +212,9 @@ function Studio({ health, capabilities, databases, selectedDb, setSelectedDb, sh
 
   return <div className="workspace studio-workspace"><PageHeading eyebrow="Squrve run configuration" title="SQL Studio" status={<Status tone={error ? 'danger' : result ? 'success' : busy ? 'running' : 'neutral'}>{phase}</Status>} />
     <div className="config-builder-grid"><section className="tool-panel config-block"><div className="config-step"><i>01</i><div><span>Database</span><small>Execution target</small></div></div><DatabaseSelector databases={databases} value={selectedDb} onChange={setSelectedDb} />{currentDb ? <ul className="schema-chips">{currentDb.tables.slice(0, 8).map(table => <li key={table}>{table}</li>)}</ul> : <Empty title="Select an integrated database" />}</section>
-      <section className="tool-panel config-block"><div className="config-step"><i>02</i><div><span>LLM Provider</span><small>Credential stays in local .env</small></div></div><label className="field"><span>Provider</span><select value={provider} onChange={event => setProvider(event.target.value)}>{providers.map(item => <option key={item.id} value={item.id}>{item.id}{item.configured ? ' · configured' : ' · setup required'}</option>)}</select></label><label className="field"><span>Model</span><select value={model} onChange={event => setModel(event.target.value)}>{(providerConfig?.models || []).map(item => <option key={item}>{item}</option>)}</select></label><Status tone={providerConfig?.configured ? 'success' : 'danger'}>{providerConfig?.configured ? 'credential available' : 'credential required'}</Status></section>
+      <section className="tool-panel config-block"><div className="config-step"><i>02</i><div><span>LLM Provider</span><small>{hosted ? 'Browser session credential' : 'Credential stays in local .env'}</small></div></div>{hosted ? <div className="session-auth-summary"><span>{sqlAuth?.configured ? 'Connected for this session' : 'Configure SQL API from the runtime header'}</span>{sqlAuth?.configured && <><strong>{sqlAuth.provider}</strong><code>{sqlAuth.model}</code></>}<Status tone={sqlAuth?.configured ? 'success' : 'danger'}>{sqlAuth?.configured ? 'session credential available' : 'credential required'}</Status></div> : <><label className="field"><span>Provider</span><select value={provider} onChange={event => setProvider(event.target.value)}>{providers.map(item => <option key={item.id} value={item.id}>{item.id}{item.configured ? ' · configured' : ' · setup required'}</option>)}</select></label><label className="field"><span>Model</span><select value={model} onChange={event => setModel(event.target.value)}>{(providerConfig?.models || []).map(item => <option key={item}>{item}</option>)}</select></label><Status tone={providerConfig?.configured ? 'success' : 'danger'}>{providerConfig?.configured ? 'credential available' : 'credential required'}</Status></>}</section>
       <section className="tool-panel config-block actor-config-block"><div className="config-step"><i>03</i><div><span>Actor Workflow</span><small>{workflow.join(' → ')}</small></div></div><ActorComposer {...{ capabilities, workflowIndex, setWorkflowIndex, actorSelections, setActorSelections }} /></section></div>
-    <div className="run-config-grid"><section className="tool-panel config-preview"><div className="config-step"><i>04</i><div><span>Run Config</span><small>Database + LLM + Actor pipeline</small></div></div><pre>{JSON.stringify(configPreview, null, 2)}</pre></section><section className="tool-panel run-input"><label className="field"><span>Natural-language input</span><textarea value={question} onChange={event => setQuestion(event.target.value)} placeholder="Ask a question for this configured workflow." /></label><button className="button primary" disabled={busy || !selectedDb || !question.trim() || !providerConfig?.configured || selectedActors.length !== workflow.length} onClick={runConfig}>{busy ? 'Running Squrve config…' : 'Run config'}</button>{error && <p className="error-banner">{error}</p>}</section></div>
+    <div className="run-config-grid"><section className="tool-panel config-preview"><div className="config-step"><i>04</i><div><span>Run Config</span><small>Database + LLM + Actor pipeline</small></div></div><pre>{JSON.stringify(configPreview, null, 2)}</pre></section><section className="tool-panel run-input"><label className="field"><span>Natural-language input</span><textarea value={question} onChange={event => setQuestion(event.target.value)} placeholder="Ask a question for this configured workflow." /></label><button className="button primary" disabled={busy || !selectedDb || !question.trim() || !sqlReady || selectedActors.length !== workflow.length} onClick={runConfig}>{busy ? 'Running Squrve config…' : 'Run config'}</button>{error && <p className="error-banner">{error}</p>}</section></div>
     {(sql || result) && <section className="tool-panel studio-result"><div className="result-summary"><div><span>Generated SQL</span><code>{sql}</code></div><div><span>Actor path</span><b>{trace.map(item => item.actor_name).join(' → ') || selectedActors.join(' → ')}</b></div></div><div className="result-meta"><span>Read-only database execution</span>{result && <b>{result.row_count} rows · {result.elapsed_ms} ms</b>}</div><ResultTable result={result} /></section>}
     {showAgentHarness && <Suspense fallback={<section className="tool-panel agent-harness-loading"><Empty title="Loading Pi Agent chat" /></section>}><AgentHarness {...{ api, postJson, Status }} /></Suspense>}
   </div>
@@ -516,14 +526,16 @@ function App() {
   const [databases, setDatabases] = useState([])
   const [selectedDb, setSelectedDb] = useState('')
   const [busy, setBusy] = useState(false)
+  const [sqlAuth, setSqlAuth] = useState(null)
   const hosted = deploymentTarget(capabilities) === 'hf-space'
   const selectedStudio = studioSurface(capabilities)
   const showProviderConfig = featureEnabled(capabilities, 'provider_configuration')
+  const sessionSqlAuth = hosted && featureEnabled(capabilities, 'session_sql_auth')
   const showAgentHarness = featureEnabled(capabilities, 'agent_chat')
   const liveEvaluation = featureEnabled(capabilities, 'live_evaluation')
-  const refresh = async () => { setBusy(true); try { const [healthData, capabilityData, databaseData] = await Promise.all([api('/api/health'), api('/api/capabilities'), api('/api/databases')]); setHealth(healthData); setCapabilities(capabilityData); setDatabases(databaseData.databases) } catch (error) { setHealth({ status: 'error', provider: { configured: false, ready: false, message: error.message } }) } finally { setBusy(false) } }
+  const refresh = async () => { setBusy(true); try { const [healthData, capabilityData, databaseData] = await Promise.all([api('/api/health'), api('/api/capabilities'), api('/api/databases')]); const hostedData = deploymentTarget(capabilityData) === 'hf-space' && featureEnabled(capabilityData, 'session_sql_auth') ? await api('/api/sql-auth') : null; setHealth(healthData); setCapabilities(capabilityData); setDatabases(databaseData.databases); setSqlAuth(hostedData) } catch (error) { setHealth({ status: 'error', provider: { configured: false, ready: false, message: error.message } }) } finally { setBusy(false) } }
   useEffect(() => { refresh() }, [])
-  return <div className="app-shell"><ShellNav page={page} setPage={setPage} /><main><Topbar health={health} capabilities={capabilities} refresh={refresh} busy={busy} hosted={hosted} showProviderConfig={showProviderConfig} />{hosted && <div className="hosted-demo-notice">Hugging Face Live Demo · the LLM and model are configured by SqurveBridge</div>}{page === 'board' ? <ExperimentBoard {...{ capabilities, liveEvaluation, api, postJson, Status, PageHeading, Empty }} /> : page === 'archive' ? <Archive {...{ api, Status, PageHeading, Empty }} /> : selectedStudio === 'live-sql' ? <Studio {...{ health, capabilities, databases, selectedDb, setSelectedDb, showAgentHarness }} /> : <WorkspaceStudio {...{ capabilities, databases, showAgentHarness, liveEvaluation }} />}</main></div>
+  return <div className="app-shell"><ShellNav page={page} setPage={setPage} /><main><Topbar health={health} capabilities={capabilities} refresh={refresh} busy={busy} hosted={hosted} showProviderConfig={showProviderConfig} sessionSqlAuth={sessionSqlAuth} sqlAuth={sqlAuth} onSqlAuthChange={setSqlAuth} />{hosted && <div className="hosted-demo-notice">Hugging Face Live Demo · Bring your own SQL and Pi credentials · session only</div>}{page === 'board' ? <ExperimentBoard {...{ capabilities, liveEvaluation, api, postJson, Status, PageHeading, Empty }} /> : page === 'archive' ? <Archive {...{ api, Status, PageHeading, Empty }} /> : selectedStudio === 'live-sql' ? <Studio {...{ health, capabilities, databases, selectedDb, setSelectedDb, showAgentHarness, hosted, sqlAuth }} /> : <WorkspaceStudio {...{ capabilities, databases, showAgentHarness, liveEvaluation }} />}</main></div>
 }
 
 const root = globalThis.__SQURVE_DEMO_ROOT__ || createRoot(document.getElementById('root'))

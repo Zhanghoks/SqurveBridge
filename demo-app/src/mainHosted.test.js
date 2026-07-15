@@ -1,0 +1,58 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { register as registerLoader } from 'node:module'
+import React from 'react'
+import { register } from 'tsx/esm/api'
+import { installTestDom } from './testDom.js'
+
+const closeDom = installTestDom()
+globalThis.React = React
+const { cleanup, render, screen } = await import('@testing-library/react')
+const userEvent = (await import('@testing-library/user-event')).default
+registerLoader('./cssTestLoader.mjs', import.meta.url)
+const unregister = register()
+
+test.afterEach(() => cleanup())
+test.after(() => {
+  unregister()
+  closeDom()
+})
+
+test('hosted App exposes session SQL configuration instead of local env configuration', async () => {
+  const providers = [{ id: 'qwen', models: ['qwen-plus'], default_model: 'qwen-plus' }]
+  const responses = {
+    '/api/health': { status: 'ok', provider: { configured: false, ready: false } },
+    '/api/capabilities': {
+      llm_providers: providers,
+      actors: {},
+      workflows: [[]],
+      deployment: {
+        target: 'hf-space',
+        features: {
+          live_sql: true,
+          session_sql_auth: true,
+          provider_configuration: false,
+          agent_chat: false,
+          live_evaluation: false,
+        },
+      },
+    },
+    '/api/databases': { databases: [] },
+    '/api/sql-auth': { status: 'ok', configured: false, providers },
+  }
+  globalThis.fetch = async path => ({
+    ok: true,
+    statusText: 'OK',
+    json: async () => responses[path],
+  })
+  let appElement
+  globalThis.__SQURVE_DEMO_ROOT__ = { render: element => { appElement = element } }
+  await import(`./main.jsx?hosted-test=${Date.now()}`)
+  render(React.createElement(appElement.type))
+
+  const configure = await screen.findByRole('button', { name: 'Configure SQL API' })
+  assert.equal(screen.queryByRole('button', { name: 'Configure LLM' }), null)
+  assert.match(document.body.textContent, /Bring your own SQL and Pi credentials/i)
+  await userEvent.setup().click(configure)
+  assert.ok(screen.getByRole('dialog', { name: 'Configure SQL API' }))
+})
