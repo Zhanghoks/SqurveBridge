@@ -1,6 +1,6 @@
 import unittest
 
-from demo.session_credentials import (
+from demo.session_auth import (
     SessionCredentialRegistry,
     SqlCredential,
     new_session_id,

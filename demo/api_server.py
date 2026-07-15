@@ -44,7 +44,7 @@ from reproduce.lib.env_config import (
 from tools.profile_weakness import build_weakness_json
 from tools.evidence import EvidenceError, verify_bundle
 from demo.pi_api import register_pi_routes
-from demo.session_credentials import (
+from demo.session_auth import (
     SessionCredentialRegistry,
     SqlCredential,
     new_session_id,

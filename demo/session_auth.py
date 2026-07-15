@@ -1,4 +1,4 @@
-"""In-memory, browser-session-scoped SQL credentials for the hosted demo."""
+"""In-memory, browser-session-scoped SQL authentication for the hosted demo."""
 
 from __future__ import annotations
 

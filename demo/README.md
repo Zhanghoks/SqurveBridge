@@ -50,7 +50,7 @@ SQURVE_DEMO_WEB_PORT=5174 ./demo/start.sh
 1. 仓库根目录已有可用的 Python 虚拟环境 `.venv/`（含 demo API 依赖）
 2. 已安装 Node.js 22.19+ / npm
 3. 首次启动会按需构建 `pi/`，并在缺少 `demo-app/node_modules` 时执行 `npm ci`
-4. LLM 凭据：复制 `.env.example` → `.env`，或在页面右上角 **Configure LLM** 配置
+4. 本地 LLM 凭据：复制 `.env.example` → `.env`，或在页面中配置 provider
 
 ```bash
 # 若尚未创建虚拟环境，按仓库主依赖安装后再装 demo 额外包
@@ -65,6 +65,19 @@ python3 -m venv .venv
 | **01 SQL Studio** | 选择 method/benchmark、配置 Actor 工作流并生成与执行 SQL |
 | **02 Experiment Board** | 同一 dataset 上多方法对比（雷达、Formal tables、错误/特征、成本） |
 | **03 Archive** | 浏览 `artifacts/` 与 `tmp/demo-runs/` 中的 score bundle 与报告 |
+
+## Hugging Face Space 凭据
+
+公开 Space 不配置维护者共享模型 Key。每位访问者分别使用两个入口：
+
+- **Configure SQL API**：配置 Squrve SQL 生成所用的 provider、model 和 Key；
+  凭据只保存在当前浏览器会话对应的服务端内存中，空闲最多 30 分钟。
+- **Login to Pi**：直接使用 Pi 原生 provider 登录与模型选择；凭据仅存在于该
+  Pi 子进程内，结束 Agent session 即清除，与 SQL Key 完全分离。
+
+凭据不会写入浏览器存储、`.env`、文件、日志或 API 响应。页面刷新、会话过期或
+Space 重启后可能需要重新输入。公开演示建议使用限额、可撤销的临时 Key；托管 Pi
+始终使用 `hosted-readonly` 工具配置。
 
 ## 手动启动（调试用）
 

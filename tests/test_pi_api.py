@@ -187,6 +187,37 @@ class PiApiTests(unittest.TestCase):
         self.assertIn("Unsupported Pi client command", payload)
         self.assertNotIn("unknown-secret", payload)
 
+    def test_hosted_pi_sessions_keep_credentials_process_local_and_out_of_child_env(self):
+        environment = {
+            "SQURVE_DEPLOYMENT_TARGET": "hf-space",
+            "QWEN_API_KEY": "sql-boundary-secret",
+            "ANTHROPIC_API_KEY": "server-pi-secret",
+            "SQURVE_LLM_PROVIDER": "qwen",
+            "SQURVE_LLM_MODEL": "qwen-plus",
+        }
+        client, registry, sock = self.make_client(environment)
+        first_id = client.post("/api/agent/sessions", json={}).json["session_id"]
+        second_id = client.post("/api/agent/sessions", json={}).json["session_id"]
+        first = registry.get(first_id)
+        second = registry.get(second_id)
+
+        self.assertIsNone(first.settings.provider)
+        self.assertIsNone(first.settings.model)
+        self.assertNotIn("QWEN_API_KEY", first.settings.child_environment())
+        self.assertNotIn("ANTHROPIC_API_KEY", first.settings.child_environment())
+
+        first_socket = ScriptedWebSocket(['{"type":"auth_prompt_response","request_id":"a","value":"first-pi-secret"}'])
+        second_socket = ScriptedWebSocket(['{"type":"auth_prompt_response","request_id":"b","value":"second-pi-secret"}'])
+        sock.handlers["/api/agent/sessions/<session_id>/ws"](first_socket, first_id)
+        sock.handlers["/api/agent/sessions/<session_id>/ws"](second_socket, second_id)
+
+        self.assertEqual(first.commands[0]["value"], "first-pi-secret")
+        self.assertEqual(second.commands[0]["value"], "second-pi-secret")
+        self.assertNotIn("second-pi-secret", str(first.commands))
+        self.assertNotIn("first-pi-secret", str(second.commands))
+        self.assertNotIn("first-pi-secret", "".join(first_socket.messages))
+        self.assertNotIn("second-pi-secret", "".join(second_socket.messages))
+
     def test_hosted_space_limits_agent_sessions_below_http_thread_capacity(self):
         client, _, _ = self.make_client({"SQURVE_DEPLOYMENT_TARGET": "hf-space"})
         self.assertEqual(client.post("/api/agent/sessions", json={}).status_code, 201)

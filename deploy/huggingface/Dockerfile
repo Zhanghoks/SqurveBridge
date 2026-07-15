@@ -17,9 +17,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     VIRTUAL_ENV=/opt/venv \
     PATH=/opt/venv/bin:$PATH \
-    SQURVE_DEPLOYMENT_TARGET=hf-space \
-    SQURVE_LLM_PROVIDER=qwen \
-    SQURVE_LLM_MODEL=qwen-plus
+    SQURVE_DEPLOYMENT_TARGET=hf-space
 WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential curl python3 python3-venv \

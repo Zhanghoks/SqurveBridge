@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from demo.session_credentials import SessionCredentialRegistry
+from demo.session_auth import SessionCredentialRegistry
 
 
 class SpaceApiTests(unittest.TestCase):
@@ -104,6 +104,28 @@ class SpaceApiTests(unittest.TestCase):
         self.assertIn("Max-Age=0", disconnected.headers["Set-Cookie"])
         self.assertNotIn("disconnect-secret", disconnected.get_data(as_text=True))
 
+    def test_sql_session_timeout_and_capacity_eviction_remove_access(self):
+        now = [100.0]
+        self.api_server._sql_credentials = SessionCredentialRegistry(
+            max_sessions=1, idle_timeout=30, clock=lambda: now[0]
+        )
+        first = self.api_server.app.test_client()
+        second = self.api_server.app.test_client()
+        environment = {"SQURVE_DEPLOYMENT_TARGET": "hf-space"}
+        with patch.dict(os.environ, environment, clear=False), patch.object(
+            self.api_server, "_validate_sql_credential", return_value=None
+        ):
+            first.put("/api/sql-auth", json={"provider": "qwen", "model": "qwen-plus", "api_key": "evicted-sql-secret"})
+            second.put("/api/sql-auth", json={"provider": "deepseek", "model": "deepseek-chat", "api_key": "active-sql-secret"})
+            self.assertFalse(first.get("/api/sql-auth").json["configured"])
+            self.assertTrue(second.get("/api/sql-auth").json["configured"])
+            now[0] += 31
+            expired = second.get("/api/sql-auth")
+
+        self.assertFalse(expired.json["configured"])
+        self.assertNotIn("evicted-sql-secret", expired.get_data(as_text=True))
+        self.assertNotIn("active-sql-secret", expired.get_data(as_text=True))
+
     def test_hosted_sql_auth_rejects_cross_origin_mutation(self):
         payload = {"provider": "qwen", "model": "qwen-plus", "api_key": "cross-origin-secret"}
         with patch.dict(os.environ, {"SQURVE_DEPLOYMENT_TARGET": "hf-space"}, clear=False):
@@ -201,12 +223,12 @@ class SpaceApiTests(unittest.TestCase):
                     config_path=str(config_path),
                     provider="qwen",
                     model_name="qwen-plus",
-                    api_key="direct-secret",
+                    api_key="test-direct-secret",
                 )
 
         resolve.assert_not_called()
         routed_config = init_config.call_args.args[0]
-        self.assertEqual(routed_config["api_key"]["qwen"], "direct-secret")
+        self.assertEqual(routed_config["api_key"]["qwen"], "test-direct-secret")
 
     def test_hosted_space_retains_core_llm_routes(self):
         with patch.dict(os.environ, {"SQURVE_DEPLOYMENT_TARGET": "hf-space"}, clear=False):

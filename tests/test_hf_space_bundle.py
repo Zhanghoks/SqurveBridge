@@ -60,8 +60,8 @@ class HuggingFaceBundleContractTests(unittest.TestCase):
         self.assertIn("bash demo/build_embedded_pi.sh", dockerfile)
         self.assertIn("COPY --from=pi-builder /build/pi /app/pi", dockerfile)
         self.assertIn("node --version", dockerfile)
-        self.assertIn("SQURVE_LLM_PROVIDER=qwen", dockerfile)
-        self.assertIn("SQURVE_LLM_MODEL=qwen-plus", dockerfile)
+        self.assertNotIn("SQURVE_LLM_PROVIDER=", dockerfile)
+        self.assertNotIn("SQURVE_LLM_MODEL=", dockerfile)
         self.assertIn("npm ci --ignore-scripts", build_script)
         self.assertNotIn("npm run build", build_script)
         self.assertIn("packages/coding-agent/tsconfig.build.json", build_script)
@@ -143,6 +143,8 @@ class HuggingFaceBundleTests(unittest.TestCase):
             "core/engine.py",
             "demo/space_server.py",
             "demo-app/src/main.jsx",
+            "demo-app/src/SqlAuthDialog.jsx",
+            "demo-app/src/PiAuthDialog.jsx",
             "pi/packages/coding-agent/package.json",
             "pi/packages/ai/src/auth/credential-store.ts",
             "skills/run/SKILL.md",
@@ -272,6 +274,17 @@ class HuggingFaceBundleTests(unittest.TestCase):
                 self.assertNotIn(path.suffix.lower(), sensitive_suffixes)
                 if relative != "pi/packages/ai/src/auth/credential-store.ts":
                     self.assertNotIn("credential", path.name.lower())
+
+    def test_bundle_contains_no_shared_provider_configuration_or_test_secret(self) -> None:
+        sentinel = "release-boundary-sentinel-secret"
+        dockerfile = (self.output / "Dockerfile").read_text(encoding="utf-8")
+        entrypoint = (self.output / "deploy/huggingface/entrypoint.sh").read_text(encoding="utf-8")
+        self.assertNotIn("SQURVE_LLM_PROVIDER=", dockerfile)
+        self.assertNotIn("SQURVE_LLM_MODEL=", dockerfile)
+        self.assertNotIn("SQURVE_LLM_PROVIDER is required", entrypoint)
+        self.assertNotIn("SQURVE_LLM_MODEL is required", entrypoint)
+        for path in self.staged_files:
+            self.assertNotIn(sentinel, path.read_text(encoding="utf-8", errors="ignore"))
 
 if __name__ == "__main__":
     unittest.main()

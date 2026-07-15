@@ -230,6 +230,21 @@ cannot access files outside the bundled repository. See the
 [Demo guide](demo/README_EN.md) and
 [hosted bundle metadata](deploy/huggingface/README.space.md).
 
+### Public Space credentials
+
+The public Space does not use a maintainer-owned model key. Each visitor configures
+two independent connections:
+
+- **Configure SQL API** selects the Squrve SQL provider/model. The key stays in
+  server memory for that browser session and expires after at most 30 idle minutes.
+- **Login to Pi** uses Pi's native provider authentication and model catalog. Its
+  credential stays only in that session's Pi process, which remains read-only in
+  the hosted demo.
+
+Keys are not written to browser storage, files, logs, or API responses. Disconnecting,
+ending the Pi session, refreshing after expiry, or restarting the Space may require
+entry again. Use disposable credentials with limited quota for public demos.
+
 ## Project Layout
 
 | Path | Responsibility |
