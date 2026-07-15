@@ -99,6 +99,7 @@ benchmarks/bird/
 !benchmarks/packages/README.md
 
 # Optional local state
+.worktrees/
 .omc/
 .omx/
 .gradio/
