@@ -24,6 +24,7 @@ class DemoDeploymentTests(unittest.TestCase):
                 "sql_execution": True,
                 "recorded_evidence": True,
                 "provider_configuration": False,
+                "session_sql_auth": True,
                 "database_upload": False,
                 "agent_chat": True,
                 "live_evaluation": False,
@@ -35,6 +36,10 @@ class DemoDeploymentTests(unittest.TestCase):
         self.assertTrue(hosted_route_allowed("POST", "/api/query", env))
         self.assertTrue(hosted_route_allowed("POST", "/api/execute", env))
         self.assertTrue(hosted_route_allowed("POST", "/api/agent/sessions", env))
+        self.assertTrue(hosted_route_allowed("GET", "/api/sql-auth", env))
+        self.assertTrue(hosted_route_allowed("POST", "/api/sql-auth/test", env))
+        self.assertTrue(hosted_route_allowed("PUT", "/api/sql-auth", env))
+        self.assertTrue(hosted_route_allowed("DELETE", "/api/sql-auth", env))
         self.assertTrue(hosted_route_allowed("GET", "/api/archive", env))
         self.assertFalse(hosted_route_allowed("POST", "/api/provider", env))
         self.assertFalse(hosted_route_allowed("POST", "/api/databases/upload", env))

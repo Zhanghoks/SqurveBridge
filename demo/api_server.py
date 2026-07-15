@@ -15,7 +15,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from flask import Flask, jsonify, request
 from flask_sock import Sock
@@ -44,6 +44,11 @@ from reproduce.lib.env_config import (
 from tools.profile_weakness import build_weakness_json
 from tools.evidence import EvidenceError, verify_bundle
 from demo.pi_api import register_pi_routes
+from demo.session_credentials import (
+    SessionCredentialRegistry,
+    SqlCredential,
+    new_session_id,
+)
 
 
 app = Flask(__name__)
@@ -78,6 +83,8 @@ _processes: dict[str, subprocess.Popen] = {}
 _run_dir = _project_root / "tmp" / "demo-runs"
 _provider_validation = {"verified": False, "error": None}
 _runtime_llm: dict[str, str | None] = {"provider": None, "model": None}
+_sql_credentials = SessionCredentialRegistry(max_sessions=128, idle_timeout=1800)
+_session_cookie_name = "squrve_session"
 _sample_limits = {3, 10, 20, 50, 100, 200}
 _provider_models = {
     "qwen": ["qwen-turbo", "qwen-plus", "qwen-max", "deepseek-v4-flash"],
@@ -116,6 +123,12 @@ def _json_error(message: str, status: int = 400):
     return jsonify({"status": "error", "message": message}), status
 
 
+class SqlAuthError(Exception):
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
 @app.after_request
 def _allow_local_frontend(response):
     origin = request.headers.get("Origin", "")
@@ -123,7 +136,7 @@ def _allow_local_frontend(response):
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Vary"] = "Origin"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+    response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
     return response
 
 
@@ -134,6 +147,119 @@ def _get_demo(provider: str, model: str) -> SqurveDemo:
             if key not in _demo_instances:
                 _demo_instances[key] = SqurveDemo(provider=provider, model_name=model)
     return _demo_instances[key]
+
+
+def _session_demo(credential: SqlCredential) -> SqurveDemo:
+    return SqurveDemo(
+        provider=credential.provider,
+        model_name=credential.model,
+        api_key=credential.api_key,
+    )
+
+
+def _browser_session(*, create: bool) -> tuple[str | None, bool]:
+    session_id = request.cookies.get(_session_cookie_name, "").strip()
+    if session_id:
+        return session_id, False
+    if not create:
+        return None, False
+    return new_session_id(), True
+
+
+def _set_session_cookie(response, session_id: str) -> None:
+    response.set_cookie(
+        _session_cookie_name,
+        session_id,
+        max_age=1800,
+        secure=deployment_target() == "hf-space",
+        httponly=True,
+        samesite="Lax",
+    )
+
+
+def _same_origin_error():
+    if deployment_target() != "hf-space":
+        return None
+    origin = request.headers.get("Origin", "").rstrip("/")
+    forwarded_host = request.headers.get("X-Forwarded-Host", "").split(",", 1)[0].strip()
+    forwarded_proto = request.headers.get("X-Forwarded-Proto", "").split(",", 1)[0].strip()
+    expected_host = forwarded_host or request.host
+    expected_scheme = forwarded_proto or request.scheme
+    parsed_origin = urlsplit(origin) if origin else None
+    if parsed_origin and (
+        parsed_origin.scheme != expected_scheme or parsed_origin.netloc != expected_host
+    ):
+        return jsonify({
+            "status": "error",
+            "code": "origin_forbidden",
+            "message": "Credential changes require a same-origin request.",
+        }), 403
+    return None
+
+
+def _sql_provider_catalog() -> list[dict[str, object]]:
+    return [
+        {
+            "id": provider,
+            "models": list(models),
+            "default_model": models[0],
+        }
+        for provider, models in _provider_models.items()
+    ]
+
+
+def _credential_from_payload(payload: dict) -> SqlCredential:
+    provider = str(payload.get("provider") or "").strip()
+    model = str(payload.get("model") or "").strip()
+    api_key = payload.get("api_key")
+    if provider not in _provider_models:
+        raise SqlAuthError("unsupported_provider")
+    if model not in _provider_models[provider]:
+        raise SqlAuthError("unsupported_model")
+    if not isinstance(api_key, str) or not api_key.strip():
+        raise SqlAuthError("credential_required")
+    return SqlCredential(provider=provider, model=model, api_key=api_key.strip())
+
+
+def _validate_sql_credential(credential: SqlCredential) -> None:
+    try:
+        demo = _session_demo(credential)
+        llm = demo.engine.dataloader.llm
+        if llm is None:
+            raise SqlAuthError("unsupported_provider")
+        llm.time_out = min(float(llm.time_out), 20.0)
+        llm.complete("Reply with OK only.")
+    except SqlAuthError:
+        raise
+    except Exception as exc:
+        message = str(exc).lower()
+        status_code = getattr(exc, "status_code", None)
+        if status_code in {401, 403} or any(token in message for token in ("401", "403", "invalid api key", "incorrect api key")):
+            raise SqlAuthError("credential_rejected") from None
+        raise SqlAuthError("provider_unreachable") from None
+
+
+def _sql_auth_error_response(error: SqlAuthError, provider: str = "provider"):
+    statuses = {
+        "credential_rejected": 401,
+        "provider_unreachable": 503,
+        "origin_forbidden": 403,
+        "unsupported_provider": 400,
+        "unsupported_model": 400,
+        "credential_required": 400,
+    }
+    messages = {
+        "credential_rejected": f"The {provider} credential was rejected.",
+        "provider_unreachable": f"The {provider} provider could not be reached.",
+        "unsupported_provider": "The selected SQL provider is unsupported.",
+        "unsupported_model": "The selected SQL model is unsupported.",
+        "credential_required": "An API key is required.",
+    }
+    return jsonify({
+        "status": "error",
+        "code": error.code,
+        "message": messages.get(error.code, "SQL authentication failed."),
+    }), statuses.get(error.code, 400)
 
 
 def _database_records() -> list[dict]:
@@ -324,20 +450,9 @@ def _provider_status() -> dict:
 
 
 def _llm_provider_catalog() -> list[dict]:
-    load_dotenv(_project_root / ".env")
     if deployment_target() == "hf-space":
-        provider = os.environ.get("SQURVE_LLM_PROVIDER", "qwen").strip()
-        models = _provider_models.get(provider) or []
-        model = os.environ.get("SQURVE_LLM_MODEL", models[0] if models else "").strip()
-        if provider not in _provider_models or model not in models:
-            return []
-        return [{
-            "id": provider,
-            "configured": bool(resolve_api_key(provider, None)),
-            "models": [model],
-            "default_model": model,
-            "env_var": PROVIDER_ENV_VARS[provider],
-        }]
+        return _sql_provider_catalog()
+    load_dotenv(_project_root / ".env")
     default = _provider_status()
     return [
         {
@@ -354,6 +469,77 @@ def _llm_provider_catalog() -> list[dict]:
 @app.get("/api/health")
 def health():
     return jsonify({"status": "ok", "provider": _provider_status()})
+
+
+@app.get("/api/sql-auth")
+def sql_auth_status():
+    session_id, _ = _browser_session(create=False)
+    status = _sql_credentials.status(session_id or "")
+    return jsonify({"status": "ok", **status, "providers": _sql_provider_catalog()})
+
+
+@app.post("/api/sql-auth/test")
+def test_sql_auth():
+    origin_error = _same_origin_error()
+    if origin_error:
+        return origin_error
+    payload = request.get_json(silent=True) or {}
+    try:
+        credential = _credential_from_payload(payload)
+        _validate_sql_credential(credential)
+    except SqlAuthError as exc:
+        return _sql_auth_error_response(exc, str(payload.get("provider") or "provider"))
+    return jsonify({
+        "status": "ok",
+        "validated": True,
+        "provider": credential.provider,
+        "model": credential.model,
+    })
+
+
+@app.put("/api/sql-auth")
+def save_sql_auth():
+    origin_error = _same_origin_error()
+    if origin_error:
+        return origin_error
+    payload = request.get_json(silent=True) or {}
+    try:
+        credential = _credential_from_payload(payload)
+        _validate_sql_credential(credential)
+    except SqlAuthError as exc:
+        return _sql_auth_error_response(exc, str(payload.get("provider") or "provider"))
+    credential.validated_at = time.time()
+    session_id, _ = _browser_session(create=True)
+    _sql_credentials.put(session_id, credential)
+    response = jsonify({
+        "status": "ok",
+        **_sql_credentials.status(session_id),
+        "providers": _sql_provider_catalog(),
+    })
+    _set_session_cookie(response, session_id)
+    return response
+
+
+@app.delete("/api/sql-auth")
+def delete_sql_auth():
+    origin_error = _same_origin_error()
+    if origin_error:
+        return origin_error
+    session_id, _ = _browser_session(create=False)
+    if session_id:
+        _sql_credentials.delete(session_id)
+    response = jsonify({
+        "status": "ok",
+        "configured": False,
+        "providers": _sql_provider_catalog(),
+    })
+    response.delete_cookie(
+        _session_cookie_name,
+        secure=deployment_target() == "hf-space",
+        httponly=True,
+        samesite="Lax",
+    )
+    return response
 
 
 @app.post("/api/provider")
@@ -439,16 +625,31 @@ def query():
     mode = payload.get("mode", "direct")
     actors = payload.get("actors") or []
     generator = payload.get("generator") or "DINSQLGenerator"
-    provider = str(payload.get("provider") or _provider_status()["provider"])
-    provider_config = next((item for item in _llm_provider_catalog() if item["id"] == provider), None)
-    if not provider_config:
-        return _json_error(f"Unsupported LLM provider: {provider}")
-    model = str(payload.get("model") or provider_config["default_model"])
-    if model not in provider_config["models"]:
-        return _json_error(f"Unsupported model for {provider}: {model}")
-    if not provider_config["configured"]:
-        return _json_error(f"Provider {provider} is not configured in the local .env.")
-    result = _get_demo(provider, model).generate_sql(
+    hosted = deployment_target() == "hf-space"
+    if hosted:
+        session_id, _ = _browser_session(create=False)
+        credential = _sql_credentials.get(session_id or "")
+        if credential is None:
+            return jsonify({
+                "status": "error",
+                "code": "auth_required",
+                "message": "Configure a SQL API provider for this browser session.",
+            }), 401
+        provider = credential.provider
+        model = credential.model
+        demo = _session_demo(credential)
+    else:
+        provider = str(payload.get("provider") or _provider_status()["provider"])
+        provider_config = next((item for item in _llm_provider_catalog() if item["id"] == provider), None)
+        if not provider_config:
+            return _json_error(f"Unsupported LLM provider: {provider}")
+        model = str(payload.get("model") or provider_config["default_model"])
+        if model not in provider_config["models"]:
+            return _json_error(f"Unsupported model for {provider}: {model}")
+        if not provider_config["configured"]:
+            return _json_error(f"Provider {provider} is not configured in the local .env.")
+        demo = _get_demo(provider, model)
+    result = demo.generate_sql(
         question=question,
         db_id=db_id,
         schema_path=database["schema_path"],
@@ -458,7 +659,8 @@ def query():
         generate_type=generator,
     )
     if result.get("status") == "success":
-        _provider_validation.update(verified=True, error=None)
+        if not hosted:
+            _provider_validation.update(verified=True, error=None)
         result["run_config"] = {
             "database": db_id,
             "llm": {"provider": provider, "model": model},
@@ -466,6 +668,11 @@ def query():
         }
     else:
         message = str(result.get("message", ""))
+        if hosted:
+            code = "credential_rejected" if any(
+                token in message.lower() for token in ("invalid_api_key", "incorrect api key", "401", "403")
+            ) else "provider_unreachable"
+            return _sql_auth_error_response(SqlAuthError(code), provider)
         if "invalid_api_key" in message or "Incorrect API key" in message or "401" in message:
             _provider_validation.update(
                 verified=False,

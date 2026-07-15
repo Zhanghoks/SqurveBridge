@@ -33,6 +33,7 @@ def deployment_features(environment: Mapping[str, str] | None = None) -> dict[st
         "sql_execution": True,
         "recorded_evidence": True,
         "provider_configuration": not hosted,
+        "session_sql_auth": hosted,
         "database_upload": not hosted,
         "agent_chat": True,
         "live_evaluation": not hosted,

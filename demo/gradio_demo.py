@@ -201,19 +201,23 @@ class SqurveDemo:
             config_path: Optional[str] = None,
             provider: Optional[str] = None,
             model_name: Optional[str] = None,
+            api_key: Optional[str] = None,
     ):
         config_path = config_path or get_router_config_path()
         if not Path(config_path).is_absolute():
             config_path = str(_project_root / config_path)
         config_file = Path(config_path).resolve()
-        load_dotenv(_project_root / ".env")
         config = json.loads(config_file.read_text(encoding="utf-8"))
         if provider:
             config.setdefault("api_key", {}).setdefault(provider, "your_api_key_here")
             config.setdefault("llm", {})["use"] = provider
         if model_name:
             config.setdefault("llm", {})["model_name"] = model_name
-        config = resolve_config_api_keys(config)
+        if provider and api_key:
+            config.setdefault("api_key", {})[provider] = api_key
+        else:
+            load_dotenv(_project_root / ".env")
+            config = resolve_config_api_keys(config)
         self._resolve_config_paths(config, config_file.parent)
 
         # Router's legacy defaults are relative to the process cwd. The demo is
