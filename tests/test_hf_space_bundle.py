@@ -38,10 +38,94 @@ def _write_minimal_runtime(root: Path) -> None:
     (deploy / "Dockerfile.dockerignore").write_text("node_modules\n", encoding="utf-8")
 
 
+def _require_full_runtime(root: Path) -> None:
+    benchmark = root / "benchmarks" / "spider"
+    if not benchmark.is_dir():
+        raise unittest.SkipTest(
+            "full Hugging Face bundle checks require the installed Spider benchmark"
+        )
+
+
+class HuggingFaceBundleContractTests(unittest.TestCase):
+    def test_missing_benchmark_skips_only_full_bundle_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(unittest.SkipTest, "Spider benchmark"):
+                _require_full_runtime(Path(directory))
+
+    def test_space_builds_and_runs_the_embedded_pi_source(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        dockerfile = (root / "deploy/huggingface/Dockerfile").read_text(encoding="utf-8")
+        build_script = (root / "demo/build_embedded_pi.sh").read_text(encoding="utf-8")
+        self.assertIn("FROM node:22-bookworm-slim AS pi-builder", dockerfile)
+        self.assertIn("bash demo/build_embedded_pi.sh", dockerfile)
+        self.assertIn("COPY --from=pi-builder /build/pi /app/pi", dockerfile)
+        self.assertIn("node --version", dockerfile)
+        self.assertIn("SQURVE_LLM_PROVIDER=qwen", dockerfile)
+        self.assertIn("SQURVE_LLM_MODEL=qwen-plus", dockerfile)
+        self.assertIn("npm ci --ignore-scripts", build_script)
+        self.assertNotIn("npm run build", build_script)
+        self.assertIn("packages/coding-agent/tsconfig.build.json", build_script)
+
+    def test_space_dependency_range_keeps_transformers_hub_compatible(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        requirements = (root / "requirements.txt").read_text(encoding="utf-8")
+        self.assertIn("gradio>=4.0.0,<5.0.0", requirements)
+
+    def test_gradio_dependency_constraints_are_compatible(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        requirements = (root / "requirements.txt").read_text(encoding="utf-8")
+        self.assertIn("MarkupSafe==2.1.5", requirements)
+        self.assertNotIn("MarkupSafe==3.0.2", requirements)
+        self.assertIn("pillow==10.4.0", requirements)
+        self.assertNotIn("pillow==11.2.1", requirements)
+        self.assertIn("tomlkit==0.12.0", requirements)
+        self.assertNotIn("tomlkit==0.13.3", requirements)
+
+    def test_runtime_reuses_the_node_images_uid_1000_user(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        dockerfile = (root / "deploy/huggingface/Dockerfile").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("useradd --create-home --uid 1000", dockerfile)
+        self.assertIn("chown -R node:node /app", dockerfile)
+        self.assertIn("USER node", dockerfile)
+
+    def test_small_bundle_rebuild_is_deterministic_and_removes_stale_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "root"
+            output = Path(directory) / "space"
+            root.mkdir()
+            _write_minimal_runtime(root)
+
+            (root / "core" / "__pycache__").mkdir()
+            (root / "core" / "__pycache__" / "cached.pyc").write_bytes(b"cache")
+            (root / "demo-app" / "node_modules").mkdir()
+            (root / "demo-app" / "node_modules" / "package.js").write_text(
+                "generated", encoding="utf-8"
+            )
+            (root / "demo-app" / "dist").mkdir()
+            (root / "demo-app" / "dist" / "bundle.js").write_text(
+                "generated", encoding="utf-8"
+            )
+            (root / "demo" / ".DS_Store").write_bytes(b"metadata")
+
+            first_manifest = build_space(root, output)
+            (output / "stale.txt").write_text("stale", encoding="utf-8")
+            second_manifest = build_space(root, output)
+
+            self.assertEqual(first_manifest, second_manifest)
+            self.assertFalse((output / "stale.txt").exists())
+            self.assertFalse((output / "core" / "__pycache__").exists())
+            self.assertFalse((output / "demo-app" / "node_modules").exists())
+            self.assertFalse((output / "demo-app" / "dist").exists())
+            self.assertFalse((output / "demo" / ".DS_Store").exists())
+
+
 class HuggingFaceBundleTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.root = Path(__file__).resolve().parents[1]
+        _require_full_runtime(cls.root)
         cls._temporary_directory = tempfile.TemporaryDirectory()
         cls.output = Path(cls._temporary_directory.name) / "space"
         cls.files = build_space(cls.root, cls.output)
@@ -188,71 +272,6 @@ class HuggingFaceBundleTests(unittest.TestCase):
                 self.assertNotIn(path.suffix.lower(), sensitive_suffixes)
                 if relative != "pi/packages/ai/src/auth/credential-store.ts":
                     self.assertNotIn("credential", path.name.lower())
-
-    def test_space_builds_and_runs_the_embedded_pi_source(self) -> None:
-        dockerfile = (self.root / "deploy/huggingface/Dockerfile").read_text(encoding="utf-8")
-        build_script = (self.root / "demo/build_embedded_pi.sh").read_text(encoding="utf-8")
-        self.assertIn("FROM node:22-bookworm-slim AS pi-builder", dockerfile)
-        self.assertIn("bash demo/build_embedded_pi.sh", dockerfile)
-        self.assertIn("COPY --from=pi-builder /build/pi /app/pi", dockerfile)
-        self.assertIn("node --version", dockerfile)
-        self.assertIn("SQURVE_LLM_PROVIDER=qwen", dockerfile)
-        self.assertIn("SQURVE_LLM_MODEL=qwen-plus", dockerfile)
-        self.assertIn("npm ci --ignore-scripts", build_script)
-        self.assertNotIn("npm run build", build_script)
-        self.assertIn("packages/coding-agent/tsconfig.build.json", build_script)
-
-    def test_space_dependency_range_keeps_transformers_hub_compatible(self) -> None:
-        requirements = (self.root / "requirements.txt").read_text(encoding="utf-8")
-        self.assertIn("gradio>=4.0.0,<5.0.0", requirements)
-
-    def test_gradio_and_markupsafe_constraints_are_compatible(self) -> None:
-        requirements = (self.root / "requirements.txt").read_text(encoding="utf-8")
-        self.assertIn("MarkupSafe==2.1.5", requirements)
-        self.assertNotIn("MarkupSafe==3.0.2", requirements)
-        self.assertIn("pillow==10.4.0", requirements)
-        self.assertNotIn("pillow==11.2.1", requirements)
-        self.assertIn("tomlkit==0.12.0", requirements)
-        self.assertNotIn("tomlkit==0.13.3", requirements)
-
-    def test_runtime_reuses_the_node_images_uid_1000_user(self) -> None:
-        dockerfile = (self.root / "deploy/huggingface/Dockerfile").read_text(
-            encoding="utf-8"
-        )
-        self.assertNotIn("useradd --create-home --uid 1000", dockerfile)
-        self.assertIn("chown -R node:node /app", dockerfile)
-        self.assertIn("USER node", dockerfile)
-
-    def test_small_bundle_rebuild_is_deterministic_and_removes_stale_output(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / "root"
-            output = Path(directory) / "space"
-            root.mkdir()
-            _write_minimal_runtime(root)
-
-            (root / "core" / "__pycache__").mkdir()
-            (root / "core" / "__pycache__" / "cached.pyc").write_bytes(b"cache")
-            (root / "demo-app" / "node_modules").mkdir()
-            (root / "demo-app" / "node_modules" / "package.js").write_text(
-                "generated", encoding="utf-8"
-            )
-            (root / "demo-app" / "dist").mkdir()
-            (root / "demo-app" / "dist" / "bundle.js").write_text(
-                "generated", encoding="utf-8"
-            )
-            (root / "demo" / ".DS_Store").write_bytes(b"metadata")
-
-            first_manifest = build_space(root, output)
-            (output / "stale.txt").write_text("stale", encoding="utf-8")
-            second_manifest = build_space(root, output)
-
-            self.assertEqual(first_manifest, second_manifest)
-            self.assertFalse((output / "stale.txt").exists())
-            self.assertFalse((output / "core" / "__pycache__").exists())
-            self.assertFalse((output / "demo-app" / "node_modules").exists())
-            self.assertFalse((output / "demo-app" / "dist").exists())
-            self.assertFalse((output / "demo" / ".DS_Store").exists())
-
 
 if __name__ == "__main__":
     unittest.main()
