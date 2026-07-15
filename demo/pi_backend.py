@@ -14,9 +14,6 @@ from collections.abc import Mapping
 from collections.abc import Callable
 
 from demo.deployment import deployment_target
-from reproduce.lib.env_config import PROVIDER_ENV_VARS
-
-
 PI_SKILLS = {
     "candidate-reader",
     "integration-pipeline",
@@ -26,6 +23,15 @@ PI_SKILLS = {
 }
 READ_ONLY_TOOLS = ("read", "grep", "find", "ls")
 FULL_TOOLS = ("read", "bash", "edit", "write", "grep", "find", "ls")
+PI_CLIENT_COMMANDS = {
+    "auth_start",
+    "auth_prompt_response",
+    "auth_cancel",
+    "model_select",
+    "logout",
+    "prompt",
+    "abort",
+}
 SAFE_CHILD_ENV_VARS = (
     "HOME",
     "LANG",
@@ -69,12 +75,14 @@ class PiBackendSettings:
     ) -> "PiBackendSettings":
         values = os.environ if environment is None else environment
         hosted = deployment_target(values) == "hf-space"
+        provider = None if hosted else (values.get("PI_AGENT_PROVIDER") or values.get("SQURVE_LLM_PROVIDER") or None)
+        model = None if hosted else (values.get("PI_AGENT_MODEL") or values.get("SQURVE_LLM_MODEL") or None)
         return cls(
             project_root=project_root.resolve(),
             profile="hosted-readonly" if hosted else "local-full",
             tools=READ_ONLY_TOOLS if hosted else FULL_TOOLS,
-            provider=(values.get("PI_AGENT_PROVIDER") or values.get("SQURVE_LLM_PROVIDER") or None),
-            model=(values.get("PI_AGENT_MODEL") or values.get("SQURVE_LLM_MODEL") or None),
+            provider=provider,
+            model=model,
             node_binary=values.get("PI_NODE_BINARY", "node"),
             source_environment=dict(values),
         )
@@ -87,9 +95,6 @@ class PiBackendSettings:
             for name in SAFE_CHILD_ENV_VARS
             if self.source_environment.get(name)
         }
-        key_name = PROVIDER_ENV_VARS.get(self.provider or "")
-        if key_name and self.source_environment.get(key_name):
-            child[key_name] = self.source_environment[key_name]
         return child
 
     def command(self) -> list[str]:
@@ -202,7 +207,7 @@ class PiAgentSession:
         try:
             for line in self.process.stderr:
                 message = line.strip()
-                if message:
+                if message and self.settings.profile != "hosted-readonly":
                     self._append({"type": "bridge_log", "message": message[:4000]})
         except OSError:
             return
@@ -217,10 +222,24 @@ class PiAgentSession:
             raise RuntimeError("Pi agent session is not running") from exc
 
     def send_prompt(self, prompt: str) -> None:
-        message = normalize_pi_prompt(prompt)
-        if not message or len(message) > 65536:
-            raise ValueError("Pi prompt must contain between 1 and 65536 characters")
-        self.send({"type": "prompt", "message": message})
+        self.send_command({"type": "prompt", "message": prompt})
+
+    def send_command(self, command: Mapping[str, object]) -> None:
+        command_type = str(command.get("type", ""))
+        if command_type not in PI_CLIENT_COMMANDS:
+            raise ValueError("Unsupported Pi client command")
+        payload = dict(command)
+        if command_type == "prompt":
+            message = normalize_pi_prompt(str(payload.get("message", "")))
+            if not message or len(message) > 65536:
+                raise ValueError("Pi prompt must contain between 1 and 65536 characters")
+            payload = {"type": "prompt", "message": message}
+        elif command_type == "auth_prompt_response":
+            value = str(payload.get("value", ""))
+            if len(value) > 65536:
+                raise ValueError("Pi authentication response is too long")
+            payload["value"] = value
+        self.send(payload)
 
     def read(self, cursor: int) -> tuple[list[dict], int]:
         with self._condition:

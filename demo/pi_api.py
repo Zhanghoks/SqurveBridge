@@ -148,10 +148,9 @@ def register_pi_routes(
                 if raw:
                     try:
                         command = json.loads(raw)
-                        if command.get("type") == "prompt":
-                            session.send_prompt(str(command.get("message", "")))
-                        elif command.get("type") == "abort":
-                            session.send({"type": "abort"})
+                        if not isinstance(command, dict):
+                            raise ValueError("Pi client commands must be JSON objects")
+                        session.send_command(command)
                     except (ValueError, RuntimeError, json.JSONDecodeError) as exc:
                         ws.send(json.dumps({"type": "command_error", "message": str(exc)}))
                 events, cursor = session.wait_read(cursor, timeout=.05)

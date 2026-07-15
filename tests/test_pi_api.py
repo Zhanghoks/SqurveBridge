@@ -26,6 +26,7 @@ class FakeSession:
         self.session_id = f"session{type(self).next_id}"
         self.running = True
         self.prompts = []
+        self.commands = []
 
     def public_state(self):
         return {
@@ -37,6 +38,15 @@ class FakeSession:
 
     def send_prompt(self, prompt):
         self.prompts.append(prompt)
+
+    def send_command(self, command):
+        allowed = {
+            "auth_start", "auth_prompt_response", "auth_cancel",
+            "model_select", "logout", "prompt", "abort",
+        }
+        if command.get("type") not in allowed:
+            raise ValueError("Unsupported Pi client command")
+        self.commands.append(command)
 
     def read(self, cursor):
         return ([{"type": "ready", "backend": "pi"}], 1)
@@ -60,6 +70,17 @@ class DisconnectingWebSocket:
 
     def close(self):
         pass
+
+
+class ScriptedWebSocket(DisconnectingWebSocket):
+    def __init__(self, commands):
+        super().__init__()
+        self.commands = list(commands)
+
+    def receive(self, timeout=None):
+        if self.commands:
+            return self.commands.pop(0)
+        raise ConnectionError("browser disconnected")
 
 
 class PiApiTests(unittest.TestCase):
@@ -139,6 +160,32 @@ class PiApiTests(unittest.TestCase):
 
         self.assertFalse(session.running)
         self.assertIsNone(registry.get(session_id))
+
+    def test_websocket_relays_typed_pi_auth_commands_without_echoing_secrets(self):
+        client, registry, sock = self.make_client({"SQURVE_DEPLOYMENT_TARGET": "hf-space"})
+        session_id = client.post("/api/agent/sessions", json={}).json["session_id"]
+        session = registry.get(session_id)
+        socket = ScriptedWebSocket([
+            '{"type":"auth_start","provider":"anthropic","method":"api_key"}',
+            '{"type":"auth_prompt_response","request_id":"auth-1","value":"ws-pi-secret"}',
+        ])
+
+        sock.handlers["/api/agent/sessions/<session_id>/ws"](socket, session_id)
+
+        self.assertEqual(session.commands[0]["type"], "auth_start")
+        self.assertEqual(session.commands[1]["value"], "ws-pi-secret")
+        self.assertNotIn("ws-pi-secret", "".join(socket.messages))
+
+    def test_websocket_rejects_unknown_commands_without_echoing_payload(self):
+        client, _, sock = self.make_client({"SQURVE_DEPLOYMENT_TARGET": "hf-space"})
+        session_id = client.post("/api/agent/sessions", json={}).json["session_id"]
+        socket = ScriptedWebSocket(['{"type":"unknown","value":"unknown-secret"}'])
+
+        sock.handlers["/api/agent/sessions/<session_id>/ws"](socket, session_id)
+
+        payload = "".join(socket.messages)
+        self.assertIn("Unsupported Pi client command", payload)
+        self.assertNotIn("unknown-secret", payload)
 
     def test_hosted_space_limits_agent_sessions_below_http_thread_capacity(self):
         client, _, _ = self.make_client({"SQURVE_DEPLOYMENT_TARGET": "hf-space"})

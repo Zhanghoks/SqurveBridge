@@ -25,8 +25,8 @@ class PiBackendTests(unittest.TestCase):
         )
         self.assertEqual(settings.profile, "hosted-readonly")
         self.assertEqual(settings.tools, ("read", "grep", "find", "ls"))
-        self.assertEqual(settings.provider, "deepseek")
-        self.assertEqual(settings.model, "deepseek-chat")
+        self.assertIsNone(settings.provider)
+        self.assertIsNone(settings.model)
 
     def test_local_profile_uses_full_pi_coding_tools(self):
         backend = self.backend()
@@ -64,7 +64,7 @@ class PiBackendTests(unittest.TestCase):
         payload = json.loads(command[command.index("--tools") + 1])
         self.assertEqual(payload, list(settings.tools))
 
-    def test_child_environment_exposes_only_active_provider_key(self):
+    def test_hosted_child_environment_exposes_no_provider_keys(self):
         backend = self.backend()
         settings = backend.PiBackendSettings.from_environment(
             {
@@ -80,10 +80,55 @@ class PiBackendTests(unittest.TestCase):
             Path("/workspace"),
         )
         child = settings.child_environment()
-        self.assertEqual(child["QWEN_API_KEY"], "active-key")
         self.assertEqual(child["PATH"], "/usr/bin")
+        self.assertNotIn("QWEN_API_KEY", child)
         self.assertNotIn("OPENAI_API_KEY", child)
         self.assertNotIn("HF_TOKEN", child)
+
+    def test_session_accepts_only_typed_client_commands_without_public_secret_echo(self):
+        backend = self.backend()
+        session = backend.PiAgentSession.__new__(backend.PiAgentSession)
+        session.settings = backend.PiBackendSettings.from_environment(
+            {"SQURVE_DEPLOYMENT_TARGET": "hf-space"},
+            Path("/workspace"),
+        )
+        session.session_id = "session-safe"
+        session._closed = False
+
+        class InputProcess:
+            def __init__(self):
+                self.stdin = io.StringIO()
+
+            def poll(self):
+                return None
+
+        session.process = InputProcess()
+        session.send_command({
+            "type": "auth_prompt_response",
+            "request_id": "auth-1",
+            "value": "pi-command-secret",
+        })
+        written = json.loads(session.process.stdin.getvalue())
+        self.assertEqual(written["value"], "pi-command-secret")
+        self.assertNotIn("pi-command-secret", json.dumps(session.public_state()))
+        with self.assertRaisesRegex(ValueError, "Unsupported Pi client command"):
+            session.send_command({"type": "unknown", "value": "must-not-echo"})
+
+    def test_hosted_stderr_is_not_forwarded_to_browser_events(self):
+        backend = self.backend()
+        session = backend.PiAgentSession.__new__(backend.PiAgentSession)
+        session.settings = backend.PiBackendSettings.from_environment(
+            {"SQURVE_DEPLOYMENT_TARGET": "hf-space"},
+            Path("/workspace"),
+        )
+        session._condition = threading.Condition(threading.RLock())
+        session._events = []
+        session._event_base = 0
+        session.process = type("Process", (), {"stderr": io.StringIO("provider pi-stderr-secret\n")})()
+
+        session._read_stderr()
+
+        self.assertNotIn("pi-stderr-secret", json.dumps(session._events))
 
     def test_qwen_model_config_uses_environment_secret(self):
         config_path = Path(__file__).resolve().parents[1] / "config" / "pi_models.json"
