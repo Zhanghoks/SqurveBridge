@@ -50,7 +50,7 @@ export default {
   'run.action': 'Run workflow',
   'run.connectModel': 'Connect a model to run',
   'run.unavailable': 'This configuration is unavailable.',
-  'run.stagingEmpty': 'Run controls will be added in the next stage; the focused reproduce configuration remains available.',
+  'run.stagingEmpty': 'Run controls will be added in the next stage; no run has been started.',
   'run.loadingData': 'Loading data',
   'run.buildingWorkflow': 'Building workflow',
   'run.generatingSql': 'Generating SQL',

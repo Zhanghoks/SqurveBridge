@@ -50,7 +50,7 @@ export default {
   'run.action': '运行工作流',
   'run.connectModel': '连接模型后运行',
   'run.unavailable': '此配置不可用。',
-  'run.stagingEmpty': '运行控件将在下一阶段加入；当前聚焦的 reproduce 配置仍保持可用。',
+  'run.stagingEmpty': '运行控件将在下一阶段加入；当前尚未启动运行。',
   'run.loadingData': '正在加载数据',
   'run.buildingWorkflow': '正在构建工作流',
   'run.generatingSql': '正在生成 SQL',

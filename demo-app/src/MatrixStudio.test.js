@@ -145,6 +145,7 @@ test('states the staging and persisted-evidence boundaries without contradicting
 
   assert.match(document.querySelector('#run').textContent, /Run controls will be added in the next stage/)
   assert.doesNotMatch(document.querySelector('#run').textContent, /configuration is unavailable/)
+  assert.doesNotMatch(document.querySelector('#run').textContent, /configuration remains available/)
   assert.match(document.querySelector('#inspect').textContent, /Run a workflow to inspect its artifacts/)
   assert.match(document.querySelector('#diagnose').textContent, /persisted score bundle/)
   assert.match(document.querySelector('#improve').textContent, /persisted improvement or weakness-evolution record/)
@@ -158,6 +159,7 @@ test('translates the process navigation landmark and staging boundaries', async 
 
   assert.ok(screen.getByRole('navigation', { name: 'Text-to-SQL 工作流' }))
   assert.match(document.querySelector('#run').textContent, /运行控件将在下一阶段加入/)
+  assert.doesNotMatch(document.querySelector('#run').textContent, /配置仍保持可用/)
   assert.match(document.querySelector('#diagnose').textContent, /持久化评分包/)
   assert.match(document.querySelector('#improve').textContent, /持久化改进记录或弱点演化记录/)
 })
@@ -185,4 +187,6 @@ test('does not invent stages for an unavailable connection', async () => {
   assert.match(screen.getByTestId('focused-configuration').textContent, /Unavailable/)
   assert.match(screen.getByTestId('actor-workflow').textContent, /No verified workflow/)
   assert.doesNotMatch(screen.getByTestId('actor-workflow').textContent, /Generator/)
+  assert.match(document.querySelector('#run').textContent, /Run controls will be added in the next stage/)
+  assert.doesNotMatch(document.querySelector('#run').textContent, /configuration (?:is|remains) (?:un)?available/)
 })
