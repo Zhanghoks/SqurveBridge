@@ -12,7 +12,7 @@ const userEvent = (await import('@testing-library/user-event')).default
 registerLoader('../cssTestLoader.mjs', import.meta.url)
 const unregister = register()
 
-const { default: RunWorkspace } = await import('./RunWorkspace.jsx')
+const { default: RunWorkspace, sanitizeRunError } = await import('./RunWorkspace.jsx')
 const { default: ResultWorkspace } = await import('./ResultWorkspace.jsx')
 
 const translations = {
@@ -27,6 +27,7 @@ const translations = {
   'run.configureModel': 'Configure SQL API',
   'run.configureModelAction': 'Configure SQL API from Run Workspace',
   'run.unavailable': 'This configuration is unavailable.',
+  'run.databaseUnavailable': 'The focused database is not available in the live runtime.',
   'run.ready': 'Ready to run',
   'run.completed': 'Run completed',
   'run.loadingData': 'Loading data',
@@ -34,6 +35,7 @@ const translations = {
   'run.generatingSql': 'Generating SQL',
   'run.executingSql': 'Executing SQL',
   'run.evaluating': 'Evaluating',
+  'run.notApplicable': 'Not applicable',
   'inspect.title': 'Result Inspection',
   'inspect.description': 'Inspect evidence returned by the current run.',
   'inspect.sql': 'SQL',
@@ -46,6 +48,10 @@ const translations = {
   'inspect.noSql': 'No SQL was returned.',
   'inspect.noResult': 'No execution result was returned.',
   'inspect.noTrace': 'No trace was returned.',
+  'inspect.runContext': 'Run context',
+  'inspect.contextDatabase': 'Live database',
+  'inspect.contextConfig': 'Configuration',
+  'inspect.contextActors': 'Actors',
   'status.ready': 'Ready',
   'status.running': 'Running',
   'status.completed': 'Completed',
@@ -130,6 +136,26 @@ test('runs query then execute for the focused connection', async () => {
   assert.ok(await screen.findByText('SELECT name FROM singer'))
   assert.equal(states.at(-1).phase, 'completed')
   assert.equal(states.at(-1).result.rows[0][0], 'Alice')
+  assert.deepEqual(states.map(state => state.phase), [
+    'generatingSql',
+    'executingSql',
+    'completed',
+  ])
+  assert.deepEqual(states.at(-1).context, {
+    method: 'DINSQL',
+    database: 'Spider',
+    db_id: 'Spider',
+    config_path: 'reproduce/configs/spider/dinsql.json',
+    actors: ['DINSQLGenerator'],
+  })
+  assert.equal(screen.getByText('Loading data').closest('li').dataset.state, 'neutral')
+  assert.equal(screen.getByText('Building workflow').closest('li').dataset.state, 'neutral')
+  assert.equal(screen.getByText('Generating SQL').closest('li').dataset.state, 'completed')
+  assert.equal(screen.getByText('Executing SQL').closest('li').dataset.state, 'completed')
+  assert.equal(screen.getByText('Evaluating').closest('li').dataset.state, 'neutral')
+  for (const phase of ['Loading data', 'Building workflow', 'Evaluating']) {
+    assert.match(screen.getByText(phase).closest('li').textContent, /Not applicable/)
+  }
 })
 
 test('preserves the question and sanitizes a rejected query error', async () => {
@@ -147,6 +173,32 @@ test('preserves the question and sanitizes a rejected query error', async () => 
   assert.ok(await screen.findByRole('alert'))
   assert.equal(document.body.textContent.includes('sk-live-secret'), false)
   assert.match(screen.getByRole('alert').textContent, /Provider rejected/)
+})
+
+test('sanitizes supported credential forms while preserving benign technical text', () => {
+  const error = new Error([
+    'API key: api-secret',
+    'OPENAI_API_KEY=openai-secret',
+    'DEEPSEEK_API_KEY=deepseek-secret',
+    'DASHSCOPE_API_KEY=dashscope-secret',
+    'Bearer bearer-secret',
+    'qwen key: qwen-secret',
+    'SQLite syntax error near SELECT at line 4',
+  ].join('; '))
+
+  const sanitized = sanitizeRunError(error)
+
+  for (const secret of [
+    'api-secret',
+    'openai-secret',
+    'deepseek-secret',
+    'dashscope-secret',
+    'bearer-secret',
+    'qwen-secret',
+  ]) {
+    assert.equal(sanitized.includes(secret), false)
+  }
+  assert.match(sanitized, /SQLite syntax error near SELECT at line 4/)
 })
 
 test('marks the actual stage that failed instead of completing later stages', async () => {
@@ -201,6 +253,18 @@ test('disables real execution when the config or SQL session is unavailable', as
   assert.equal(configured, 1)
 })
 
+test('disables execution when the focused catalog database has no live database match', async () => {
+  renderRun({ databases: [] })
+
+  await userEvent.setup().type(
+    screen.getByLabelText('Natural-language question'),
+    'List singer names',
+  )
+
+  assert.equal(screen.getByRole('button', { name: 'Run Reproduce' }).disabled, true)
+  assert.match(document.querySelector('#run').textContent, /not available in the live runtime/)
+})
+
 test('result tabs show only returned evidence and keep metrics and logs empty', async () => {
   render(React.createElement(ResultWorkspace, {
     runState: {
@@ -215,19 +279,70 @@ test('result tabs show only returned evidence and keep metrics and logs empty', 
       },
       error: '',
       busy: false,
+      context: {
+        method: 'DINSQL',
+        database: 'Spider',
+        db_id: 'Spider',
+        config_path: 'reproduce/configs/spider/dinsql.json',
+        actors: ['DINSQLGenerator'],
+      },
     },
     t,
   }))
   const user = userEvent.setup()
 
+  assert.match(screen.getByTestId('run-context').textContent, /DINSQL/)
+  assert.match(screen.getByTestId('run-context').textContent, /Spider/)
+  assert.match(screen.getByTestId('run-context').textContent, /dinsql\.json/)
+  assert.match(screen.getByTestId('run-context').textContent, /DINSQLGenerator/)
+  for (const tab of screen.getAllByRole('tab')) {
+    assert.equal(tab.tabIndex, 0)
+  }
   assert.ok(screen.getByText('SELECT name FROM singer'))
   await user.click(screen.getByRole('tab', { name: 'Result' }))
   assert.ok(screen.getByRole('cell', { name: 'Alice' }))
   await user.click(screen.getByRole('tab', { name: 'Trace' }))
-  assert.ok(screen.getByText('DINSQLGenerator'))
+  assert.equal(screen.getAllByText('DINSQLGenerator').length, 2)
   await user.click(screen.getByRole('tab', { name: 'Metrics' }))
   assert.match(document.querySelector('#inspect').textContent, /Evidence is required/)
   await user.click(screen.getByRole('tab', { name: 'Logs' }))
   assert.match(document.querySelector('#inspect').textContent, /Evidence is required/)
   assert.doesNotMatch(document.querySelector('#inspect').textContent, /Loading data|Generating SQL|Executing SQL/)
+})
+
+test('renders duplicate SQL column labels without duplicate React key warnings', async () => {
+  const errors = []
+  const originalError = console.error
+  console.error = (...args) => { errors.push(args.join(' ')) }
+  try {
+    render(React.createElement(ResultWorkspace, {
+      runState: {
+        phase: 'completed',
+        sql: 'SELECT a.name, b.name FROM a JOIN b',
+        trace: [],
+        result: {
+          columns: ['name', 'name'],
+          rows: [['Alice', 'Bob']],
+          row_count: 1,
+          elapsed_ms: 2,
+        },
+        error: '',
+        busy: false,
+        context: {
+          method: 'DINSQL',
+          database: 'Spider',
+          db_id: 'Spider',
+          config_path: 'reproduce/configs/spider/dinsql.json',
+          actors: ['DINSQLGenerator'],
+        },
+      },
+      t,
+    }))
+    await userEvent.setup().click(screen.getByRole('tab', { name: 'Result' }))
+  } finally {
+    console.error = originalError
+  }
+
+  assert.equal(screen.getAllByRole('columnheader', { name: 'name' }).length, 2)
+  assert.equal(errors.some(message => /same key|unique "key"/i.test(message)), false)
 })

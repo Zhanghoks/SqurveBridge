@@ -11,6 +11,8 @@ export const RUN_PHASES = [
   'failed',
 ]
 
+const OPERATION_PHASES = new Set(['generatingSql', 'executingSql'])
+
 export const INITIAL_RUN_STATE = {
   phase: 'ready',
   sql: '',
@@ -18,11 +20,14 @@ export const INITIAL_RUN_STATE = {
   result: null,
   error: '',
   busy: false,
+  context: null,
 }
 
 const sensitivePatterns = [
-  [/\bAuthorization\s*:\s*Bearer\s+\S+/gi, 'Authorization: Bearer [redacted]'],
-  [/\b(api[_-]?key|token|secret)\s*[=:]\s*\S+/gi, '$1=[redacted]'],
+  [/\b(authorization\s*:\s*)?bearer\s+[^\s;,]+/gi, (_, authorization = '') => `${authorization}Bearer [redacted]`],
+  [/\b([a-z0-9_]*(?:api_key|access_token|auth_token|secret_key))\s*=\s*[^\s;,]+/gi, '$1=[redacted]'],
+  [/\b(api[\s_-]*key)\s*[:=]\s*[^\s;,]+/gi, '$1: [redacted]'],
+  [/\b((?:openai|deepseek|dashscope|qwen|anthropic|gemini|groq|mistral)\s+(?:api\s+)?key)\s*[:=]\s*[^\s;,]+/gi, '$1: [redacted]'],
   [/\bsk-[A-Za-z0-9_-]{6,}\b/g, '[redacted]'],
 ]
 
@@ -41,7 +46,20 @@ const actorNames = config => (config?.stages || [])
 const databaseIdFor = (databases, focusedDatabase) =>
   (databases || []).find(
     database => String(database.id).toLowerCase() === String(focusedDatabase).toLowerCase(),
-  )?.id || focusedDatabase
+  )?.id || ''
+
+const phaseState = (phase, runPhase, failedPhase) => {
+  if (!OPERATION_PHASES.has(phase)) return 'neutral'
+  const phasePosition = RUN_PHASES.indexOf(phase)
+  if (runPhase === 'failed') {
+    const failedPosition = RUN_PHASES.indexOf(failedPhase)
+    if (phasePosition === failedPosition) return 'failed'
+    return phasePosition < failedPosition ? 'completed' : 'pending'
+  }
+  const runPosition = RUN_PHASES.indexOf(runPhase)
+  if (runPhase === 'completed' || phasePosition < runPosition) return 'completed'
+  return phasePosition === runPosition ? 'current' : 'pending'
+}
 
 export default function RunWorkspace({
   focusedConfig,
@@ -68,7 +86,8 @@ export default function RunWorkspace({
   const runnable = Boolean(focusedConfig && sqlAuth?.configured && databaseId)
   const preview = {
     method: focusedMethod,
-    database: databaseId,
+    database: focusedDatabase,
+    live_database: databaseId || null,
     config: focusedConfig?.config_path || null,
     sampling: {
       limit: sampleLimit,
@@ -96,19 +115,25 @@ export default function RunWorkspace({
   const run = async () => {
     if (!runnable || !question.trim() || runState.busy) return
 
+    const context = Object.freeze({
+      method: focusedMethod,
+      database: focusedDatabase,
+      db_id: databaseId,
+      config_path: focusedConfig.config_path || null,
+      actors: Object.freeze([...actors]),
+    })
     setFailedPhase('')
-    let current = advance('loadingData', {
+    let current = advance('generatingSql', {
       ...INITIAL_RUN_STATE,
       busy: true,
+      context,
     })
     try {
-      current = advance('buildingWorkflow', current)
-      current = advance('generatingSql', current)
       const generated = await postJson('/api/query', {
         question: question.trim(),
-        db_id: databaseId,
-        mode: actors.length ? 'workflow' : 'direct',
-        actors,
+        db_id: context.db_id,
+        mode: context.actors.length ? 'workflow' : 'direct',
+        actors: context.actors,
         generator,
         provider: sqlAuth?.provider,
         model: sqlAuth?.model,
@@ -120,11 +145,10 @@ export default function RunWorkspace({
         trace: Array.isArray(generated.trace) ? generated.trace : [],
       })
       const execution = await postJson('/api/execute', {
-        db_id: databaseId,
+        db_id: context.db_id,
         sql: generated.sql,
       })
-      current = advance('evaluating', current, { result: execution })
-      advance('completed', current, { busy: false })
+      advance('completed', current, { result: execution, busy: false })
     } catch (error) {
       setFailedPhase(current.phase)
       advance('failed', current, {
@@ -133,9 +157,6 @@ export default function RunWorkspace({
       })
     }
   }
-
-  const phasePosition = RUN_PHASES.indexOf(runState.phase)
-  const failedPhasePosition = RUN_PHASES.indexOf(failedPhase)
 
   return <section id="run" className="flow-module run-workspace">
     <header className="flow-module-header">
@@ -162,6 +183,7 @@ export default function RunWorkspace({
           />
         </label>
         {!focusedConfig && <p>{t('run.unavailable')}</p>}
+        {focusedConfig && !databaseId && <p>{t('run.databaseUnavailable')}</p>}
         {!sqlAuth?.configured && <button
           type="button"
           aria-label={t('run.configureModelAction')}
@@ -181,21 +203,11 @@ export default function RunWorkspace({
 
     <ol className="run-phase-list" aria-label={t('run.stageStatus')}>
       {RUN_PHASES.slice(1, -2).map((phase, index) => {
-        const absoluteIndex = RUN_PHASES.indexOf(phase)
-        const state = runState.phase === 'failed'
-          ? absoluteIndex === failedPhasePosition
-            ? 'failed'
-            : absoluteIndex < failedPhasePosition
-              ? 'completed'
-              : 'pending'
-          : runState.phase === 'completed' || absoluteIndex < phasePosition
-            ? 'completed'
-            : absoluteIndex === phasePosition
-              ? 'current'
-              : 'pending'
+        const state = phaseState(phase, runState.phase, failedPhase)
         return <li key={phase} data-state={state}>
           <i>{index + 1}</i>
           <span>{t(`run.${phase}`)}</span>
+          {state === 'neutral' && <small>{t('run.notApplicable')}</small>}
         </li>
       })}
     </ol>

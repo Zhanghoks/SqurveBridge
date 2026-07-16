@@ -27,7 +27,7 @@ const baseCapabilities = {
   }],
 }
 
-function renderDemo(locale = 'en-US', capabilities = baseCapabilities) {
+function renderDemo(locale = 'en-US', capabilities = baseCapabilities, overrides = {}) {
   localStorage.setItem('squrve-demo-locale', locale)
   return render(React.createElement(FullFlowDemo, {
     capabilities,
@@ -36,6 +36,7 @@ function renderDemo(locale = 'en-US', capabilities = baseCapabilities) {
     api: async () => ({ runs: [] }),
     postJson: async () => ({}),
     onConfigureSql: () => {},
+    ...overrides,
   }))
 }
 
@@ -189,4 +190,40 @@ test('does not invent stages for an unavailable connection', async () => {
   assert.doesNotMatch(screen.getByTestId('actor-workflow').textContent, /Generator/)
   assert.match(document.querySelector('#run').textContent, /configuration is unavailable/)
   assert.equal(screen.getByRole('button', { name: 'Run workflow' }).disabled, true)
+})
+
+test('keeps completed evidence labelled with its immutable run connection after focus changes', async () => {
+  const capabilities = {
+    reproduce_configs: [
+      baseCapabilities.reproduce_configs[0],
+      {
+        method: 'c3sql',
+        dataset: 'bird',
+        config_path: 'reproduce/configs/bird/c3sql.json',
+        stages: [{ id: 'generate', type: 'GenerateTask', actor: 'C3SQLGenerator' }],
+      },
+    ],
+  }
+  const postJson = async path => path === '/api/query'
+    ? { sql: 'SELECT name FROM singer', trace: [{ actor_name: 'C3SQLGenerator' }] }
+    : { columns: ['name'], rows: [['Alice']], row_count: 1, elapsed_ms: 4 }
+  renderDemo('en-US', capabilities, {
+    databases: [{ id: 'Spider' }, { id: 'BIRD' }],
+    sqlAuth: { configured: true, provider: 'openai', model: 'gpt-4.1-mini' },
+    postJson,
+  })
+  const user = userEvent.setup()
+
+  await user.type(screen.getByLabelText('Question'), 'List singer names')
+  await user.click(screen.getByRole('button', { name: 'Run workflow' }))
+  assert.equal((await screen.findAllByText('SELECT name FROM singer')).length, 2)
+
+  await user.click(screen.getByRole('button', { name: 'Select database BIRD' }))
+  await user.click(screen.getByRole('button', { name: 'Focus connection C3SQL to BIRD' }))
+
+  assert.match(screen.getByTestId('focused-configuration').textContent, /bird\/c3sql\.json/)
+  const context = screen.getByTestId('run-context').textContent
+  assert.match(context, /Spider/)
+  assert.match(context, /spider\/c3sql\.json/)
+  assert.doesNotMatch(context, /bird\/c3sql\.json/)
 })

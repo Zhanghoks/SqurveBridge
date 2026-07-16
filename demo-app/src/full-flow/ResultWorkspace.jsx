@@ -13,7 +13,7 @@ function ResultTable({ result, empty }) {
   return <div className="results-table-wrap">
     <table>
       <thead>
-        <tr>{result.columns.map(column => <th key={column}>{column}</th>)}</tr>
+        <tr>{result.columns.map((column, index) => <th key={`${column}-${index}`}>{column}</th>)}</tr>
       </thead>
       <tbody>
         {result.rows.map((row, rowIndex) => <tr key={rowIndex}>
@@ -58,6 +58,25 @@ export default function ResultWorkspace({ runState, t }) {
       </div>
     </header>
 
+    {state.context && <aside className="result-run-context" data-testid="run-context">
+      <span>{t('inspect.runContext')}</span>
+      <strong>{state.context.method} → {state.context.database}</strong>
+      <dl>
+        <div>
+          <dt>{t('inspect.contextDatabase')}</dt>
+          <dd><code>{state.context.db_id}</code></dd>
+        </div>
+        <div>
+          <dt>{t('inspect.contextConfig')}</dt>
+          <dd><code>{state.context.config_path || t('status.unavailable')}</code></dd>
+        </div>
+        <div>
+          <dt>{t('inspect.contextActors')}</dt>
+          <dd>{state.context.actors?.join(' → ') || t('status.unavailable')}</dd>
+        </div>
+      </dl>
+    </aside>}
+
     {!hasRunEvidence && state.phase !== 'failed'
       ? <EmptyEvidence>{t('inspect.empty')}</EmptyEvidence>
       : <>
@@ -69,7 +88,6 @@ export default function ResultWorkspace({ runState, t }) {
             role="tab"
             aria-controls={`inspect-panel-${tab}`}
             aria-selected={selectedTab === tab}
-            tabIndex={selectedTab === tab ? 0 : -1}
             onClick={() => setSelectedTab(tab)}
           >
             {t(`inspect.${tab}`)}
