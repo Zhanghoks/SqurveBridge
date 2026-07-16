@@ -1043,15 +1043,44 @@ def _serialize_workflows(value) -> list:
     for row in value[:100]:
         if not isinstance(row, dict):
             continue
-        record = {}
-        for field in ("id", "stage", "actor", "status"):
-            if field in row:
-                record[field] = _public_identifier(row[field])
-        for field in ("metrics", "timing"):
-            if field in row:
-                record[field] = _sanitize_numeric_tree(row[field]) or {}
+        task_id = _public_identifier(row.get("task_id"))
+        if task_id in {None, "[redacted]"}:
+            continue
+        record = {"task_id": task_id}
+        for field in ("stages", "eval_type"):
+            if isinstance(row.get(field), list):
+                record[field] = [
+                    identifier for item in row[field][:100]
+                    if (identifier := _public_identifier(item)) not in {None, "[redacted]"}
+                ]
         records.append(record)
     return records
+
+
+def _serialize_workflow_aggregate(value) -> dict:
+    if not isinstance(value, dict):
+        return {}
+    result = {}
+    if isinstance(value.get("bottleneck_distribution"), dict):
+        result["bottleneck_distribution"] = _serialize_bottlenecks(
+            value["bottleneck_distribution"],
+        )
+    if isinstance(value.get("stage_summary"), dict):
+        stage_summary = {}
+        for stage_id, record in value["stage_summary"].items():
+            public_stage = _public_identifier(stage_id)
+            if public_stage in {None, "[redacted]"} or not isinstance(record, dict):
+                continue
+            public = {}
+            for field in ("task_type", "actor_class"):
+                if field in record:
+                    public[field] = _public_identifier(record[field])
+            for field in ("status_counts", "metrics", "signals"):
+                if field in record:
+                    public[field] = _sanitize_numeric_tree(record[field]) or {}
+            stage_summary[public_stage] = public
+        result["stage_summary"] = stage_summary
+    return result
 
 
 def _serialize_stage_metrics(value) -> dict:
@@ -1148,7 +1177,7 @@ def _serialize_comparison_run(
         "stage_metrics": _serialize_stage_metrics(scores.get("stage_metrics") or {}),
         "workflow": {
             "workflows": _serialize_workflows(workflow.get("workflows") or []),
-            "aggregate": _sanitize_numeric_tree(workflow.get("aggregate") or {}) or {},
+            "aggregate": _serialize_workflow_aggregate(workflow.get("aggregate") or {}),
         },
         "by_hardness": _serialize_hardness(scores.get("by_hardness") or {}),
         "by_sql_feature": _serialize_slices(scores.get("by_sql_feature") or {}),

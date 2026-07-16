@@ -295,14 +295,27 @@ class SpaceApiTests(unittest.TestCase):
             },
             "workflow_trace": {
                 "workflows": [{
-                    "id": "workflow_1",
-                    "stage": "generate",
-                    "actor": "C3SQLGenerator",
-                    "status": "completed",
-                    "metrics": {"execute_accuracy": 0.9},
+                    "task_id": "c3sql_full",
+                    "stages": ["reduce", "generate"],
+                    "eval_type": ["execute_accuracy"],
                     "notes": ["private prose"],
                 }],
-                "aggregate": {"elapsed_s": 0.9, "nested": forbidden},
+                "aggregate": {
+                    "bottleneck_distribution": {"generate": 2, "success": 8},
+                    "stage_summary": {
+                        "generate": {
+                            "task_type": "GenerateTask",
+                            "actor_class": "C3SQLGenerator",
+                            "status_counts": {"pass": 8, "fail": 2},
+                            "metrics": {"execute_accuracy": 0.8},
+                            "signals": {"oracle_ex": 0.9},
+                            "notes": ["private prose"],
+                            "dataset_save_path": unix_paths[0],
+                            "source_excerpt": "private source",
+                        },
+                    },
+                    "details": ["private prose"],
+                },
             },
             "by_hardness": {
                 "hard": {
@@ -389,6 +402,23 @@ class SpaceApiTests(unittest.TestCase):
             "task_type": "GenerateTask",
             "metrics": {"execute_accuracy": 0.9},
             "timing": {"elapsed_s": 1.2},
+        })
+        self.assertEqual(run["workflow"]["workflows"], [{
+            "task_id": "c3sql_full",
+            "stages": ["reduce", "generate"],
+            "eval_type": ["execute_accuracy"],
+        }])
+        self.assertEqual(run["workflow"]["aggregate"], {
+            "bottleneck_distribution": {"generate": 2, "success": 8},
+            "stage_summary": {
+                "generate": {
+                    "task_type": "GenerateTask",
+                    "actor_class": "C3SQLGenerator",
+                    "status_counts": {"pass": 8, "fail": 2},
+                    "metrics": {"execute_accuracy": 0.8},
+                    "signals": {"oracle_ex": 0.9},
+                },
+            },
         })
         self.assertEqual(run["token"], {
             "input_tokens": 120,
