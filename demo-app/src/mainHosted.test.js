@@ -68,16 +68,17 @@ test('hosted App exposes session SQL configuration instead of local env configur
   const configure = await screen.findByRole('button', { name: 'Configure SQL API' })
   assert.equal(screen.queryByRole('button', { name: 'Configure LLM' }), null)
   assert.match(document.body.textContent, /Bring your own SQL model credential/i)
-  for (const title of [
-    'Configuration Studio',
-    'Workflow Composition',
-    'Run Workspace',
-    'Result Inspection',
-    'Weakness Diagnosis',
-    'Bounded Improvement',
-  ]) {
-    assert.ok(screen.getByRole('heading', { name: title }))
-  }
+  assert.deepEqual(
+    [...document.querySelectorAll('.flow-module h2')].map(heading => heading.textContent),
+    [
+      'Configuration Studio',
+      'Workflow Composition',
+      'Run Workspace',
+      'Result Inspection',
+      'Weakness Diagnosis',
+      'Bounded Improvement',
+    ],
+  )
   assert.match(document.body.textContent, /64 runnable configurations/i)
   assert.match(document.body.textContent, /Method × Database/i)
   assert.equal(screen.queryByText('Experiment Board'), null)
