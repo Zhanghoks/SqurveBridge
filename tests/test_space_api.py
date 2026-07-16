@@ -266,20 +266,72 @@ class SpaceApiTests(unittest.TestCase):
                     "cost_usd": 0.004,
                     "provider": "must-not-pass",
                 },
+                "error_root_distribution": {
+                    "execution_error": {
+                        "count": 2,
+                        "pct": 0.5,
+                        "sample_ids": ["dev_1", "dev_2"],
+                        "details": ["private prose"],
+                    },
+                },
                 "nested": forbidden,
                 "patch_summary": "private patch summary",
                 "source_excerpt": "private source excerpt",
                 "code_snippet": "private code snippet",
             },
-            "stage_metrics": {"generate": {"ex": 0.0, "nested": forbidden}},
+            "stage_metrics": {
+                "generate": {
+                    "iteration": 2,
+                    "task_type": "GenerateTask",
+                    "valid_num": 9,
+                    "total_items": 10,
+                    "metrics": {"execute_accuracy": 0.9},
+                    "timing": {"elapsed_s": 1.2},
+                    "dataset_save_path": unix_paths[0],
+                    "per_sample": [{"notes": "private prose"}],
+                    "notes": ["internal roadmap text"],
+                    "details": ["private candidate instruction"],
+                },
+            },
             "workflow_trace": {
-                "workflows": [{"stage": "generate", "nested": forbidden}],
+                "workflows": [{
+                    "id": "workflow_1",
+                    "stage": "generate",
+                    "actor": "C3SQLGenerator",
+                    "status": "completed",
+                    "metrics": {"execute_accuracy": 0.9},
+                    "notes": ["private prose"],
+                }],
                 "aggregate": {"elapsed_s": 0.9, "nested": forbidden},
             },
-            "by_hardness": {"hard": {"ex": 0.0, "nested": forbidden}},
-            "by_sql_feature": {"group_by": {"ex": 0.0, "nested": forbidden}},
+            "by_hardness": {
+                "hard": {
+                    "ex": 0.0,
+                    "cf1_join": 0.4,
+                    "cf1_where": 0.7,
+                    "error_dist": {
+                        "missing_join": {"count": 1, "pct": 0.25, "sample_ids": ["dev_1"]},
+                    },
+                    "notes": ["private prose"],
+                },
+            },
+            "by_sql_feature": {
+                "group_by": {
+                    "ex": 0.0,
+                    "bottlenecks": {"generate": 3, "reduce": 1},
+                    "details": ["private prose"],
+                },
+            },
             "by_scenario": {"join": {"ex": 0.0, "nested": forbidden}},
-            "qvt": {"summary": {"score": 0.0, "nested": forbidden}},
+            "qvt": {
+                "eligible_groups": 4,
+                "avg_group_exec_acc": 0.75,
+                "stable_group_rate": 0.5,
+                "flip_rate": 0.25,
+                "groups": {
+                    "g1": {"exec_acc": 1.0, "stable": True, "flip": False, "notes": "private prose"},
+                },
+            },
             "weakness_profile": {
                 "summary": "schema linking",
                 "nested": forbidden,
@@ -319,7 +371,25 @@ class SpaceApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         run = response.json["runs"][0]
-        self.assertEqual(run["by_hardness"], {"hard": {"ex": 0.0, "nested": {}}})
+        self.assertEqual(run["errors"]["execution_error"], {
+            "count": 2,
+            "pct": 0.5,
+            "sample_ids": ["dev_1", "dev_2"],
+        })
+        self.assertEqual(run["by_hardness"]["hard"]["cf1_join"], 0.4)
+        self.assertEqual(run["by_hardness"]["hard"]["cf1_where"], 0.7)
+        self.assertEqual(run["by_hardness"]["hard"]["error_dist"]["missing_join"]["pct"], 0.25)
+        self.assertEqual(run["by_sql_feature"]["group_by"]["bottlenecks"], {"generate": 3, "reduce": 1})
+        self.assertEqual(run["qvt"]["eligible_groups"], 4)
+        self.assertEqual(run["qvt"]["groups"]["g1"], {"exec_acc": 1.0, "stable": True, "flip": False})
+        self.assertEqual(run["stage_metrics"]["generate"], {
+            "iteration": 2,
+            "valid_num": 9,
+            "total_items": 10,
+            "task_type": "GenerateTask",
+            "metrics": {"execute_accuracy": 0.9},
+            "timing": {"elapsed_s": 1.2},
+        })
         self.assertEqual(run["token"], {
             "input_tokens": 120,
             "output_tokens": 30,

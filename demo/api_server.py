@@ -873,14 +873,10 @@ _PRIVATE_VALUE_PATTERNS = (
     re.compile(r"(?i)\b[A-Z]:\\(?:[^\\\s]+\\)*[^\\\s]+"),
 )
 _CONTROLLED_STRING = re.compile(r"^[A-Za-z0-9 _.,:+@()/-]{0,160}$")
-_DIAGNOSTIC_SCALAR_FIELDS = {
-    "aggregate", "avg", "mean", "median", "min", "max", "p50", "p95", "p99",
-    "count", "sample_count", "total", "rate", "ratio", "score", "accuracy",
-    "precision", "recall", "f1", "sf1", "ex", "em", "ves", "sl_recall",
-    "elapsed", "latency", "cost", "status", "stage", "actor", "id", "name",
-    "root", "sub", "hardness", "feature", "scenario", "metric", "value",
-    "workflows", "workflow", "by_stage", "error_root_distribution",
-}
+_PUBLIC_IDENTIFIER = re.compile(r"^[A-Za-z0-9_.:@+-]{1,160}$")
+_PUBLIC_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}(?:[T ][0-9:.+-]+Z?)?$")
+_PUBLIC_ARTIFACT_REF = re.compile(r"^(?:session:)?[A-Za-z0-9_.:@+-]+(?:/[A-Za-z0-9_.@+-]+)*$")
+_PUBLIC_SOURCES = {"artifact", "session", "evidence", "artifacts", "demo-runs", "archive"}
 _EVOLUTION_STAGES = {
     "baseline", "weakness_profile", "candidate_change", "smoke",
     "bounded_evaluation", "confirmation", "human_review",
@@ -908,46 +904,188 @@ def _sanitize_public_scalar(value):
     return sanitized[:240]
 
 
-def _safe_diagnostic_key(key: object, value) -> bool:
-    normalized = re.sub(r"[^a-z0-9]+", "_", str(key).lower()).strip("_")
-    return (
-        bool(normalized)
-        and not _forbidden_comparison_key(normalized)
-        and len(normalized) <= 80
-        and bool(re.fullmatch(r"[a-z0-9_]+", normalized))
-        and (
-            isinstance(value, (dict, list))
-            or normalized in _DIAGNOSTIC_SCALAR_FIELDS
-        )
-    )
-
-
-def _sanitize_diagnostic_value(value):
-    if isinstance(value, dict):
-        return {
-            str(key)[:80]: _sanitize_diagnostic_value(item)
-            for key, item in value.items()
-            if _safe_diagnostic_key(key, item)
-        }
-    if isinstance(value, list):
-        return [_sanitize_diagnostic_value(item) for item in value[:200]]
-    if isinstance(value, str):
-        sanitized = _sanitize_public_scalar(value)
-        return sanitized if sanitized == "[redacted]" or _CONTROLLED_STRING.fullmatch(sanitized or "") else "[redacted]"
-    return value if value is None or isinstance(value, (bool, int, float)) else None
-
-
 def _sanitize_numeric_tree(value):
     if isinstance(value, dict):
-        return {
+        result = {
             str(key)[:80]: sanitized
             for key, item in value.items()
             if re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", str(key))
             and (sanitized := _sanitize_numeric_tree(item)) is not None
         }
+        return result or None
     if isinstance(value, list):
-        return [item for item in (_sanitize_numeric_tree(item) for item in value[:200]) if item is not None]
+        result = [item for item in (_sanitize_numeric_tree(item) for item in value[:200]) if item is not None]
+        return result or None
     return value if value is None or isinstance(value, (bool, int, float)) else None
+
+
+def _public_identifier(value) -> str | None:
+    if value is None:
+        return None
+    sanitized = _sanitize_public_scalar(value)
+    return sanitized if isinstance(sanitized, str) and _PUBLIC_IDENTIFIER.fullmatch(sanitized) else "[redacted]"
+
+
+def _public_timestamp(value) -> str | None:
+    if value is None:
+        return None
+    sanitized = _sanitize_public_scalar(value)
+    return sanitized if isinstance(sanitized, str) and _PUBLIC_TIMESTAMP.fullmatch(sanitized) else "[redacted]"
+
+
+def _public_artifact_ref(value) -> str | None:
+    if value is None:
+        return None
+    sanitized = _sanitize_public_scalar(value)
+    return sanitized if isinstance(sanitized, str) and _PUBLIC_ARTIFACT_REF.fullmatch(sanitized) else "[redacted]"
+
+
+def _serialize_aggregate_metrics(value) -> dict:
+    if not isinstance(value, dict):
+        return {}
+    excluded = {"token", "error_root_distribution"}
+    return {
+        str(key)[:80]: sanitized
+        for key, item in value.items()
+        if str(key) not in excluded
+        and re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", str(key))
+        and (sanitized := _sanitize_numeric_tree(item)) is not None
+    }
+
+
+def _serialize_error_distribution(value) -> dict:
+    if not isinstance(value, dict):
+        return {}
+    result = {}
+    for root, stats in value.items():
+        root_id = _public_identifier(root)
+        if root_id == "[redacted]" or not isinstance(stats, dict):
+            continue
+        public = {}
+        for field in ("count", "pct"):
+            if stats.get(field) is None or isinstance(stats.get(field), (bool, int, float)):
+                public[field] = stats.get(field)
+        if isinstance(stats.get("sample_ids"), list):
+            public["sample_ids"] = [
+                identifier for item in stats["sample_ids"][:200]
+                if (identifier := _public_identifier(item)) != "[redacted]"
+            ]
+        result[root_id] = public
+    return result
+
+
+def _serialize_hardness(value) -> dict:
+    if not isinstance(value, dict):
+        return {}
+    result = {}
+    for bucket, metrics in value.items():
+        bucket_id = _public_identifier(bucket)
+        if bucket_id == "[redacted]" or not isinstance(metrics, dict):
+            continue
+        public = {
+            str(key)[:80]: item
+            for key, item in metrics.items()
+            if key != "error_dist"
+            and re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", str(key))
+            and (item is None or isinstance(item, (bool, int, float)))
+        }
+        if "error_dist" in metrics:
+            public["error_dist"] = _serialize_error_distribution(metrics["error_dist"])
+        result[bucket_id] = public
+    return result
+
+
+def _serialize_bottlenecks(value):
+    if isinstance(value, dict):
+        return {
+            identifier: item
+            for key, item in value.items()
+            if (identifier := _public_identifier(key)) != "[redacted]"
+            and (item is None or isinstance(item, (bool, int, float)))
+        }
+    if isinstance(value, list):
+        return [
+            identifier for item in value[:100]
+            if (identifier := _public_identifier(item)) != "[redacted]"
+        ]
+    return {}
+
+
+def _serialize_slices(value) -> dict:
+    if not isinstance(value, dict):
+        return {}
+    result = {}
+    for name, metrics in value.items():
+        name_id = _public_identifier(name)
+        if name_id == "[redacted]" or not isinstance(metrics, dict):
+            continue
+        public = {
+            str(key)[:80]: item
+            for key, item in metrics.items()
+            if key != "bottlenecks"
+            and re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", str(key))
+            and (item is None or isinstance(item, (bool, int, float)))
+        }
+        if "bottlenecks" in metrics:
+            public["bottlenecks"] = _serialize_bottlenecks(metrics["bottlenecks"])
+        result[name_id] = public
+    return result
+
+
+def _serialize_qvt(value) -> dict:
+    return (_sanitize_numeric_tree(value) or {}) if isinstance(value, dict) else {}
+
+
+def _serialize_workflows(value) -> list:
+    if not isinstance(value, list):
+        return []
+    records = []
+    for row in value[:100]:
+        if not isinstance(row, dict):
+            continue
+        record = {}
+        for field in ("id", "stage", "actor", "status"):
+            if field in row:
+                record[field] = _public_identifier(row[field])
+        for field in ("metrics", "timing"):
+            if field in row:
+                record[field] = _sanitize_numeric_tree(row[field]) or {}
+        records.append(record)
+    return records
+
+
+def _serialize_stage_metrics(value) -> dict:
+    if not isinstance(value, dict):
+        return {}
+    result = {}
+    for stage_id, record in value.items():
+        public_stage = _public_identifier(stage_id)
+        if public_stage == "[redacted]" or not isinstance(record, dict):
+            continue
+        public = {}
+        for field in ("iteration", "valid_num", "total_items"):
+            if record.get(field) is None or isinstance(record.get(field), (bool, int, float)):
+                public[field] = record.get(field)
+        for field in ("task_type", "status", "id"):
+            if field in record:
+                public[field] = _public_identifier(record[field])
+        for field in ("metrics", "timing"):
+            if field in record:
+                public[field] = _sanitize_numeric_tree(record[field]) or {}
+        result[public_stage] = public
+    return result
+
+
+def _serialize_sampling(value) -> dict:
+    if not isinstance(value, dict):
+        return {}
+    result = {}
+    if value.get("mode") in {"slice", "random"}:
+        result["mode"] = value["mode"]
+    for field in ("limit", "seed"):
+        if value.get(field) is None or isinstance(value.get(field), (int, float)):
+            result[field] = value.get(field)
+    return result
 
 
 def _sanitize_evolution_record(value, *, stages: bool = False):
@@ -962,10 +1100,22 @@ def _sanitize_evolution_record(value, *, stages: bool = False):
         if isinstance(item, dict):
             result[normalized] = _sanitize_evolution_record(item)
         elif isinstance(item, list):
-            result[normalized] = [_sanitize_diagnostic_value(entry) for entry in item[:100]]
+            result[normalized] = [
+                sanitized for entry in item[:100]
+                if (sanitized := _sanitize_evolution_scalar(entry)) is not None
+            ]
         else:
-            result[normalized] = _sanitize_diagnostic_value(item)
+            result[normalized] = _sanitize_evolution_scalar(item)
     return result
+
+
+def _sanitize_evolution_scalar(value):
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    sanitized = _sanitize_public_scalar(value)
+    if isinstance(sanitized, str) and _CONTROLLED_STRING.fullmatch(sanitized):
+        return sanitized
+    return "[redacted]" if isinstance(sanitized, str) else None
 
 
 def _serialize_comparison_run(
@@ -980,33 +1130,33 @@ def _serialize_comparison_run(
     ]
     sample_hash = hashlib.sha256("\n".join(sample_ids).encode("utf-8")).hexdigest()[:16]
     raw_aggregate = scores.get("aggregate") or {}
-    aggregate = _sanitize_diagnostic_value(raw_aggregate)
+    aggregate = _serialize_aggregate_metrics(raw_aggregate)
     workflow = scores.get("workflow_trace") or {}
     serialized = {
-        "run_id": _sanitize_public_scalar(scores.get("run_id")),
-        "method": _sanitize_public_scalar(scores.get("method")),
-        "dataset": _sanitize_public_scalar(scores.get("dataset")),
-        "split": _sanitize_public_scalar(scores.get("split")),
-        "scope": _sanitize_public_scalar(scores.get("scope")),
+        "run_id": _public_identifier(scores.get("run_id")),
+        "method": _public_identifier(scores.get("method")),
+        "dataset": _public_identifier(scores.get("dataset")),
+        "split": _public_identifier(scores.get("split")),
+        "scope": _public_identifier(scores.get("scope")),
         "sample_count": _sanitize_public_scalar(scores.get("sample_count")),
-        "timestamp": _sanitize_public_scalar(scores.get("timestamp")),
-        "source": _sanitize_public_scalar(source),
-        "artifact_ref": _sanitize_public_scalar(artifact_ref),
-        "sampling": _sanitize_diagnostic_value(_sampling_metadata(scores, job)),
+        "timestamp": _public_timestamp(scores.get("timestamp")),
+        "source": source if source in _PUBLIC_SOURCES else "[redacted]",
+        "artifact_ref": _public_artifact_ref(artifact_ref),
+        "sampling": _serialize_sampling(_sampling_metadata(scores, job)),
         "sample_hash": sample_hash,
         "aggregate": aggregate,
-        "stage_metrics": _sanitize_diagnostic_value(scores.get("stage_metrics") or {}),
+        "stage_metrics": _serialize_stage_metrics(scores.get("stage_metrics") or {}),
         "workflow": {
-            "workflows": _sanitize_diagnostic_value(workflow.get("workflows") or []),
-            "aggregate": _sanitize_diagnostic_value(workflow.get("aggregate") or {}),
+            "workflows": _serialize_workflows(workflow.get("workflows") or []),
+            "aggregate": _sanitize_numeric_tree(workflow.get("aggregate") or {}) or {},
         },
-        "by_hardness": _sanitize_diagnostic_value(scores.get("by_hardness") or {}),
-        "by_sql_feature": _sanitize_diagnostic_value(scores.get("by_sql_feature") or {}),
-        "by_scenario": _sanitize_diagnostic_value(scores.get("by_scenario") or {}),
-        "qvt": _sanitize_diagnostic_value(scores.get("qvt") or {}),
-        "token": _sanitize_numeric_tree(raw_aggregate.get("token") or {}),
-        "errors": _sanitize_diagnostic_value(raw_aggregate.get("error_root_distribution") or {}),
-        "latency": _sanitize_numeric_tree(_latency_summary(scores, job)),
+        "by_hardness": _serialize_hardness(scores.get("by_hardness") or {}),
+        "by_sql_feature": _serialize_slices(scores.get("by_sql_feature") or {}),
+        "by_scenario": _serialize_slices(scores.get("by_scenario") or {}),
+        "qvt": _serialize_qvt(scores.get("qvt") or {}),
+        "token": _sanitize_numeric_tree(raw_aggregate.get("token") or {}) or {},
+        "errors": _serialize_error_distribution(raw_aggregate.get("error_root_distribution") or {}),
+        "latency": _sanitize_numeric_tree(_latency_summary(scores, job)) or {},
         "samples": [
             {
                 "instance_id": _sanitize_public_scalar(row.get("instance_id")),
