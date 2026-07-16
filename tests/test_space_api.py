@@ -237,6 +237,11 @@ class SpaceApiTests(unittest.TestCase):
             self.assertEqual(self.client.get("/api/archive").status_code, 200)
 
     def test_comparison_results_expose_only_sanitized_sample_diagnostics(self):
+        forbidden = {
+            "question": "private benchmark question",
+            "gold_sql": "SELECT private_gold",
+            "pred_sql": "SELECT private_prediction",
+        }
         scores = {
             "run_id": "safe-run",
             "method": "c3sql",
@@ -244,7 +249,27 @@ class SpaceApiTests(unittest.TestCase):
             "split": "dev",
             "scope": "sample",
             "sample_count": 1,
-            "by_hardness": {"hard": {"ex": 0.0}},
+            "aggregate": {
+                "ex": {"avg": 0.0},
+                "nested": forbidden,
+            },
+            "stage_metrics": {"generate": {"ex": 0.0, "nested": forbidden}},
+            "workflow_trace": {
+                "workflows": [{"stage": "generate", "nested": forbidden}],
+                "aggregate": {"elapsed_s": 0.9, "nested": forbidden},
+            },
+            "by_hardness": {"hard": {"ex": 0.0, "nested": forbidden}},
+            "by_sql_feature": {"group_by": {"ex": 0.0, "nested": forbidden}},
+            "by_scenario": {"join": {"ex": 0.0, "nested": forbidden}},
+            "qvt": {"summary": {"score": 0.0, "nested": forbidden}},
+            "weakness_profile": {
+                "summary": "schema linking",
+                "nested": forbidden,
+            },
+            "evolution_record": {
+                "baseline": {"artifact": "scores.json", "nested": forbidden},
+                "candidate_change": {"status": "recorded"},
+            },
             "per_sample": [{
                 "instance_id": "dev_1",
                 "db_id": "concert_singer",
@@ -254,9 +279,7 @@ class SpaceApiTests(unittest.TestCase):
                 "error_sub": "missing_column",
                 "sl_recall": 0.5,
                 "act_elapsed_s": 0.9,
-                "question": "private benchmark question",
-                "gold_sql": "SELECT private_gold",
-                "pred_sql": "SELECT private_prediction",
+                **forbidden,
             }],
         }
 
@@ -269,7 +292,12 @@ class SpaceApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         run = response.json["runs"][0]
-        self.assertEqual(run["by_hardness"], {"hard": {"ex": 0.0}})
+        self.assertEqual(run["by_hardness"], {"hard": {"ex": 0.0, "nested": {}}})
+        self.assertEqual(run["weakness_profile"]["summary"], "schema linking")
+        self.assertEqual(
+            run["evolution_record"]["candidate_change"]["status"],
+            "recorded",
+        )
         self.assertEqual(run["samples"], [{
             "instance_id": "dev_1",
             "db_id": "concert_singer",

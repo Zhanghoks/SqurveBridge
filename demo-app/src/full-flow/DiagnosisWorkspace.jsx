@@ -73,8 +73,13 @@ export default function DiagnosisWorkspace({ evidence, t }) {
         <h2>{t('diagnose.title')}</h2>
       </div>
     </header>
-    {!hasEvidence && <p>{t('diagnose.empty')}</p>}
-    {hasEvidence && <div className="diagnostic-grid">
+    {evidence?.loading
+      ? <p>{t('diagnose.loading')}</p>
+      : evidence?.error
+        ? <p role="alert">{t('diagnose.loadError')}</p>
+        : !hasEvidence
+          ? <p>{t('diagnose.empty')}</p>
+          : <div className="diagnostic-grid">
       {groups.map(group => <DiagnosticGroup
         key={group.field}
         title={t(group.label)}

@@ -43,12 +43,17 @@ export default function ImprovementWorkspace({ evidence, t }) {
         <h2>{t('improve.title')}</h2>
       </div>
     </header>
-    {records.length === 0 && <p>{t('improve.empty')}</p>}
-    {records.length > 0 && <ol>
-      {records.map(record => <li key={record.field}>
-        <h3>{t(record.label)}</h3>
-        <RecordedValue value={record.value} />
-      </li>)}
-    </ol>}
+    {evidence?.loading
+      ? <p>{t('improve.loading')}</p>
+      : evidence?.error
+        ? <p role="alert">{t('improve.loadError')}</p>
+        : records.length === 0
+          ? <p>{t('improve.empty')}</p>
+          : <ol>
+            {records.map(record => <li key={record.field}>
+              <h3>{t(record.label)}</h3>
+              <RecordedValue value={record.value} />
+            </li>)}
+          </ol>}
   </section>
 }

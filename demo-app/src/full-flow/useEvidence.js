@@ -13,10 +13,22 @@ export function useEvidence(api) {
   const refresh = useCallback(async () => {
     setState(current => ({ ...current, loading: true, error: '' }))
     try {
-      const [comparison, archive] = await Promise.all([
-        api('/api/comparisons/latest/results').catch(() => ({ runs: [] })),
-        api('/api/archive').catch(() => ({ runs: [] })),
+      if (typeof api !== 'function') {
+        throw new Error('Evidence API is unavailable.')
+      }
+      const [comparisonResult, archiveResult] = await Promise.allSettled([
+        api('/api/comparisons/latest/results'),
+        api('/api/archive'),
       ])
+      if (comparisonResult.status === 'rejected' && archiveResult.status === 'rejected') {
+        throw new Error('Persisted evidence could not be loaded.')
+      }
+      const comparison = comparisonResult.status === 'fulfilled'
+        ? comparisonResult.value
+        : { runs: [] }
+      const archive = archiveResult.status === 'fulfilled'
+        ? archiveResult.value
+        : { runs: [] }
       const selectedRun = comparison.runs?.[0] || archive.runs?.[0] || null
       setState({
         loading: false,
@@ -31,7 +43,7 @@ export function useEvidence(api) {
         comparison: null,
         archive: [],
         selectedRun: null,
-        error: error.message,
+        error: error.message || 'Persisted evidence could not be loaded.',
       })
     }
   }, [api])

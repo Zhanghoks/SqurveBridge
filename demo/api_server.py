@@ -859,15 +859,30 @@ def _latency_summary(scores: dict, job: dict | None = None) -> dict:
     }
 
 
+_FORBIDDEN_COMPARISON_KEYS = {"question", "gold_sql", "pred_sql"}
+
+
+def _sanitize_comparison_value(value):
+    if isinstance(value, dict):
+        return {
+            key: _sanitize_comparison_value(item)
+            for key, item in value.items()
+            if str(key).lower() not in _FORBIDDEN_COMPARISON_KEYS
+        }
+    if isinstance(value, list):
+        return [_sanitize_comparison_value(item) for item in value]
+    return value
+
+
 def _serialize_comparison_run(scores: dict, job: dict | None = None, source: str = "artifact") -> dict:
     sample_ids = [
         str(row.get("instance_id")) for row in (scores.get("per_sample") or [])
         if row.get("instance_id") is not None
     ]
     sample_hash = hashlib.sha256("\n".join(sample_ids).encode("utf-8")).hexdigest()[:16]
-    aggregate = scores.get("aggregate") or {}
+    aggregate = _sanitize_comparison_value(scores.get("aggregate") or {})
     workflow = scores.get("workflow_trace") or {}
-    return {
+    serialized = {
         "run_id": scores.get("run_id"),
         "method": scores.get("method"),
         "dataset": scores.get("dataset"),
@@ -879,17 +894,17 @@ def _serialize_comparison_run(scores: dict, job: dict | None = None, source: str
         "sampling": _sampling_metadata(scores, job),
         "sample_hash": sample_hash,
         "aggregate": aggregate,
-        "stage_metrics": scores.get("stage_metrics") or {},
+        "stage_metrics": _sanitize_comparison_value(scores.get("stage_metrics") or {}),
         "workflow": {
-            "workflows": workflow.get("workflows") or [],
-            "aggregate": workflow.get("aggregate") or {},
+            "workflows": _sanitize_comparison_value(workflow.get("workflows") or []),
+            "aggregate": _sanitize_comparison_value(workflow.get("aggregate") or {}),
         },
-        "by_hardness": scores.get("by_hardness") or {},
-        "by_sql_feature": scores.get("by_sql_feature") or {},
-        "by_scenario": scores.get("by_scenario") or {},
-        "qvt": scores.get("qvt") or {},
-        "token": aggregate.get("token") or {},
-        "errors": aggregate.get("error_root_distribution") or {},
+        "by_hardness": _sanitize_comparison_value(scores.get("by_hardness") or {}),
+        "by_sql_feature": _sanitize_comparison_value(scores.get("by_sql_feature") or {}),
+        "by_scenario": _sanitize_comparison_value(scores.get("by_scenario") or {}),
+        "qvt": _sanitize_comparison_value(scores.get("qvt") or {}),
+        "token": _sanitize_comparison_value(aggregate.get("token") or {}),
+        "errors": _sanitize_comparison_value(aggregate.get("error_root_distribution") or {}),
         "latency": _latency_summary(scores, job),
         "samples": [
             {
@@ -905,6 +920,10 @@ def _serialize_comparison_run(scores: dict, job: dict | None = None, source: str
             for row in (scores.get("per_sample") or [])
         ],
     }
+    for field in ("weakness_profile", "evolution_record"):
+        if field in scores and scores[field] is not None:
+            serialized[field] = _sanitize_comparison_value(scores[field])
+    return serialized
 
 
 def _comparison_payload(runs: list[dict], expected_methods: list[str], comparison_id: str | None = None) -> dict:

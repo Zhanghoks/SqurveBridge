@@ -17,6 +17,8 @@ const { useEvidence } = await import('./useEvidence.js')
 
 const labels = {
   'diagnose.title': 'Weakness Diagnosis',
+  'diagnose.loading': 'Loading persisted diagnosis evidence.',
+  'diagnose.loadError': 'Diagnosis evidence could not be loaded.',
   'diagnose.empty': 'A persisted score bundle is required.',
   'diagnose.errorRoots': 'Top Error Roots',
   'diagnose.hardness': 'Hardness',
@@ -25,6 +27,8 @@ const labels = {
   'diagnose.latency': 'Cost and Latency',
   'diagnose.samples': 'Samples',
   'improve.title': 'Bounded Improvement',
+  'improve.loading': 'Loading persisted improvement evidence.',
+  'improve.loadError': 'Improvement evidence could not be loaded.',
   'improve.empty': 'A persisted improvement record is required.',
   'improve.baseline': 'Baseline',
   'improve.weakness': 'Weakness Profile',
@@ -63,6 +67,49 @@ test('does not synthesize diagnosis or improvement without artifacts', async () 
   assert.equal(screen.queryByText('schema linking'), null)
 })
 
+test('distinguishes loading from a real artifact-empty response', async () => {
+  let resolveRequest
+  const pending = new Promise(resolve => {
+    resolveRequest = resolve
+  })
+  renderEvidence({ api: () => pending })
+
+  assert.ok(screen.getByText('Loading persisted diagnosis evidence.'))
+  assert.ok(screen.getByText('Loading persisted improvement evidence.'))
+  assert.equal(screen.queryByText('A persisted score bundle is required.'), null)
+
+  resolveRequest({ runs: [] })
+  assert.ok(await screen.findByText('A persisted score bundle is required.'))
+})
+
+test('shows load failure when both evidence sources fail or api is missing', async () => {
+  const first = renderEvidence({ api: async () => { throw new Error('offline') } })
+  assert.ok(await screen.findByText('Diagnosis evidence could not be loaded.'))
+  assert.ok(screen.getByText('Improvement evidence could not be loaded.'))
+  assert.equal(screen.queryByText('A persisted score bundle is required.'), null)
+  first.unmount()
+
+  renderEvidence({})
+  assert.ok(await screen.findByText('Diagnosis evidence could not be loaded.'))
+  assert.ok(screen.getByText('Improvement evidence could not be loaded.'))
+})
+
+test('uses the available evidence source when the other source fails', async () => {
+  const api = async path => {
+    if (path.includes('comparisons')) throw new Error('comparison unavailable')
+    return {
+      runs: [{
+        errors: { execution_error: 1 },
+      }],
+    }
+  }
+
+  renderEvidence({ api })
+
+  assert.ok(await screen.findByText('Top Error Roots'))
+  assert.equal(screen.queryByText('Diagnosis evidence could not be loaded.'), null)
+})
+
 test('renders only persisted diagnostic fields from the selected comparison run', async () => {
   const api = async path => path.includes('comparisons')
     ? {
@@ -97,12 +144,12 @@ test('renders only persisted diagnostic fields from the selected comparison run'
   assert.doesNotMatch(diagnosis, /private question/)
 })
 
-test('renders improvement only from explicit weakness and evolution records', async () => {
+test('renders improvement only from backend weakness_profile and evolution_record fields', async () => {
   const api = async path => path.includes('comparisons')
     ? {
       runs: [{
-        weakness: { summary: 'schema linking' },
-        evolution: {
+        weakness_profile: { summary: 'schema linking' },
+        evolution_record: {
           baseline: { artifact: 'scores.json' },
           candidate_change: { status: 'recorded' },
           smoke: { status: 'passed' },

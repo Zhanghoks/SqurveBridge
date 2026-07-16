@@ -141,13 +141,14 @@ test('moves database focus to a remaining selected database when removing the fo
   assert.match(screen.getByTestId('focused-configuration').textContent, /spider\/c3sql\.json/)
 })
 
-test('renders real run controls while preserving persisted-evidence boundaries', () => {
+test('renders real run controls while preserving persisted-evidence boundaries', async () => {
   renderDemo('en-US')
 
   assert.match(document.querySelector('#run').textContent, /Configuration preview/)
   assert.doesNotMatch(document.querySelector('#run').textContent, /configuration is unavailable/)
   assert.equal(screen.getByRole('button', { name: 'Run workflow' }).disabled, true)
   assert.match(document.querySelector('#inspect').textContent, /Run a workflow to inspect its artifacts/)
+  await screen.findByText(/Diagnosis requires a persisted score bundle/)
   assert.match(document.querySelector('#diagnose').textContent, /persisted score bundle/)
   assert.match(document.querySelector('#improve').textContent, /persisted improvement or weakness-evolution record/)
 })
