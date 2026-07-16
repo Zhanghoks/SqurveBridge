@@ -7,7 +7,7 @@ import { installTestDom } from './testDom.js'
 
 const closeDom = installTestDom()
 globalThis.React = React
-const { cleanup, render, screen } = await import('@testing-library/react')
+const { cleanup, render, screen, waitFor } = await import('@testing-library/react')
 const userEvent = (await import('@testing-library/user-event')).default
 registerLoader('./cssTestLoader.mjs', import.meta.url)
 const unregister = register()
@@ -39,12 +39,18 @@ test('hosted App exposes session SQL configuration instead of local env configur
     },
     '/api/databases': { databases: [] },
     '/api/sql-auth': { status: 'ok', configured: false, providers },
+    '/api/comparisons/latest/results': { runs: [] },
+    '/api/archive': { runs: [] },
   }
-  globalThis.fetch = async path => ({
-    ok: true,
-    statusText: 'OK',
-    json: async () => responses[path],
-  })
+  const requested = []
+  globalThis.fetch = async path => {
+    requested.push(path)
+    return {
+      ok: true,
+      statusText: 'OK',
+      json: async () => responses[path],
+    }
+  }
   let appElement
   globalThis.__SQURVE_DEMO_ROOT__ = { render: element => { appElement = element } }
   await import(`./main.jsx?hosted-test=${Date.now()}`)
@@ -52,7 +58,14 @@ test('hosted App exposes session SQL configuration instead of local env configur
 
   const configure = await screen.findByRole('button', { name: 'Configure SQL API' })
   assert.equal(screen.queryByRole('button', { name: 'Configure LLM' }), null)
-  assert.match(document.body.textContent, /Bring your own SQL and Pi credentials/i)
+  assert.match(document.body.textContent, /Bring your own SQL model credential/i)
+  assert.match(document.body.textContent, /Method × Database/i)
+  assert.equal(screen.queryByText('Experiment Board'), null)
+  assert.equal(screen.queryByText('Archive'), null)
+  await waitFor(() => {
+    assert.ok(requested.includes('/api/comparisons/latest/results'))
+    assert.ok(requested.includes('/api/archive'))
+  })
   await userEvent.setup().click(configure)
   assert.ok(screen.getByRole('dialog', { name: 'Configure SQL API' }))
 })

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './styles.css'
 import ExperimentBoard from './ExperimentBoard.jsx'
 import Archive from './Archive.jsx'
+import MatrixStudio from './MatrixStudio.jsx'
 import SqlAuthDialog from './SqlAuthDialog.jsx'
 import { deploymentTarget, featureEnabled, studioSurface } from './runtimeMode.js'
 
@@ -527,6 +528,7 @@ function App() {
   const [selectedDb, setSelectedDb] = useState('')
   const [busy, setBusy] = useState(false)
   const [sqlAuth, setSqlAuth] = useState(null)
+  const [sqlAuthOpen, setSqlAuthOpen] = useState(false)
   const hosted = deploymentTarget(capabilities) === 'hf-space'
   const selectedStudio = studioSurface(capabilities)
   const showProviderConfig = featureEnabled(capabilities, 'provider_configuration')
@@ -535,6 +537,11 @@ function App() {
   const liveEvaluation = featureEnabled(capabilities, 'live_evaluation')
   const refresh = async () => { setBusy(true); try { const [healthData, capabilityData, databaseData] = await Promise.all([api('/api/health'), api('/api/capabilities'), api('/api/databases')]); const hostedData = deploymentTarget(capabilityData) === 'hf-space' && featureEnabled(capabilityData, 'session_sql_auth') ? await api('/api/sql-auth') : null; setHealth(healthData); setCapabilities(capabilityData); setDatabases(databaseData.databases); setSqlAuth(hostedData) } catch (error) { setHealth({ status: 'error', provider: { configured: false, ready: false, message: error.message } }) } finally { setBusy(false) } }
   useEffect(() => { refresh() }, [])
+  if (hosted) return <div className="hosted-matrix-shell">
+    <div className="matrix-live-notice">Hugging Face Live Demo · Bring your own SQL model credential · session only</div>
+    <MatrixStudio capabilities={capabilities} databases={databases} sqlAuth={sqlAuth} api={api} postJson={postJson} onConfigureSql={() => setSqlAuthOpen(true)} />
+    <SqlAuthDialog open={sqlAuthOpen} api={api} status={sqlAuth} onStatusChange={setSqlAuth} onClose={() => setSqlAuthOpen(false)} />
+  </div>
   return <div className="app-shell"><ShellNav page={page} setPage={setPage} /><main><Topbar health={health} capabilities={capabilities} refresh={refresh} busy={busy} hosted={hosted} showProviderConfig={showProviderConfig} sessionSqlAuth={sessionSqlAuth} sqlAuth={sqlAuth} onSqlAuthChange={setSqlAuth} />{hosted && <div className="hosted-demo-notice">Hugging Face Live Demo · Bring your own SQL and Pi credentials · session only</div>}{page === 'board' ? <ExperimentBoard {...{ capabilities, liveEvaluation, api, postJson, Status, PageHeading, Empty }} /> : page === 'archive' ? <Archive {...{ api, Status, PageHeading, Empty }} /> : selectedStudio === 'live-sql' ? <Studio {...{ health, capabilities, databases, selectedDb, setSelectedDb, showAgentHarness, hosted, sqlAuth }} /> : <WorkspaceStudio {...{ capabilities, databases, showAgentHarness, liveEvaluation }} />}</main></div>
 }
 
