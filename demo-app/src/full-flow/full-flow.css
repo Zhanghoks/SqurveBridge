@@ -13,6 +13,8 @@
   --flow-amber: #efb65f;
   --flow-red: #ff7b7b;
   --flow-radius: 20px;
+  --flow-type-control: 12px;
+  --flow-type-meta: 11px;
   min-height: 100vh;
   padding: 22px clamp(16px, 3vw, 48px) 72px;
   color: var(--flow-text);
@@ -120,7 +122,7 @@
   margin-top: 3px;
   overflow: hidden;
   color: var(--flow-muted);
-  font-size: 10px;
+  font-size: var(--flow-type-meta);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -129,7 +131,7 @@
   justify-content: center;
   gap: 8px;
   color: var(--flow-muted);
-  font: 600 10px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 600 var(--flow-type-meta)/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .flow-demo .flow-header-status > span {
@@ -163,7 +165,7 @@
   padding: 0 13px;
   color: #cfe3f9;
   background: rgb(9 22 39 / 88%);
-  font-size: 10px;
+  font-size: var(--flow-type-control);
   font-weight: 750;
   cursor: pointer;
   transition: border-color 150ms ease, background 150ms ease, color 150ms ease, transform 150ms ease;
@@ -227,7 +229,7 @@
   border: 1px solid transparent;
   border-radius: 11px;
   color: var(--flow-muted);
-  font-size: 10px;
+  font-size: var(--flow-type-control);
   font-weight: 720;
   text-decoration: none;
   transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
@@ -241,7 +243,7 @@
 
 .flow-demo .flow-process-rail a span {
   color: var(--flow-blue);
-  font: 780 9px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 780 var(--flow-type-meta)/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .flow-demo .flow-module {
@@ -290,7 +292,7 @@
 .flow-demo .flow-module-header span {
   display: block;
   color: var(--flow-blue);
-  font: 800 10px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 800 var(--flow-type-meta)/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   letter-spacing: .14em;
   text-transform: uppercase;
 }
@@ -318,7 +320,7 @@
   padding: 7px 10px;
   color: var(--flow-muted);
   background: rgb(8 18 32 / 78%);
-  font-size: 9px;
+  font-size: var(--flow-type-meta);
 }
 
 .flow-demo .flow-configuration-layout {
@@ -346,14 +348,14 @@
 .flow-demo .configuration-grid legend {
   padding: 0 7px;
   color: #bcd2e9;
-  font-size: 10px;
+  font-size: var(--flow-type-control);
   font-weight: 780;
 }
 
 .flow-demo .configuration-grid fieldset > p {
   margin: 7px 0 0;
   color: var(--flow-muted);
-  font: 600 10px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 600 var(--flow-type-meta)/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   overflow-wrap: anywhere;
 }
 
@@ -379,7 +381,7 @@
   padding: 0 10px;
   color: var(--flow-muted);
   background: rgb(13 28 47 / 88%);
-  font-size: 9px;
+  font-size: var(--flow-type-control);
   font-weight: 720;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -419,7 +421,7 @@
   align-content: start;
   gap: 7px;
   color: var(--flow-muted);
-  font-size: 9px;
+  font-size: var(--flow-type-control);
   font-weight: 700;
 }
 
@@ -433,7 +435,7 @@
   color: var(--flow-text);
   outline: none;
   background: var(--flow-glass-strong);
-  font: 650 10px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 650 var(--flow-type-control)/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .flow-demo .focused-configuration {
@@ -449,7 +451,7 @@
 .flow-demo .focused-configuration > span {
   display: block;
   color: var(--flow-blue);
-  font-size: 9px;
+  font-size: var(--flow-type-meta);
   font-weight: 800;
   letter-spacing: .11em;
   text-transform: uppercase;
@@ -484,7 +486,7 @@
 
 .flow-demo .focused-configuration dt {
   color: var(--flow-muted);
-  font-size: 8px;
+  font-size: var(--flow-type-meta);
 }
 
 .flow-demo .focused-configuration dd {
@@ -498,7 +500,7 @@
   display: block;
   overflow-wrap: anywhere;
   color: #b9cce0;
-  font: 600 9px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 600 var(--flow-type-meta)/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .flow-demo .flow-compose-grid {
@@ -534,7 +536,7 @@
 .flow-demo .improvement-workspace h3 {
   margin: 0;
   color: #dcecff;
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: -.01em;
 }
 
@@ -543,7 +545,7 @@
   justify-content: space-between;
   margin: 11px 0 8px;
   color: var(--flow-muted);
-  font-size: 8px;
+  font-size: var(--flow-type-meta);
   font-weight: 750;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -613,7 +615,7 @@
   border: 1px solid var(--flow-border);
   color: #bfcee0;
   background: rgb(12 26 44 / 96%);
-  font-size: 8px;
+  font-size: var(--flow-type-control);
   font-weight: 720;
 }
 
@@ -637,7 +639,7 @@
 .flow-demo .flow-actor-workflow > p {
   margin: 18px 0 0;
   color: var(--flow-muted);
-  font-size: 10px;
+  font-size: var(--flow-type-control);
   line-height: 1.6;
 }
 
@@ -654,7 +656,7 @@
   position: relative;
   display: grid;
   min-width: 0;
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 68px minmax(0, 1fr);
   gap: 2px 9px;
   border: 1px solid var(--flow-border);
   border-radius: 10px;
@@ -674,8 +676,8 @@
 
 .flow-demo .flow-actor-workflow li > span {
   display: grid;
-  width: 44px;
-  height: 28px;
+  width: 68px;
+  min-height: 32px;
   grid-row: 1 / 3;
   overflow: hidden;
   place-items: center;
@@ -683,7 +685,7 @@
   padding: 0 3px;
   color: #dcedff;
   background: rgb(35 135 244 / 26%);
-  font: 760 6.5px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 760 var(--flow-type-meta)/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -692,7 +694,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--flow-muted);
-  font: 650 8px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 650 var(--flow-type-meta)/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -701,7 +703,7 @@
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--flow-text);
-  font: 720 9px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 720 var(--flow-type-meta)/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .flow-demo .focused-configuration .flow-actor-workflow {
@@ -733,7 +735,7 @@
   padding: 0 10px;
   color: var(--flow-muted);
   background: rgb(13 28 47 / 96%);
-  font-size: 9px;
+  font-size: var(--flow-type-control);
   cursor: pointer;
 }
 
@@ -801,14 +803,14 @@
 
 .flow-demo .integration-provenance dt {
   color: var(--flow-muted);
-  font-size: 8px;
+  font-size: var(--flow-type-meta);
 }
 
 .flow-demo .integration-provenance dd {
   margin-top: 5px;
   overflow-wrap: anywhere;
   color: #dcecff;
-  font: 600 8px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 600 var(--flow-type-meta)/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .flow-demo .run-workspace-grid {
@@ -826,7 +828,7 @@
   display: block;
   margin-bottom: 8px;
   color: var(--flow-muted);
-  font-size: 9px;
+  font-size: var(--flow-type-meta);
   font-weight: 750;
   letter-spacing: .06em;
   text-transform: uppercase;
@@ -847,7 +849,7 @@
   padding: 13px;
   color: #d6e7f8;
   background: var(--flow-glass-strong);
-  font: 600 10px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 600 var(--flow-type-meta)/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -879,7 +881,7 @@
   padding: 0 14px;
   color: #fff;
   background: linear-gradient(180deg, rgb(38 139 247 / 96%), rgb(29 104 194 / 96%));
-  font-size: 10px;
+  font-size: var(--flow-type-control);
   font-weight: 780;
   cursor: pointer;
 }
@@ -896,7 +898,7 @@
 .flow-demo .diagnosis-workspace > p,
 .flow-demo .improvement-workspace > p {
   color: var(--flow-muted);
-  font-size: 10px;
+  font-size: var(--flow-type-control);
   line-height: 1.65;
 }
 
@@ -921,7 +923,7 @@
   padding: 10px;
   color: var(--flow-muted);
   background: rgb(8 18 32 / 72%);
-  font-size: 9px;
+  font-size: var(--flow-type-control);
 }
 
 .flow-demo .run-phase-list li:not(:last-child)::after {
@@ -943,14 +945,14 @@
   border-radius: 8px;
   color: #9fb2c8;
   background: rgb(33 51 73 / 74%);
-  font: 750 8px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 750 var(--flow-type-meta)/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-style: normal;
 }
 
 .flow-demo .run-phase-list small {
   grid-column: 2;
   color: #65778b;
-  font-size: 7px;
+  font-size: 10px;
 }
 
 .flow-demo .run-phase-list li[data-state="current"] {
@@ -1001,14 +1003,14 @@
 
 .flow-demo .result-run-context > span {
   color: var(--flow-blue);
-  font-size: 8px;
+  font-size: var(--flow-type-control);
   font-weight: 800;
   letter-spacing: .08em;
   text-transform: uppercase;
 }
 
 .flow-demo .result-run-context > strong {
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .flow-demo .result-run-context dl {
@@ -1029,14 +1031,14 @@
 
 .flow-demo .result-run-context dt {
   color: var(--flow-muted);
-  font-size: 7px;
+  font-size: var(--flow-type-meta);
 }
 
 .flow-demo .result-run-context dd {
   margin-top: 4px;
   overflow-wrap: anywhere;
   color: #d6e7f8;
-  font-size: 8px;
+  font-size: var(--flow-type-meta);
 }
 
 .flow-demo .result-workspace [role="tablist"] {
@@ -1055,7 +1057,7 @@
   padding: 0 13px;
   color: var(--flow-muted);
   background: rgb(8 18 32 / 72%);
-  font-size: 9px;
+  font-size: var(--flow-type-control);
   font-weight: 730;
   cursor: pointer;
 }
@@ -1088,7 +1090,7 @@
   border-collapse: collapse;
   color: var(--flow-text);
   background: var(--flow-glass-strong);
-  font: 600 9px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 600 var(--flow-type-meta)/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .flow-demo .results-table-wrap th,
@@ -1137,12 +1139,12 @@
 
 .flow-demo .diagnostic-grid dt {
   color: var(--flow-muted);
-  font-size: 8px;
+  font-size: var(--flow-type-meta);
 }
 
 .flow-demo .diagnostic-grid dd {
   color: #d9eaff;
-  font: 600 9px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 600 var(--flow-type-meta)/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   overflow-wrap: anywhere;
 }
 
@@ -1184,7 +1186,7 @@
 
 .flow-demo .improvement-workspace > ol p {
   color: var(--flow-muted);
-  font-size: 9px;
+  font-size: var(--flow-type-meta);
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -1247,6 +1249,8 @@
 
 @media (max-width: 719px) {
   .flow-demo {
+    --flow-type-control: 13px;
+    --flow-type-meta: 11px;
     padding: 12px 12px 48px;
   }
 
@@ -1274,7 +1278,7 @@
   }
 
   .flow-demo .flow-process-rail ol {
-    min-width: 650px;
+    min-width: 760px;
   }
 
   .flow-demo .flow-process-rail a {
@@ -1314,6 +1318,7 @@
   .flow-demo .configuration-methods button,
   .flow-demo .configuration-databases button {
     min-height: 44px;
+    padding-inline: 8px;
   }
 
   .flow-demo .configuration-sampling {
@@ -1366,7 +1371,7 @@
   }
 
   .flow-demo .run-phase-list li {
-    min-height: 52px;
+    min-height: 58px;
   }
 
   .flow-demo .run-phase-list li:not(:last-child)::after {

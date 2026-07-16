@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { register as registerLoader } from 'node:module'
 import React from 'react'
@@ -17,6 +18,10 @@ registerLoader('./cssTestLoader.mjs', import.meta.url)
 const unregister = register()
 
 const { default: FullFlowDemo } = await import('./MatrixStudio.jsx')
+const fullFlowCss = readFileSync(
+  new URL('./full-flow/full-flow.css', import.meta.url),
+  'utf8',
+)
 
 const baseCapabilities = {
   reproduce_configs: [{
@@ -69,6 +74,25 @@ test('renders six bilingual modules in process order', () => {
     [...document.querySelectorAll('.flow-module')].map(section => section.id),
     ['configure', 'compose', 'run', 'inspect', 'diagnose', 'improve'],
   )
+})
+
+test('keeps functional controls and technical metadata readable', () => {
+  assert.match(fullFlowCss, /--flow-type-control:\s*12px/)
+  assert.match(fullFlowCss, /--flow-type-meta:\s*11px/)
+  for (const selector of [
+    '.configuration-methods button',
+    '.flow-graph-nodes li',
+    '.flow-actor-workflow li > span',
+    '.run-phase-list li',
+    '.result-run-context dt',
+  ]) {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    assert.match(
+      fullFlowCss,
+      new RegExp(`${escaped}[^{]*\\{[^}]*var\\(--flow-type-(?:control|meta)\\)`, 's'),
+      `${selector} must use the readable type scale`,
+    )
+  }
 })
 
 test('switches to Chinese and persists the locale', async () => {
