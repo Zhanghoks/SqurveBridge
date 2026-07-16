@@ -158,7 +158,7 @@ export default function RunWorkspace({
     }
   }
 
-  return <section id="run" className="flow-module run-workspace">
+  return <section id="run" className="flow-module flow-glass run-workspace">
     <header className="flow-module-header">
       <div>
         <span>{t('process.run')}</span>

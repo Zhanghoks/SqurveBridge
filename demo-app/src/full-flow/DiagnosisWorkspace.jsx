@@ -66,7 +66,7 @@ export default function DiagnosisWorkspace({ evidence, t }) {
   const samples = Array.isArray(selectedRun?.samples) ? selectedRun.samples : []
   const hasEvidence = groups.length > 0 || samples.length > 0
 
-  return <section id="diagnose" className="flow-module diagnosis-workspace">
+  return <section id="diagnose" className="flow-module flow-glass diagnosis-workspace">
     <header className="flow-module-header">
       <div>
         <span>{t('process.diagnose')}</span>

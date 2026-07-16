@@ -10,6 +10,7 @@ import ProcessRail from './ProcessRail.jsx'
 import ResultWorkspace from './ResultWorkspace.jsx'
 import RunWorkspace, { INITIAL_RUN_STATE } from './RunWorkspace.jsx'
 import { useEvidence } from './useEvidence.js'
+import './full-flow.css'
 
 const toggleItem = (items, value) =>
   items.includes(value)

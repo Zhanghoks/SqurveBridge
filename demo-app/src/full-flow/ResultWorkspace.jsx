@@ -49,7 +49,7 @@ export default function ResultWorkspace({ runState, t }) {
     logs: <EmptyEvidence>{t('inspect.evidenceRequired')}</EmptyEvidence>,
   }
 
-  return <section id="inspect" className="flow-module result-workspace">
+  return <section id="inspect" className="flow-module flow-glass result-workspace">
     <header className="flow-module-header">
       <div>
         <span>{t('process.inspect')}</span>

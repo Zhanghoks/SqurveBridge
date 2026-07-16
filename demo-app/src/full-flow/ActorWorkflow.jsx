@@ -1,9 +1,9 @@
 import { workflowStages } from './model.js'
 
-export default function ActorWorkflow({ focusedConfig, t }) {
+export default function ActorWorkflow({ focusedConfig, t, testId = 'actor-workflow' }) {
   const stages = workflowStages(focusedConfig)
 
-  return <div className="actor-workflow" data-testid="actor-workflow">
+  return <div className="flow-actor-workflow" data-testid={testId}>
     <h3>{t('compose.actorWorkflow')}</h3>
     {stages.length
       ? <ol>

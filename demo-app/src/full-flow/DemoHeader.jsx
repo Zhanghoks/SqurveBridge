@@ -11,7 +11,7 @@ export default function DemoHeader({
     ? t('language.switchToEnglish')
     : t('language.switchToChinese')
 
-  return <header className="flow-header">
+  return <header className="flow-header flow-glass">
     <div className="flow-brand">
       <span aria-hidden="true">S</span>
       <div>

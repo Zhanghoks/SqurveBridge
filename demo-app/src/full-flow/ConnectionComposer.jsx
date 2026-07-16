@@ -24,7 +24,7 @@ export default function ConnectionComposer({
   const focusedKey = configKey(focusedMethod, focusedDatabase)
   const connections = buildConnections(selectedMethods, selectedDatabases)
 
-  return <section id="compose" className="flow-module connection-composer">
+  return <section id="compose" className="flow-module flow-glass connection-composer">
     <header className="flow-module-header">
       <div>
         <span>{t('process.compose')}</span>
@@ -33,34 +33,45 @@ export default function ConnectionComposer({
       </div>
     </header>
 
-    <div className="connection-matrix">
-      <h3>{t('compose.matrixLabel')}</h3>
-      <div className="connection-axis" aria-hidden="true">
-        <span>{t('compose.methods')}</span>
-        <span>{t('compose.databases')}</span>
+    <div className="flow-compose-grid">
+      <div className="connection-matrix">
+        <h3>{t('compose.matrixLabel')}</h3>
+        <div className="connection-axis" aria-hidden="true">
+          <span>{t('compose.methods')}</span>
+          <span>{t('compose.databases')}</span>
+        </div>
+        <div className="flow-connection-graph">
+          <ol className="flow-graph-nodes flow-method-nodes" aria-hidden="true">
+            {METHODS.map(method => <li key={method}>{method}</li>)}
+          </ol>
+          <svg
+            viewBox="0 0 1000 420"
+            preserveAspectRatio="none"
+            role="img"
+            aria-labelledby="flow-matrix-title flow-matrix-description"
+          >
+            <title id="flow-matrix-title">{t('compose.matrixTitle')}</title>
+            <desc id="flow-matrix-description">{t('compose.matrixDescription')}</desc>
+            {METHODS.flatMap((method, methodIndex) => DATABASES.map((database, databaseIndex) => {
+              const key = configKey(method, database)
+              const selected = selectedMethods.includes(method) && selectedDatabases.includes(database)
+              return <path
+                key={key}
+                className={[
+                  readyKeys.has(key) ? 'ready' : 'unavailable',
+                  selected ? 'selected' : '',
+                  focusedKey === key ? 'focused' : '',
+                ].filter(Boolean).join(' ')}
+                d={`M 0 ${pointY(methodIndex)} C 330 ${pointY(methodIndex)}, 670 ${pointY(databaseIndex)}, 1000 ${pointY(databaseIndex)}`}
+              />
+            }))}
+          </svg>
+          <ol className="flow-graph-nodes flow-database-nodes" aria-hidden="true">
+            {DATABASES.map(database => <li key={database}>{database}</li>)}
+          </ol>
+        </div>
       </div>
-      <svg
-        viewBox="0 0 1000 420"
-        preserveAspectRatio="none"
-        role="img"
-        aria-labelledby="flow-matrix-title flow-matrix-description"
-      >
-        <title id="flow-matrix-title">{t('compose.matrixTitle')}</title>
-        <desc id="flow-matrix-description">{t('compose.matrixDescription')}</desc>
-        {METHODS.flatMap((method, methodIndex) => DATABASES.map((database, databaseIndex) => {
-          const key = configKey(method, database)
-          const selected = selectedMethods.includes(method) && selectedDatabases.includes(database)
-          return <path
-            key={key}
-            className={[
-              readyKeys.has(key) ? 'ready' : 'unavailable',
-              selected ? 'selected' : '',
-              focusedKey === key ? 'focused' : '',
-            ].filter(Boolean).join(' ')}
-            d={`M 0 ${pointY(methodIndex)} C 330 ${pointY(methodIndex)}, 670 ${pointY(databaseIndex)}, 1000 ${pointY(databaseIndex)}`}
-          />
-        }))}
-      </svg>
+      <ActorWorkflow focusedConfig={focusedConfig} t={t} />
     </div>
 
     <div className="selected-connections">
@@ -81,7 +92,6 @@ export default function ConnectionComposer({
       </button>)}
     </div>
 
-    <ActorWorkflow focusedConfig={focusedConfig} t={t} />
     <IntegrationProvenance focusedConfig={focusedConfig} t={t} />
   </section>
 }

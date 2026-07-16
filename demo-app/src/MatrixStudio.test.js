@@ -52,6 +52,10 @@ test.after(() => {
 
 test('renders six bilingual modules in process order', () => {
   renderDemo('en-US')
+  assert.ok(document.querySelector('.flow-demo'))
+  assert.ok(document.querySelector('.flow-process-rail'))
+  assert.equal(document.querySelectorAll('.flow-module').length, 6)
+  assert.ok(document.querySelector('.flow-glass'))
   const headings = screen.getAllByRole('heading', { level: 2 }).map(node => node.textContent)
   assert.deepEqual(headings, [
     'Configuration Studio',

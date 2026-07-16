@@ -36,7 +36,7 @@ export default function ImprovementWorkspace({ evidence, t }) {
     }))
     .filter(record => isRecorded(record.value))
 
-  return <section id="improve" className="flow-module improvement-workspace">
+  return <section id="improve" className="flow-module flow-glass improvement-workspace">
     <header className="flow-module-header">
       <div>
         <span>{t('process.improve')}</span>
