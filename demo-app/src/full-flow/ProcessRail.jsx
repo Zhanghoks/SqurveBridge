@@ -1,7 +1,7 @@
 const PROCESS_STEPS = ['configure', 'compose', 'run', 'inspect', 'diagnose', 'improve']
 
 export default function ProcessRail({ t }) {
-  return <nav className="flow-process" aria-label="Text-to-SQL workflow">
+  return <nav className="flow-process" aria-label={t('process.ariaLabel')}>
     <ol>
       {PROCESS_STEPS.map((step, index) => <li key={step}>
         <a href={`#${step}`}>

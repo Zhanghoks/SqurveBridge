@@ -50,13 +50,21 @@ export default function FullFlowDemo({
   const toggleMethod = method => {
     const next = toggleItem(selectedMethods, method)
     setSelectedMethods(next)
-    if (next.includes(method)) setFocusedMethod(method)
+    if (next.includes(method)) {
+      setFocusedMethod(method)
+    } else if (focusedMethod === method) {
+      setFocusedMethod(next[0])
+    }
   }
 
   const toggleDatabase = database => {
     const next = toggleItem(selectedDatabases, database)
     setSelectedDatabases(next)
-    if (next.includes(database)) setFocusedDatabase(database)
+    if (next.includes(database)) {
+      setFocusedDatabase(database)
+    } else if (focusedDatabase === database) {
+      setFocusedDatabase(next[0])
+    }
   }
 
   const selection = {
@@ -108,9 +116,9 @@ export default function FullFlowDemo({
       focusedConfig={focusedConfig}
       t={t}
     />
-    <PlaceholderModule id="run" titleKey="run.title" emptyKey="run.unavailable" t={t} />
+    <PlaceholderModule id="run" titleKey="run.title" emptyKey="run.stagingEmpty" t={t} />
     <PlaceholderModule id="inspect" titleKey="inspect.title" emptyKey="inspect.empty" t={t} />
-    <PlaceholderModule id="diagnose" titleKey="diagnose.title" emptyKey="diagnose.empty" t={t} />
-    <PlaceholderModule id="improve" titleKey="improve.title" emptyKey="improve.empty" t={t} />
+    <PlaceholderModule id="diagnose" titleKey="diagnose.title" emptyKey="diagnose.persistedEmpty" t={t} />
+    <PlaceholderModule id="improve" titleKey="improve.title" emptyKey="improve.persistedEmpty" t={t} />
   </main>
 }

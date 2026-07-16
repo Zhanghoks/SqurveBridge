@@ -94,6 +94,74 @@ test('supports additive method and database selection without clearing the last 
   assert.equal(screen.getByRole('button', { name: 'Select method DINSQL' }).getAttribute('aria-pressed'), 'true')
 })
 
+test('moves method focus to a remaining selected method when removing the focused method', async () => {
+  renderDemo('en-US', {
+    reproduce_configs: [
+      ...baseCapabilities.reproduce_configs,
+      {
+        method: 'dinsql',
+        dataset: 'spider',
+        config_path: 'reproduce/configs/spider/dinsql.json',
+        stages: [{ id: 'generate', type: 'GenerateTask', actor: 'DINSQLGenerator' }],
+      },
+    ],
+  })
+  const user = userEvent.setup()
+
+  await user.click(screen.getByRole('button', { name: 'Select method DINSQL' }))
+  assert.match(screen.getByTestId('focused-configuration').textContent, /dinsql\.json/)
+  await user.click(screen.getByRole('button', { name: 'Select method DINSQL' }))
+
+  assert.equal(screen.getByRole('button', { name: 'Select method C3SQL' }).getAttribute('aria-pressed'), 'true')
+  assert.equal(screen.getByRole('button', { name: 'Select method DINSQL' }).getAttribute('aria-pressed'), 'false')
+  assert.match(screen.getByTestId('focused-configuration').textContent, /c3sql\.json/)
+})
+
+test('moves database focus to a remaining selected database when removing the focused database', async () => {
+  renderDemo('en-US', {
+    reproduce_configs: [
+      ...baseCapabilities.reproduce_configs,
+      {
+        method: 'c3sql',
+        dataset: 'bird',
+        config_path: 'reproduce/configs/bird/c3sql.json',
+        stages: [{ id: 'generate', type: 'GenerateTask', actor: 'C3SQLGenerator' }],
+      },
+    ],
+  })
+  const user = userEvent.setup()
+
+  await user.click(screen.getByRole('button', { name: 'Select database BIRD' }))
+  assert.match(screen.getByTestId('focused-configuration').textContent, /bird\/c3sql\.json/)
+  await user.click(screen.getByRole('button', { name: 'Select database BIRD' }))
+
+  assert.equal(screen.getByRole('button', { name: 'Select database Spider' }).getAttribute('aria-pressed'), 'true')
+  assert.equal(screen.getByRole('button', { name: 'Select database BIRD' }).getAttribute('aria-pressed'), 'false')
+  assert.match(screen.getByTestId('focused-configuration').textContent, /spider\/c3sql\.json/)
+})
+
+test('states the staging and persisted-evidence boundaries without contradicting runnable config', () => {
+  renderDemo('en-US')
+
+  assert.match(document.querySelector('#run').textContent, /Run controls will be added in the next stage/)
+  assert.doesNotMatch(document.querySelector('#run').textContent, /configuration is unavailable/)
+  assert.match(document.querySelector('#inspect').textContent, /Run a workflow to inspect its artifacts/)
+  assert.match(document.querySelector('#diagnose').textContent, /persisted score bundle/)
+  assert.match(document.querySelector('#improve').textContent, /persisted improvement or weakness-evolution record/)
+})
+
+test('translates the process navigation landmark and staging boundaries', async () => {
+  renderDemo('en-US')
+  assert.ok(screen.getByRole('navigation', { name: 'Text-to-SQL workflow' }))
+
+  await userEvent.setup().click(screen.getByRole('button', { name: '切换到中文' }))
+
+  assert.ok(screen.getByRole('navigation', { name: 'Text-to-SQL 工作流' }))
+  assert.match(document.querySelector('#run').textContent, /运行控件将在下一阶段加入/)
+  assert.match(document.querySelector('#diagnose').textContent, /持久化评分包/)
+  assert.match(document.querySelector('#improve').textContent, /持久化改进记录或弱点演化记录/)
+})
+
 test('renders only configuration-backed workflow and provenance', async () => {
   renderDemo()
 
