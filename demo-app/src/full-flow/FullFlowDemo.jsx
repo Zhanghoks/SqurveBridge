@@ -3,22 +3,18 @@ import { detectLocale, setDocumentLocale, translate } from '../i18n/index.js'
 import ConfigurationStudio from './ConfigurationStudio.jsx'
 import ConnectionComposer from './ConnectionComposer.jsx'
 import DemoHeader from './DemoHeader.jsx'
+import DiagnosisWorkspace from './DiagnosisWorkspace.jsx'
+import ImprovementWorkspace from './ImprovementWorkspace.jsx'
 import { DATABASES, METHODS, resolveFocusedConfig } from './model.js'
 import ProcessRail from './ProcessRail.jsx'
 import ResultWorkspace from './ResultWorkspace.jsx'
 import RunWorkspace, { INITIAL_RUN_STATE } from './RunWorkspace.jsx'
+import { useEvidence } from './useEvidence.js'
 
 const toggleItem = (items, value) =>
   items.includes(value)
     ? items.length === 1 ? items : items.filter(item => item !== value)
     : [...items, value]
-
-function PlaceholderModule({ id, titleKey, emptyKey, t }) {
-  return <section id={id} className="flow-module flow-placeholder">
-    <h2>{t(titleKey)}</h2>
-    <p>{t(emptyKey)}</p>
-  </section>
-}
 
 export default function FullFlowDemo({
   capabilities,
@@ -42,6 +38,7 @@ export default function FullFlowDemo({
   const [sampleSeed, setSampleSeed] = useState(42)
   const [runState, setRunState] = useState(INITIAL_RUN_STATE)
   const t = useCallback((key, params) => translate(locale, key, params), [locale])
+  const evidence = useEvidence(api)
 
   useEffect(() => {
     window.localStorage.setItem('squrve-demo-locale', locale)
@@ -91,8 +88,6 @@ export default function FullFlowDemo({
     onSampleSeedChange: setSampleSeed,
   }
 
-  void api
-
   return <main className="flow-demo">
     <DemoHeader
       locale={locale}
@@ -132,7 +127,7 @@ export default function FullFlowDemo({
       t={t}
     />
     <ResultWorkspace runState={runState} t={t} />
-    <PlaceholderModule id="diagnose" titleKey="diagnose.title" emptyKey="diagnose.persistedEmpty" t={t} />
-    <PlaceholderModule id="improve" titleKey="improve.title" emptyKey="improve.persistedEmpty" t={t} />
+    <DiagnosisWorkspace evidence={evidence} t={t} />
+    <ImprovementWorkspace evidence={evidence} t={t} />
   </main>
 }

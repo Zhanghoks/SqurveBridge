@@ -884,12 +884,26 @@ def _serialize_comparison_run(scores: dict, job: dict | None = None, source: str
             "workflows": workflow.get("workflows") or [],
             "aggregate": workflow.get("aggregate") or {},
         },
+        "by_hardness": scores.get("by_hardness") or {},
         "by_sql_feature": scores.get("by_sql_feature") or {},
         "by_scenario": scores.get("by_scenario") or {},
         "qvt": scores.get("qvt") or {},
         "token": aggregate.get("token") or {},
         "errors": aggregate.get("error_root_distribution") or {},
         "latency": _latency_summary(scores, job),
+        "samples": [
+            {
+                "instance_id": row.get("instance_id"),
+                "db_id": row.get("db_id"),
+                "hardness": row.get("hardness"),
+                "ex": row.get("ex"),
+                "error_root": row.get("error_root"),
+                "error_sub": row.get("error_sub"),
+                "sl_recall": row.get("sl_recall"),
+                "act_elapsed_s": row.get("act_elapsed_s"),
+            }
+            for row in (scores.get("per_sample") or [])
+        ],
     }
 
 

@@ -236,6 +236,54 @@ class SpaceApiTests(unittest.TestCase):
             self.assertNotEqual(self.client.post("/api/execute", json={}).status_code, 403)
             self.assertEqual(self.client.get("/api/archive").status_code, 200)
 
+    def test_comparison_results_expose_only_sanitized_sample_diagnostics(self):
+        scores = {
+            "run_id": "safe-run",
+            "method": "c3sql",
+            "dataset": "spider",
+            "split": "dev",
+            "scope": "sample",
+            "sample_count": 1,
+            "by_hardness": {"hard": {"ex": 0.0}},
+            "per_sample": [{
+                "instance_id": "dev_1",
+                "db_id": "concert_singer",
+                "hardness": "hard",
+                "ex": 0,
+                "error_root": "execution_error",
+                "error_sub": "missing_column",
+                "sl_recall": 0.5,
+                "act_elapsed_s": 0.9,
+                "question": "private benchmark question",
+                "gold_sql": "SELECT private_gold",
+                "pred_sql": "SELECT private_prediction",
+            }],
+        }
+
+        def comparison(*_args, **_kwargs):
+            run = self.api_server._serialize_comparison_run(scores)
+            return self.api_server._comparison_payload([run], ["c3sql"])
+
+        with patch.object(self.api_server, "_artifact_comparison", side_effect=comparison):
+            response = self.client.get("/api/comparisons/latest/results")
+
+        self.assertEqual(response.status_code, 200)
+        run = response.json["runs"][0]
+        self.assertEqual(run["by_hardness"], {"hard": {"ex": 0.0}})
+        self.assertEqual(run["samples"], [{
+            "instance_id": "dev_1",
+            "db_id": "concert_singer",
+            "hardness": "hard",
+            "ex": 0,
+            "error_root": "execution_error",
+            "error_sub": "missing_column",
+            "sl_recall": 0.5,
+            "act_elapsed_s": 0.9,
+        }])
+        serialized = response.get_data(as_text=True)
+        for forbidden in ("question", "gold_sql", "pred_sql", "private benchmark question"):
+            self.assertNotIn(forbidden, serialized)
+
     def test_localhost_7860_provider_request_reaches_business_validation(self):
         with patch.dict(os.environ, {"SQURVE_DEPLOYMENT_TARGET": "local"}, clear=False):
             response = self.client.post(
