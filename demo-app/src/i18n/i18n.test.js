@@ -23,6 +23,8 @@ test('keeps staging and accessibility keys shared across both dictionaries', () 
     'run.stagingEmpty',
     'diagnose.persistedEmpty',
     'improve.persistedEmpty',
+    'boot.loading',
+    'boot.error',
   ]) {
     assert.ok(Object.hasOwn(enUS, key), `missing English key ${key}`)
     assert.ok(Object.hasOwn(zhCN, key), `missing Chinese key ${key}`)

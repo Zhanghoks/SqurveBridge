@@ -125,3 +125,12 @@ test('shows a neutral boot error instead of falling back to the local console', 
   assert.equal(screen.queryByText('Experiment Board'), null)
   assert.equal(screen.queryByText('Archive'), null)
 })
+
+test('localizes the pre-capabilities failure for a Chinese session', async () => {
+  window.localStorage.setItem('squrve-demo-locale', 'zh-CN')
+  globalThis.fetch = async () => { throw new Error('offline') }
+  render(React.createElement(HostedApp))
+  assert.ok(await screen.findByRole('alert'))
+  assert.match(document.body.textContent, /无法加载演示部署配置/)
+  assert.equal(screen.queryByText('Experiment Board'), null)
+})

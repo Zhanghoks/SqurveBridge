@@ -859,41 +859,113 @@ def _latency_summary(scores: dict, job: dict | None = None) -> dict:
     }
 
 
-_FORBIDDEN_COMPARISON_KEYS = {
-    "question", "gold_sql", "pred_sql", "credential", "credentials", "api_key",
-    "apikey", "token", "secret", "authorization", "source", "source_code",
-    "candidate_source", "diff", "patch", "code", "review_notes", "review_note",
+_FORBIDDEN_COMPARISON_KEY_MARKERS = {
+    "question", "sql", "credential", "api_key", "apikey", "token", "secret",
+    "authorization", "source", "excerpt", "code", "snippet", "patch", "diff",
+    "prompt", "review_note", "review_notes",
 }
 _PRIVATE_VALUE_PATTERNS = (
     re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+"),
     re.compile(r"(?i)\b(?:api[_-]?key|token|secret|authorization)\s*[:=]\s*\S+"),
-    re.compile(r"(?:/" + r"Users/[^/\s]+(?:/[^\s]*)?|[A-Za-z]:\\" + r"Users\\[^\\\s]+(?:\\[^\s]*)?)"),
-    re.compile(r"(?i)\bhttps?://(?:localhost|127\.0\.0\.1|[^/\s]*(?:private|internal|intranet)[^/\s]*)[^\s]*"),
+    re.compile(r"(?i)\b(?:sk|hf_|ghp_|github_pat_|xox[baprs]-)[A-Za-z0-9._-]{6,}"),
+    re.compile(r"(?i)\b(?:https?|wss?)://[^\s]+"),
+    re.compile(r"(?<![\w.])/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+"),
+    re.compile(r"(?i)\b[A-Z]:\\(?:[^\\\s]+\\)*[^\\\s]+"),
 )
+_CONTROLLED_STRING = re.compile(r"^[A-Za-z0-9 _.,:+@()/-]{0,160}$")
+_DIAGNOSTIC_SCALAR_FIELDS = {
+    "aggregate", "avg", "mean", "median", "min", "max", "p50", "p95", "p99",
+    "count", "sample_count", "total", "rate", "ratio", "score", "accuracy",
+    "precision", "recall", "f1", "sf1", "ex", "em", "ves", "sl_recall",
+    "elapsed", "latency", "cost", "status", "stage", "actor", "id", "name",
+    "root", "sub", "hardness", "feature", "scenario", "metric", "value",
+    "workflows", "workflow", "by_stage", "error_root_distribution",
+}
+_EVOLUTION_STAGES = {
+    "baseline", "weakness_profile", "candidate_change", "smoke",
+    "bounded_evaluation", "confirmation", "human_review",
+}
+_EVOLUTION_FIELDS = {
+    "artifact", "artifact_ref", "status", "state", "outcome", "decision",
+    "summary", "metric", "value", "score", "count", "stage", "actor", "id",
+    "name", "root", "category", "before", "after", "delta", "accepted",
+}
 
 
 def _forbidden_comparison_key(key: object) -> bool:
     normalized = re.sub(r"[^a-z0-9]+", "_", str(key).lower()).strip("_")
-    return normalized in _FORBIDDEN_COMPARISON_KEYS or any(
-        marker in normalized for marker in ("credential", "api_key", "authorization", "candidate_source", "review_note")
+    return any(marker in normalized for marker in _FORBIDDEN_COMPARISON_KEY_MARKERS)
+
+
+def _sanitize_public_scalar(value):
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    if not isinstance(value, str):
+        return None
+    sanitized = value
+    for pattern in _PRIVATE_VALUE_PATTERNS:
+        sanitized = pattern.sub("[redacted]", sanitized)
+    return sanitized[:240]
+
+
+def _safe_diagnostic_key(key: object, value) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "_", str(key).lower()).strip("_")
+    return (
+        bool(normalized)
+        and not _forbidden_comparison_key(normalized)
+        and len(normalized) <= 80
+        and bool(re.fullmatch(r"[a-z0-9_]+", normalized))
+        and (
+            isinstance(value, (dict, list))
+            or normalized in _DIAGNOSTIC_SCALAR_FIELDS
+        )
     )
 
 
-def _sanitize_comparison_value(value):
+def _sanitize_diagnostic_value(value):
     if isinstance(value, dict):
         return {
-            key: _sanitize_comparison_value(item)
+            str(key)[:80]: _sanitize_diagnostic_value(item)
             for key, item in value.items()
-            if not _forbidden_comparison_key(key)
+            if _safe_diagnostic_key(key, item)
         }
     if isinstance(value, list):
-        return [_sanitize_comparison_value(item) for item in value]
+        return [_sanitize_diagnostic_value(item) for item in value[:200]]
     if isinstance(value, str):
-        sanitized = value
-        for pattern in _PRIVATE_VALUE_PATTERNS:
-            sanitized = pattern.sub("[redacted]", sanitized)
-        return sanitized
-    return value
+        sanitized = _sanitize_public_scalar(value)
+        return sanitized if sanitized == "[redacted]" or _CONTROLLED_STRING.fullmatch(sanitized or "") else "[redacted]"
+    return value if value is None or isinstance(value, (bool, int, float)) else None
+
+
+def _sanitize_numeric_tree(value):
+    if isinstance(value, dict):
+        return {
+            str(key)[:80]: sanitized
+            for key, item in value.items()
+            if re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", str(key))
+            and (sanitized := _sanitize_numeric_tree(item)) is not None
+        }
+    if isinstance(value, list):
+        return [item for item in (_sanitize_numeric_tree(item) for item in value[:200]) if item is not None]
+    return value if value is None or isinstance(value, (bool, int, float)) else None
+
+
+def _sanitize_evolution_record(value, *, stages: bool = False):
+    if not isinstance(value, dict):
+        return {}
+    allowed = _EVOLUTION_STAGES if stages else _EVOLUTION_FIELDS
+    result = {}
+    for key, item in value.items():
+        normalized = re.sub(r"[^a-z0-9]+", "_", str(key).lower()).strip("_")
+        if normalized not in allowed or _forbidden_comparison_key(normalized):
+            continue
+        if isinstance(item, dict):
+            result[normalized] = _sanitize_evolution_record(item)
+        elif isinstance(item, list):
+            result[normalized] = [_sanitize_diagnostic_value(entry) for entry in item[:100]]
+        else:
+            result[normalized] = _sanitize_diagnostic_value(item)
+    return result
 
 
 def _serialize_comparison_run(
@@ -907,50 +979,54 @@ def _serialize_comparison_run(
         if row.get("instance_id") is not None
     ]
     sample_hash = hashlib.sha256("\n".join(sample_ids).encode("utf-8")).hexdigest()[:16]
-    aggregate = _sanitize_comparison_value(scores.get("aggregate") or {})
+    raw_aggregate = scores.get("aggregate") or {}
+    aggregate = _sanitize_diagnostic_value(raw_aggregate)
     workflow = scores.get("workflow_trace") or {}
     serialized = {
-        "run_id": scores.get("run_id"),
-        "method": scores.get("method"),
-        "dataset": scores.get("dataset"),
-        "split": scores.get("split"),
-        "scope": scores.get("scope"),
-        "sample_count": scores.get("sample_count"),
-        "timestamp": scores.get("timestamp"),
-        "source": source,
-        "artifact_ref": artifact_ref,
-        "sampling": _sampling_metadata(scores, job),
+        "run_id": _sanitize_public_scalar(scores.get("run_id")),
+        "method": _sanitize_public_scalar(scores.get("method")),
+        "dataset": _sanitize_public_scalar(scores.get("dataset")),
+        "split": _sanitize_public_scalar(scores.get("split")),
+        "scope": _sanitize_public_scalar(scores.get("scope")),
+        "sample_count": _sanitize_public_scalar(scores.get("sample_count")),
+        "timestamp": _sanitize_public_scalar(scores.get("timestamp")),
+        "source": _sanitize_public_scalar(source),
+        "artifact_ref": _sanitize_public_scalar(artifact_ref),
+        "sampling": _sanitize_diagnostic_value(_sampling_metadata(scores, job)),
         "sample_hash": sample_hash,
         "aggregate": aggregate,
-        "stage_metrics": _sanitize_comparison_value(scores.get("stage_metrics") or {}),
+        "stage_metrics": _sanitize_diagnostic_value(scores.get("stage_metrics") or {}),
         "workflow": {
-            "workflows": _sanitize_comparison_value(workflow.get("workflows") or []),
-            "aggregate": _sanitize_comparison_value(workflow.get("aggregate") or {}),
+            "workflows": _sanitize_diagnostic_value(workflow.get("workflows") or []),
+            "aggregate": _sanitize_diagnostic_value(workflow.get("aggregate") or {}),
         },
-        "by_hardness": _sanitize_comparison_value(scores.get("by_hardness") or {}),
-        "by_sql_feature": _sanitize_comparison_value(scores.get("by_sql_feature") or {}),
-        "by_scenario": _sanitize_comparison_value(scores.get("by_scenario") or {}),
-        "qvt": _sanitize_comparison_value(scores.get("qvt") or {}),
-        "token": _sanitize_comparison_value(aggregate.get("token") or {}),
-        "errors": _sanitize_comparison_value(aggregate.get("error_root_distribution") or {}),
-        "latency": _latency_summary(scores, job),
+        "by_hardness": _sanitize_diagnostic_value(scores.get("by_hardness") or {}),
+        "by_sql_feature": _sanitize_diagnostic_value(scores.get("by_sql_feature") or {}),
+        "by_scenario": _sanitize_diagnostic_value(scores.get("by_scenario") or {}),
+        "qvt": _sanitize_diagnostic_value(scores.get("qvt") or {}),
+        "token": _sanitize_numeric_tree(raw_aggregate.get("token") or {}),
+        "errors": _sanitize_diagnostic_value(raw_aggregate.get("error_root_distribution") or {}),
+        "latency": _sanitize_numeric_tree(_latency_summary(scores, job)),
         "samples": [
             {
-                "instance_id": row.get("instance_id"),
-                "db_id": row.get("db_id"),
-                "hardness": row.get("hardness"),
-                "ex": row.get("ex"),
-                "error_root": row.get("error_root"),
-                "error_sub": row.get("error_sub"),
-                "sl_recall": row.get("sl_recall"),
-                "act_elapsed_s": row.get("act_elapsed_s"),
+                "instance_id": _sanitize_public_scalar(row.get("instance_id")),
+                "db_id": _sanitize_public_scalar(row.get("db_id")),
+                "hardness": _sanitize_public_scalar(row.get("hardness")),
+                "ex": _sanitize_public_scalar(row.get("ex")),
+                "error_root": _sanitize_public_scalar(row.get("error_root")),
+                "error_sub": _sanitize_public_scalar(row.get("error_sub")),
+                "sl_recall": _sanitize_public_scalar(row.get("sl_recall")),
+                "act_elapsed_s": _sanitize_public_scalar(row.get("act_elapsed_s")),
             }
             for row in (scores.get("per_sample") or [])
         ],
     }
     for field in ("weakness_profile", "evolution_record"):
         if field in scores and scores[field] is not None:
-            serialized[field] = _sanitize_comparison_value(scores[field])
+            serialized[field] = _sanitize_evolution_record(
+                scores[field],
+                stages=field == "evolution_record",
+            )
     return serialized
 
 

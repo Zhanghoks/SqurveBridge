@@ -2,6 +2,8 @@ export default {
   'brand.subtitle': '动态 Text-to-SQL 编排',
   'header.configCount': '{count} 个规范配置',
   'hosted.notice': 'Hugging Face 在线演示 · 使用您自己的 SQL 模型凭据 · 仅限当前会话',
+  'boot.loading': '正在加载演示…',
+  'boot.error': '无法加载演示部署配置，请重试。',
   'header.configureApi': '配置 SQL API',
   'process.configure': '配置',
   'process.compose': '编排',

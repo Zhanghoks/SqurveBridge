@@ -238,21 +238,38 @@ class SpaceApiTests(unittest.TestCase):
 
     def test_comparison_results_expose_only_sanitized_sample_diagnostics(self):
         private_path = "/" + "Users/private/project/file.py"
+        unix_paths = [
+            "/" + "home/alice/private/project",
+            "/" + "root/private/project",
+            "/" + "workspace/private/project",
+        ]
+        standalone_secret = "sk-" + "live-secret-value"
+        arbitrary_url = "https://" + "example.test/private"
         forbidden = {
             "question": "private benchmark question",
             "gold_sql": "SELECT private_gold",
             "pred_sql": "SELECT private_prediction",
         }
         scores = {
-            "run_id": "safe-run",
-            "method": "c3sql",
-            "dataset": "spider",
+            "run_id": f"safe-run {standalone_secret}",
+            "method": f"c3sql {unix_paths[1]}",
+            "dataset": f"spider {arbitrary_url}",
             "split": "dev",
+            "timestamp": f"2026-01-01 {unix_paths[2]}",
             "scope": "sample",
             "sample_count": 1,
             "aggregate": {
                 "ex": {"avg": 0.0},
+                "token": {
+                    "input_tokens": 120,
+                    "output_tokens": 30,
+                    "cost_usd": 0.004,
+                    "provider": "must-not-pass",
+                },
                 "nested": forbidden,
+                "patch_summary": "private patch summary",
+                "source_excerpt": "private source excerpt",
+                "code_snippet": "private code snippet",
             },
             "stage_metrics": {"generate": {"ex": 0.0, "nested": forbidden}},
             "workflow_trace": {
@@ -281,13 +298,14 @@ class SpaceApiTests(unittest.TestCase):
             },
             "per_sample": [{
                 "instance_id": "dev_1",
-                "db_id": "concert_singer",
-                "hardness": "hard",
+                "db_id": f"concert_singer {unix_paths[1]}",
+                "hardness": f"hard {unix_paths[2]}",
                 "ex": 0,
                 "error_root": "execution_error",
                 "error_sub": "missing_column",
                 "sl_recall": 0.5,
                 "act_elapsed_s": 0.9,
+                "error_sub": f"failure at {unix_paths[0]} {arbitrary_url}",
                 **forbidden,
             }],
         }
@@ -302,6 +320,11 @@ class SpaceApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         run = response.json["runs"][0]
         self.assertEqual(run["by_hardness"], {"hard": {"ex": 0.0, "nested": {}}})
+        self.assertEqual(run["token"], {
+            "input_tokens": 120,
+            "output_tokens": 30,
+            "cost_usd": 0.004,
+        })
         self.assertEqual(run["weakness_profile"]["summary"], "schema linking")
         self.assertEqual(
             run["evolution_record"]["candidate_change"]["status"],
@@ -309,11 +332,11 @@ class SpaceApiTests(unittest.TestCase):
         )
         self.assertEqual(run["samples"], [{
             "instance_id": "dev_1",
-            "db_id": "concert_singer",
-            "hardness": "hard",
+            "db_id": "concert_singer [redacted]",
+            "hardness": "hard [redacted]",
             "ex": 0,
             "error_root": "execution_error",
-            "error_sub": "missing_column",
+            "error_sub": "failure at [redacted] [redacted]",
             "sl_recall": 0.5,
             "act_elapsed_s": 0.9,
         }])
@@ -322,6 +345,8 @@ class SpaceApiTests(unittest.TestCase):
             "question", "gold_sql", "pred_sql", "private benchmark question",
             "private candidate source", "private patch", "do not publish",
             "abc.def", private_path, "internal.example.test",
+            standalone_secret, arbitrary_url, *unix_paths,
+            "private patch summary", "private source excerpt", "private code snippet",
         ):
             self.assertNotIn(forbidden, serialized)
 

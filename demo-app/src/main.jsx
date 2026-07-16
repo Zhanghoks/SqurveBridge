@@ -6,6 +6,7 @@ import Archive from './Archive.jsx'
 import MatrixStudio from './MatrixStudio.jsx'
 import SqlAuthDialog from './SqlAuthDialog.jsx'
 import { deploymentTarget, featureEnabled, studioSurface } from './runtimeMode.js'
+import { detectLocale, translate } from './i18n/index.js'
 
 const AgentHarness = lazy(() => import('./AgentHarness.jsx'))
 
@@ -529,16 +530,22 @@ function App() {
   const [busy, setBusy] = useState(false)
   const [sqlAuth, setSqlAuth] = useState(null)
   const [sqlAuthOpen, setSqlAuthOpen] = useState(false)
-  const [bootError, setBootError] = useState('')
+  const [bootError, setBootError] = useState(false)
+  const [bootLocale] = useState(() => detectLocale(
+    navigator.language,
+    window.localStorage.getItem('squrve-demo-locale'),
+  ))
   const hosted = deploymentTarget(capabilities) === 'hf-space'
   const selectedStudio = studioSurface(capabilities)
   const showProviderConfig = featureEnabled(capabilities, 'provider_configuration')
   const sessionSqlAuth = hosted && featureEnabled(capabilities, 'session_sql_auth')
   const showAgentHarness = featureEnabled(capabilities, 'agent_chat')
   const liveEvaluation = featureEnabled(capabilities, 'live_evaluation')
-  const refresh = async () => { setBusy(true); setBootError(''); try { const [healthData, capabilityData, databaseData] = await Promise.all([api('/api/health'), api('/api/capabilities'), api('/api/databases')]); const hostedData = deploymentTarget(capabilityData) === 'hf-space' && featureEnabled(capabilityData, 'session_sql_auth') ? await api('/api/sql-auth') : null; setHealth(healthData); setCapabilities(capabilityData); setDatabases(databaseData.databases); setSqlAuth(hostedData) } catch (error) { setBootError('The demo could not load its deployment configuration. Please retry.'); setHealth({ status: 'error', provider: { configured: false, ready: false, message: error.message } }) } finally { setBusy(false) } }
+  const refresh = async () => { setBusy(true); setBootError(false); try { const [healthData, capabilityData, databaseData] = await Promise.all([api('/api/health'), api('/api/capabilities'), api('/api/databases')]); const hostedData = deploymentTarget(capabilityData) === 'hf-space' && featureEnabled(capabilityData, 'session_sql_auth') ? await api('/api/sql-auth') : null; setHealth(healthData); setCapabilities(capabilityData); setDatabases(databaseData.databases); setSqlAuth(hostedData) } catch (error) { setBootError(true); setHealth({ status: 'error', provider: { configured: false, ready: false, message: error.message } }) } finally { setBusy(false) } }
   useEffect(() => { refresh() }, [])
-  if (!capabilities) return <main className="deployment-gate" role={bootError ? 'alert' : 'status'}>{bootError || 'Loading demo…'}</main>
+  if (!capabilities) return <main className="deployment-gate" role={bootError ? 'alert' : 'status'}>
+    {translate(bootLocale, bootError ? 'boot.error' : 'boot.loading')}
+  </main>
   if (hosted) return <div className="hosted-matrix-shell">
     <MatrixStudio capabilities={capabilities} databases={databases} sqlAuth={sqlAuth} api={api} postJson={postJson} onConfigureSql={() => setSqlAuthOpen(true)} />
     <SqlAuthDialog open={sqlAuthOpen} api={api} status={sqlAuth} onStatusChange={setSqlAuth} onClose={() => setSqlAuthOpen(false)} />

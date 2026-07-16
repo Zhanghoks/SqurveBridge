@@ -2,6 +2,8 @@ export default {
   'brand.subtitle': 'Dynamic Text-to-SQL orchestration',
   'header.configCount': '{count} canonical configurations',
   'hosted.notice': 'Hugging Face Live Demo · Bring your own SQL model credential · session only',
+  'boot.loading': 'Loading demo…',
+  'boot.error': 'The demo could not load its deployment configuration. Please retry.',
   'header.configureApi': 'Configure SQL API',
   'process.configure': 'Configure',
   'process.compose': 'Compose',
