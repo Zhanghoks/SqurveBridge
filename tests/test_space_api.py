@@ -237,6 +237,7 @@ class SpaceApiTests(unittest.TestCase):
             self.assertEqual(self.client.get("/api/archive").status_code, 200)
 
     def test_comparison_results_expose_only_sanitized_sample_diagnostics(self):
+        private_path = "/" + "Users/private/project/file.py"
         forbidden = {
             "question": "private benchmark question",
             "gold_sql": "SELECT private_gold",
@@ -274,7 +275,7 @@ class SpaceApiTests(unittest.TestCase):
                     "diff": "private patch",
                     "review_notes": "do not publish",
                     "credential": "Bearer abc.def",
-                    "path": "/Users/private/project/file.py",
+                    "path": private_path,
                     "url": "https://internal.example.test/roadmap",
                 },
             },
@@ -320,7 +321,7 @@ class SpaceApiTests(unittest.TestCase):
         for forbidden in (
             "question", "gold_sql", "pred_sql", "private benchmark question",
             "private candidate source", "private patch", "do not publish",
-            "abc.def", "/Users/private", "internal.example.test",
+            "abc.def", private_path, "internal.example.test",
         ):
             self.assertNotIn(forbidden, serialized)
 

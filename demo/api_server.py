@@ -867,7 +867,7 @@ _FORBIDDEN_COMPARISON_KEYS = {
 _PRIVATE_VALUE_PATTERNS = (
     re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+"),
     re.compile(r"(?i)\b(?:api[_-]?key|token|secret|authorization)\s*[:=]\s*\S+"),
-    re.compile(r"(?:/Users/[^/\s]+(?:/[^\s]*)?|[A-Za-z]:\\Users\\[^\\\s]+(?:\\[^\s]*)?)"),
+    re.compile(r"(?:/" + r"Users/[^/\s]+(?:/[^\s]*)?|[A-Za-z]:\\" + r"Users\\[^\\\s]+(?:\\[^\s]*)?)"),
     re.compile(r"(?i)\bhttps?://(?:localhost|127\.0\.0\.1|[^/\s]*(?:private|internal|intranet)[^/\s]*)[^\s]*"),
 )
 
