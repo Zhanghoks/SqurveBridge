@@ -5,6 +5,8 @@ import ConnectionComposer from './ConnectionComposer.jsx'
 import DemoHeader from './DemoHeader.jsx'
 import { DATABASES, METHODS, resolveFocusedConfig } from './model.js'
 import ProcessRail from './ProcessRail.jsx'
+import ResultWorkspace from './ResultWorkspace.jsx'
+import RunWorkspace, { INITIAL_RUN_STATE } from './RunWorkspace.jsx'
 
 const toggleItem = (items, value) =>
   items.includes(value)
@@ -38,6 +40,7 @@ export default function FullFlowDemo({
   const [sampleLimit, setSampleLimit] = useState(20)
   const [sampleMode, setSampleMode] = useState('slice')
   const [sampleSeed, setSampleSeed] = useState(42)
+  const [runState, setRunState] = useState(INITIAL_RUN_STATE)
   const t = useCallback((key, params) => translate(locale, key, params), [locale])
 
   useEffect(() => {
@@ -88,8 +91,6 @@ export default function FullFlowDemo({
     onSampleSeedChange: setSampleSeed,
   }
 
-  void databases
-  void postJson
   void api
 
   return <main className="flow-demo">
@@ -116,8 +117,21 @@ export default function FullFlowDemo({
       focusedConfig={focusedConfig}
       t={t}
     />
-    <PlaceholderModule id="run" titleKey="run.title" emptyKey="run.stagingEmpty" t={t} />
-    <PlaceholderModule id="inspect" titleKey="inspect.title" emptyKey="inspect.empty" t={t} />
+    <RunWorkspace
+      focusedConfig={focusedConfig}
+      focusedMethod={focusedMethod}
+      focusedDatabase={focusedDatabase}
+      databases={databases}
+      sampleLimit={sampleLimit}
+      sampleMode={sampleMode}
+      sampleSeed={sampleSeed}
+      sqlAuth={sqlAuth}
+      postJson={postJson}
+      onConfigureSql={onConfigureSql}
+      onRunStateChange={setRunState}
+      t={t}
+    />
+    <ResultWorkspace runState={runState} t={t} />
     <PlaceholderModule id="diagnose" titleKey="diagnose.title" emptyKey="diagnose.persistedEmpty" t={t} />
     <PlaceholderModule id="improve" titleKey="improve.title" emptyKey="improve.persistedEmpty" t={t} />
   </main>

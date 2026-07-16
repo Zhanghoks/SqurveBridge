@@ -140,26 +140,26 @@ test('moves database focus to a remaining selected database when removing the fo
   assert.match(screen.getByTestId('focused-configuration').textContent, /spider\/c3sql\.json/)
 })
 
-test('states the staging and persisted-evidence boundaries without contradicting runnable config', () => {
+test('renders real run controls while preserving persisted-evidence boundaries', () => {
   renderDemo('en-US')
 
-  assert.match(document.querySelector('#run').textContent, /Run controls will be added in the next stage/)
+  assert.match(document.querySelector('#run').textContent, /Configuration preview/)
   assert.doesNotMatch(document.querySelector('#run').textContent, /configuration is unavailable/)
-  assert.doesNotMatch(document.querySelector('#run').textContent, /configuration remains available/)
+  assert.equal(screen.getByRole('button', { name: 'Run workflow' }).disabled, true)
   assert.match(document.querySelector('#inspect').textContent, /Run a workflow to inspect its artifacts/)
   assert.match(document.querySelector('#diagnose').textContent, /persisted score bundle/)
   assert.match(document.querySelector('#improve').textContent, /persisted improvement or weakness-evolution record/)
 })
 
-test('translates the process navigation landmark and staging boundaries', async () => {
+test('translates the process navigation, run controls, and evidence boundaries', async () => {
   renderDemo('en-US')
   assert.ok(screen.getByRole('navigation', { name: 'Text-to-SQL workflow' }))
 
   await userEvent.setup().click(screen.getByRole('button', { name: '切换到中文' }))
 
   assert.ok(screen.getByRole('navigation', { name: 'Text-to-SQL 工作流' }))
-  assert.match(document.querySelector('#run').textContent, /运行控件将在下一阶段加入/)
-  assert.doesNotMatch(document.querySelector('#run').textContent, /配置仍保持可用/)
+  assert.match(document.querySelector('#run').textContent, /配置预览/)
+  assert.ok(screen.getByRole('button', { name: '从运行工作台配置 SQL API' }))
   assert.match(document.querySelector('#diagnose').textContent, /持久化评分包/)
   assert.match(document.querySelector('#improve').textContent, /持久化改进记录或弱点演化记录/)
 })
@@ -187,6 +187,6 @@ test('does not invent stages for an unavailable connection', async () => {
   assert.match(screen.getByTestId('focused-configuration').textContent, /Unavailable/)
   assert.match(screen.getByTestId('actor-workflow').textContent, /No verified workflow/)
   assert.doesNotMatch(screen.getByTestId('actor-workflow').textContent, /Generator/)
-  assert.match(document.querySelector('#run').textContent, /Run controls will be added in the next stage/)
-  assert.doesNotMatch(document.querySelector('#run').textContent, /configuration (?:is|remains) (?:un)?available/)
+  assert.match(document.querySelector('#run').textContent, /configuration is unavailable/)
+  assert.equal(screen.getByRole('button', { name: 'Run workflow' }).disabled, true)
 })
