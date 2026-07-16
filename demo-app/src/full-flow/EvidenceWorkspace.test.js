@@ -39,8 +39,8 @@ const labels = {
   'improve.review': 'Human Review',
 }
 
-function EvidenceHarness({ api }) {
-  const evidence = useEvidence(api)
+function EvidenceHarness({ api, selection }) {
+  const evidence = useEvidence(api, selection)
   const t = key => labels[key] || key
   return React.createElement(React.Fragment, null,
     React.createElement(DiagnosisWorkspace, { evidence, t }),
@@ -48,8 +48,8 @@ function EvidenceHarness({ api }) {
   )
 }
 
-function renderEvidence({ api }) {
-  return render(React.createElement(EvidenceHarness, { api }))
+function renderEvidence({ api, selection }) {
+  return render(React.createElement(EvidenceHarness, { api, selection }))
 }
 
 test.afterEach(cleanup)
@@ -167,4 +167,29 @@ test('renders improvement only from backend weakness_profile and evolution_recor
     assert.match(improvement, new RegExp(value))
   }
   assert.doesNotMatch(improvement, /hidden_stage|invented/)
+})
+
+test('requests focused persisted evidence and labels archive fallback as independent history', async () => {
+  const requested = []
+  const api = async path => {
+    requested.push(path)
+    if (path.includes('comparisons')) return { runs: [] }
+    return { runs: [{
+      run_id: 'archive-7',
+      method: 'dinsql',
+      dataset: 'bird',
+      split: 'dev',
+      source: 'evidence',
+      errors: { execution_error: 1 },
+    }] }
+  }
+  renderEvidence({
+    api,
+    selection: { method: 'dinsql', dataset: 'bird', split: 'dev', sampleMode: 'slice', sampleLimit: 20 },
+  })
+  assert.ok(await screen.findByText('evidence.historicalArchive'))
+  assert.match(requested[0], /methods=dinsql/)
+  assert.match(requested[0], /dataset=bird/)
+  assert.match(document.querySelector('#diagnose').textContent, /archive-7.*dinsql.*bird/s)
+  assert.ok(screen.getAllByText('evidence.independent').length >= 1)
 })

@@ -39,14 +39,20 @@ export default function FullFlowDemo({
   const [sampleSeed, setSampleSeed] = useState(42)
   const [runState, setRunState] = useState(INITIAL_RUN_STATE)
   const t = useCallback((key, params) => translate(locale, key, params), [locale])
-  const evidence = useEvidence(api)
+  const focusedConfig = resolveFocusedConfig(configs, focusedMethod, focusedDatabase)
+  const evidence = useEvidence(api, {
+    method: focusedConfig?.method,
+    dataset: focusedConfig?.dataset,
+    split: focusedConfig?.split,
+    sampleMode,
+    sampleLimit,
+    sampleSeed,
+  })
 
   useEffect(() => {
     window.localStorage.setItem('squrve-demo-locale', locale)
     setDocumentLocale(locale)
   }, [locale])
-
-  const focusedConfig = resolveFocusedConfig(configs, focusedMethod, focusedDatabase)
 
   const toggleMethod = method => {
     const next = toggleItem(selectedMethods, method)
@@ -90,6 +96,7 @@ export default function FullFlowDemo({
   }
 
   return <main className="flow-demo">
+    <div className="matrix-live-notice">{t('hosted.notice')}</div>
     <DemoHeader
       locale={locale}
       setLocale={setLocale}
@@ -103,6 +110,8 @@ export default function FullFlowDemo({
       {...selection}
       {...sampling}
       focusedConfig={focusedConfig}
+      configs={configs}
+      databases={databases}
       sqlAuth={sqlAuth}
       onConfigureSql={onConfigureSql}
       t={t}

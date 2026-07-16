@@ -268,7 +268,15 @@ class SpaceApiTests(unittest.TestCase):
             },
             "evolution_record": {
                 "baseline": {"artifact": "scores.json", "nested": forbidden},
-                "candidate_change": {"status": "recorded"},
+                "candidate_change": {
+                    "status": "recorded",
+                    "source": "private candidate source",
+                    "diff": "private patch",
+                    "review_notes": "do not publish",
+                    "credential": "Bearer abc.def",
+                    "path": "/Users/private/project/file.py",
+                    "url": "https://internal.example.test/roadmap",
+                },
             },
             "per_sample": [{
                 "instance_id": "dev_1",
@@ -309,7 +317,11 @@ class SpaceApiTests(unittest.TestCase):
             "act_elapsed_s": 0.9,
         }])
         serialized = response.get_data(as_text=True)
-        for forbidden in ("question", "gold_sql", "pred_sql", "private benchmark question"):
+        for forbidden in (
+            "question", "gold_sql", "pred_sql", "private benchmark question",
+            "private candidate source", "private patch", "do not publish",
+            "abc.def", "/Users/private", "internal.example.test",
+        ):
             self.assertNotIn(forbidden, serialized)
 
     def test_localhost_7860_provider_request_reaches_business_validation(self):

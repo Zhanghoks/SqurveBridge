@@ -58,6 +58,15 @@ function SanitizedSamples({ samples, title }) {
   </section>
 }
 
+function Provenance({ run, t }) {
+  const fields = ['run_id', 'method', 'dataset', 'split', 'sampling', 'source', 'timestamp', 'artifact_ref']
+  return <aside className="evidence-provenance">
+    <strong>{run.evidence_origin === 'historical-archive' ? t('evidence.historicalArchive') : t('evidence.persisted')}</strong>
+    <p>{t('evidence.independent')}</p>
+    <dl>{fields.flatMap(field => run[field] == null ? [] : [<div key={field}><dt>{field}</dt><dd><EvidenceValue value={run[field]} /></dd></div>])}</dl>
+  </aside>
+}
+
 export default function DiagnosisWorkspace({ evidence, t }) {
   const selectedRun = evidence?.selectedRun
   const groups = DIAGNOSTIC_FIELDS
@@ -79,13 +88,13 @@ export default function DiagnosisWorkspace({ evidence, t }) {
         ? <p role="alert">{t('diagnose.loadError')}</p>
         : !hasEvidence
           ? <p>{t('diagnose.empty')}</p>
-          : <div className="diagnostic-grid">
+          : <><Provenance run={selectedRun} t={t} /><div className="diagnostic-grid">
       {groups.map(group => <DiagnosticGroup
         key={group.field}
         title={t(group.label)}
         value={group.value}
       />)}
       {samples.length > 0 && <SanitizedSamples samples={samples} title={t('diagnose.samples')} />}
-    </div>}
+    </div></>}
   </section>
 }

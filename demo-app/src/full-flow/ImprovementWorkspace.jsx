@@ -22,6 +22,15 @@ function RecordedValue({ value }) {
   return <p>{String(value)}</p>
 }
 
+function Provenance({ run, t }) {
+  const fields = ['run_id', 'method', 'dataset', 'split', 'sampling', 'source', 'timestamp', 'artifact_ref']
+  return <aside className="evidence-provenance">
+    <strong>{run.evidence_origin === 'historical-archive' ? t('evidence.historicalArchive') : t('evidence.persisted')}</strong>
+    <p>{t('evidence.independent')}</p>
+    <dl>{fields.flatMap(field => run[field] == null ? [] : [<div key={field}><dt>{field}</dt><dd><RecordedValue value={run[field]} /></dd></div>])}</dl>
+  </aside>
+}
+
 export default function ImprovementWorkspace({ evidence, t }) {
   const selectedRun = evidence?.selectedRun
   const weakness = selectedRun?.weakness ?? selectedRun?.weakness_profile
@@ -49,11 +58,11 @@ export default function ImprovementWorkspace({ evidence, t }) {
         ? <p role="alert">{t('improve.loadError')}</p>
         : records.length === 0
           ? <p>{t('improve.empty')}</p>
-          : <ol>
+          : <><Provenance run={selectedRun} t={t} /><ol>
             {records.map(record => <li key={record.field}>
               <h3>{t(record.label)}</h3>
               <RecordedValue value={record.value} />
             </li>)}
-          </ol>}
+          </ol></>}
   </section>
 }

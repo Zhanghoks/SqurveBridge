@@ -7,6 +7,8 @@ export default function ConfigurationStudio({
   focusedMethod,
   focusedDatabase,
   focusedConfig,
+  configs,
+  databases,
   onToggleMethod,
   onToggleDatabase,
   sampleLimit,
@@ -18,6 +20,19 @@ export default function ConfigurationStudio({
   sqlAuth,
   t,
 }) {
+  const selectedConnections = selectedMethods.length * selectedDatabases.length
+  const matches = (config, method, database) =>
+    String(config.method).toLowerCase().replaceAll('_', '-') === method.toLowerCase().replaceAll(' ', '-')
+    && String(config.dataset).toLowerCase() === database.toLowerCase()
+  const configBacked = selectedMethods.flatMap(method =>
+    selectedDatabases.filter(database => configs.some(config => matches(config, method, database))),
+  ).length
+  const liveDatabaseIds = new Set(databases.map(database => String(database.id).toLowerCase()))
+  const liveRunnable = sqlAuth?.configured
+    ? selectedMethods.flatMap(method => selectedDatabases.filter(database =>
+      liveDatabaseIds.has(database.toLowerCase()) && configs.some(config => matches(config, method, database)),
+    )).length
+    : 0
   return <section id="configure" className="flow-module flow-glass configuration-studio">
     <header className="flow-module-header">
       <div>
@@ -102,12 +117,24 @@ export default function ConfigurationStudio({
         <strong>{focusedMethod} → {focusedDatabase}</strong>
         <dl>
           <div>
-            <dt>{t('configure.methods')}</dt>
-            <dd>{selectedMethods.length}</dd>
+            <dt>{t('configure.selectedConnections')}</dt>
+            <dd>{selectedConnections}</dd>
           </div>
           <div>
-            <dt>{t('configure.databases')}</dt>
-            <dd>{selectedDatabases.length}</dd>
+            <dt>{t('configure.configBacked')}</dt>
+            <dd>{configBacked}</dd>
+          </div>
+          <div>
+            <dt>{t('configure.liveRunnable')}</dt>
+            <dd>{liveRunnable}</dd>
+          </div>
+          <div>
+            <dt>{t('configure.databaseAsset')}</dt>
+            <dd>{liveDatabaseIds.has(focusedDatabase.toLowerCase()) ? t('status.ready') : t('status.unavailable')}</dd>
+          </div>
+          <div>
+            <dt>{t('configure.sqlAuth')}</dt>
+            <dd>{sqlAuth?.configured ? t('status.ready') : t('status.unavailable')}</dd>
           </div>
         </dl>
         {focusedConfig

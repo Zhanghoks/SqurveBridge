@@ -859,7 +859,24 @@ def _latency_summary(scores: dict, job: dict | None = None) -> dict:
     }
 
 
-_FORBIDDEN_COMPARISON_KEYS = {"question", "gold_sql", "pred_sql"}
+_FORBIDDEN_COMPARISON_KEYS = {
+    "question", "gold_sql", "pred_sql", "credential", "credentials", "api_key",
+    "apikey", "token", "secret", "authorization", "source", "source_code",
+    "candidate_source", "diff", "patch", "code", "review_notes", "review_note",
+}
+_PRIVATE_VALUE_PATTERNS = (
+    re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+"),
+    re.compile(r"(?i)\b(?:api[_-]?key|token|secret|authorization)\s*[:=]\s*\S+"),
+    re.compile(r"(?:/Users/[^/\s]+(?:/[^\s]*)?|[A-Za-z]:\\Users\\[^\\\s]+(?:\\[^\s]*)?)"),
+    re.compile(r"(?i)\bhttps?://(?:localhost|127\.0\.0\.1|[^/\s]*(?:private|internal|intranet)[^/\s]*)[^\s]*"),
+)
+
+
+def _forbidden_comparison_key(key: object) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "_", str(key).lower()).strip("_")
+    return normalized in _FORBIDDEN_COMPARISON_KEYS or any(
+        marker in normalized for marker in ("credential", "api_key", "authorization", "candidate_source", "review_note")
+    )
 
 
 def _sanitize_comparison_value(value):
@@ -867,14 +884,24 @@ def _sanitize_comparison_value(value):
         return {
             key: _sanitize_comparison_value(item)
             for key, item in value.items()
-            if str(key).lower() not in _FORBIDDEN_COMPARISON_KEYS
+            if not _forbidden_comparison_key(key)
         }
     if isinstance(value, list):
         return [_sanitize_comparison_value(item) for item in value]
+    if isinstance(value, str):
+        sanitized = value
+        for pattern in _PRIVATE_VALUE_PATTERNS:
+            sanitized = pattern.sub("[redacted]", sanitized)
+        return sanitized
     return value
 
 
-def _serialize_comparison_run(scores: dict, job: dict | None = None, source: str = "artifact") -> dict:
+def _serialize_comparison_run(
+        scores: dict,
+        job: dict | None = None,
+        source: str = "artifact",
+        artifact_ref: str | None = None,
+) -> dict:
     sample_ids = [
         str(row.get("instance_id")) for row in (scores.get("per_sample") or [])
         if row.get("instance_id") is not None
@@ -891,6 +918,7 @@ def _serialize_comparison_run(scores: dict, job: dict | None = None, source: str
         "sample_count": scores.get("sample_count"),
         "timestamp": scores.get("timestamp"),
         "source": source,
+        "artifact_ref": artifact_ref,
         "sampling": _sampling_metadata(scores, job),
         "sample_hash": sample_hash,
         "aggregate": aggregate,
@@ -986,7 +1014,10 @@ def _artifact_comparison(
             continue
         if sample_mode == "random" and sampling.get("seed") != sample_seed:
             continue
-        candidates.append(_serialize_comparison_run(scores))
+        candidates.append(_serialize_comparison_run(
+            scores,
+            artifact_ref=path.relative_to(_project_root).as_posix(),
+        ))
 
     groups: dict[tuple, list[dict]] = {}
     for run in candidates:
@@ -1161,7 +1192,12 @@ def comparison_results(comparison_id: str):
             continue
         scores = _read_scores(scores_path)
         if scores:
-            runs.append(_serialize_comparison_run(scores, job=job, source="session"))
+            runs.append(_serialize_comparison_run(
+                scores,
+                job=job,
+                source="session",
+                artifact_ref=f"session:{scores.get('run_id') or job.get('run_id') or job.get('job_id')}/scores.json",
+            ))
     payload = _comparison_payload(runs, expected_methods, comparison_id=comparison_id)
     payload["statuses"] = {job.get("method"): job.get("status") for job in jobs if job.get("method")}
     return jsonify(payload)

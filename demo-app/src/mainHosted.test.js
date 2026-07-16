@@ -2,6 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { register as registerLoader } from 'node:module'
 import React from 'react'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { register } from 'tsx/esm/api'
 import { installTestDom } from './testDom.js'
 
@@ -11,6 +14,8 @@ const { cleanup, render, screen, waitFor } = await import('@testing-library/reac
 const userEvent = (await import('@testing-library/user-event')).default
 registerLoader('./cssTestLoader.mjs', import.meta.url)
 const unregister = register()
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+let HostedApp
 
 test.afterEach(() => cleanup())
 test.after(() => {
@@ -20,14 +25,24 @@ test.after(() => {
 
 test('hosted App exposes session SQL configuration instead of local env configuration', async () => {
   const providers = [{ id: 'qwen', models: ['qwen-plus'], default_model: 'qwen-plus' }]
-  const methods = ['C3SQL', 'DINSQL', 'FinSQL', 'RESDSQL', 'E-SQL', 'SEDE', 'UNISAR', 'GPT Baseline']
-  const datasets = ['Spider', 'BIRD', 'BookSQL', 'BULL-EN', 'BULL-CN', 'EHRSQL-2024', 'AmbiDB', 'Spider2']
-  const configs = methods.flatMap(method => datasets.map(dataset => ({
-    method,
-    dataset,
-    split: 'dev',
-    stages: [{ id: 'generate', type: 'GenerateTask', actor: `${method.replaceAll(/[^A-Za-z0-9]/g, '')}Generator` }],
-  })))
+  const matrix = JSON.parse(fs.readFileSync(path.join(root, 'config/reproduce_matrix.json'), 'utf8'))
+  const configs = matrix.databases.flatMap(database => matrix.methods.map(method => {
+    const configPath = path.join(root, 'reproduce/configs', database.directory, `${method}.json`)
+    assert.ok(fs.existsSync(configPath), configPath)
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+    return {
+      method,
+      dataset: database.directory,
+      split: database.split,
+      config_path: path.relative(root, configPath),
+      stages: config.task.task_meta.map(task => ({
+        id: task.task_id,
+        type: task.task_type,
+        actor: Object.values(task.meta.task)[0],
+      })),
+    }
+  }))
+  const datasets = matrix.databases.map(database => database.directory)
   const responses = {
     '/api/health': { status: 'ok', provider: { configured: false, ready: false } },
     '/api/capabilities': {
@@ -57,12 +72,13 @@ test('hosted App exposes session SQL configuration instead of local env configur
     return {
       ok: true,
       statusText: 'OK',
-      json: async () => responses[path],
+      json: async () => path.startsWith('/api/comparisons/latest/results') ? responses['/api/comparisons/latest/results'] : responses[path],
     }
   }
   let appElement
   globalThis.__SQURVE_DEMO_ROOT__ = { render: element => { appElement = element } }
   await import(`./main.jsx?hosted-test=${Date.now()}`)
+  HostedApp = appElement.type
   render(React.createElement(appElement.type))
 
   const configure = await screen.findByRole('button', { name: 'Configure SQL API' })
@@ -79,14 +95,33 @@ test('hosted App exposes session SQL configuration instead of local env configur
       'Bounded Improvement',
     ],
   )
-  assert.match(document.body.textContent, /64 runnable configurations/i)
+  assert.match(document.body.textContent, /64 canonical configurations/i)
   assert.match(document.body.textContent, /Method × Database/i)
   assert.equal(screen.queryByText('Experiment Board'), null)
   assert.equal(screen.queryByText('Archive'), null)
   await waitFor(() => {
-    assert.ok(requested.includes('/api/comparisons/latest/results'))
+    assert.ok(requested.some(path => path.startsWith('/api/comparisons/latest/results?')))
     assert.ok(requested.includes('/api/archive'))
   })
   await userEvent.setup().click(configure)
   assert.ok(screen.getByRole('dialog', { name: 'Configure SQL API' }))
+})
+
+test('does not expose the local console while capabilities are pending', async () => {
+  let resolveFetch
+  globalThis.fetch = () => new Promise(resolve => { resolveFetch = resolve })
+  render(React.createElement(HostedApp))
+  assert.match(document.body.textContent, /Loading demo/)
+  assert.equal(screen.queryByText('Experiment Board'), null)
+  assert.equal(screen.queryByText('Archive'), null)
+  resolveFetch?.({ ok: false, statusText: 'offline', json: async () => ({}) })
+})
+
+test('shows a neutral boot error instead of falling back to the local console', async () => {
+  globalThis.fetch = async () => { throw new Error('offline') }
+  render(React.createElement(HostedApp))
+  assert.ok(await screen.findByRole('alert'))
+  assert.match(document.body.textContent, /could not load its deployment configuration/i)
+  assert.equal(screen.queryByText('Experiment Board'), null)
+  assert.equal(screen.queryByText('Archive'), null)
 })
