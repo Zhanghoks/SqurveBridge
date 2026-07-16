@@ -4,20 +4,18 @@
   },
   "llm": {
     "use": "qwen",
-    "model_name": "deepseek-v4-flash",
+    "model_name": "qwen-turbo",
     "context_window": 120000,
     "max_token": 8000,
     "top_p": 0.9,
-    "temperature": 0,
+    "temperature": 0.0,
     "time_out": 300.0
   },
   "text_embed": {
-    "embed_model_source": "HuggingFace",
     "embed_model_name": "BAAI/bge-large-en-v1.5"
   },
   "dataset": {
     "data_source": "spider:dev:",
-    "db_path": "../benchmarks/spider/database",
     "data_source_dir": "../files/data_source",
     "need_few_shot": false,
     "need_external": false
@@ -37,11 +35,17 @@
         "task_type": "ReduceTask",
         "data_source": "spider:dev:",
         "schema_source": "spider:dev",
-        "dataset_save_path": "../files/datasets/spider_finsql_reduce.json",
+        "dataset_save_path": "../files/datasets/spider_finsql_finsql_reduce.json",
         "is_save_dataset": true,
-        "eval_type": ["reduce_recall", "reduce_precision", "reduce_rate"],
+        "eval_type": [
+          "reduce_recall",
+          "reduce_precision",
+          "reduce_rate"
+        ],
         "meta": {
-          "task": {"reduce_type": "FINSQLReducer"},
+          "task": {
+            "reduce_type": "FINSQLReducer"
+          },
           "actor": {
             "is_save": true,
             "save_dir": "../files/instance_schemas/spider_finsql",
@@ -51,18 +55,22 @@
           }
         },
         "open_parallel": true,
-        "max_workers": 16
+        "max_workers": 8
       },
       {
         "task_id": "finsql_generate",
         "task_type": "GenerateTask",
         "data_source": "spider:dev:",
         "schema_source": "spider:dev",
-        "dataset_save_path": "../files/datasets/spider_finsql_generate.json",
+        "dataset_save_path": "../files/datasets/spider_finsql_finsql_generate.json",
         "is_save_dataset": true,
-        "eval_type": ["execute_accuracy"],
+        "eval_type": [
+          "execute_accuracy"
+        ],
         "meta": {
-          "task": {"generate_type": "FINSQLGenerator"},
+          "task": {
+            "generate_type": "FINSQLGenerator"
+          },
           "actor": {
             "save_dir": "../files/pred_sql/spider_finsql",
             "use_cot": true,
@@ -74,36 +82,46 @@
           }
         },
         "open_parallel": true,
-        "max_workers": 16
+        "max_workers": 8
       },
       {
         "task_id": "finsql_selector",
         "task_type": "SelectTask",
         "data_source": "spider:dev:",
         "schema_source": "spider:dev",
-        "dataset_save_path": "../files/datasets/spider_finsql_select.json",
+        "dataset_save_path": "../files/datasets/spider_finsql_finsql_selector.json",
         "is_save_dataset": true,
-        "eval_type": ["execute_accuracy"],
+        "eval_type": [
+          "execute_accuracy"
+        ],
         "meta": {
-          "task": {"select_type": "FINSQLSelector"},
+          "task": {
+            "select_type": "FINSQLSelector"
+          },
           "actor": {
             "save_dir": "../files/pred_sql/spider_finsql_select",
             "select_number": 2
           }
         },
         "open_parallel": true,
-        "max_workers": 16
+        "max_workers": 8
       }
     ],
     "cpx_task_meta": [
       {
         "task_id": "finsql_full",
-        "task_lis": ["finsql_reduce", "finsql_generate", "finsql_selector"],
-        "eval_type": ["execute_accuracy"],
+        "task_lis": [
+          "finsql_reduce",
+          "finsql_generate",
+          "finsql_selector"
+        ],
+        "eval_type": [
+          "execute_accuracy"
+        ],
         "dataset_save_path": "../files/datasets/spider_finsql_full.json",
         "is_save_dataset": true,
         "open_parallel": true,
-        "max_workers": 16
+        "max_workers": 8
       }
     ]
   },
@@ -112,10 +130,12 @@
   "generate_num": 1,
   "checkpoint": {
     "enabled": true,
-    "interval": 10,
+    "interval": 50,
     "save_state": true
   },
   "engine": {
-    "exec_process": ["finsql_full"]
+    "exec_process": [
+      "finsql_full"
+    ]
   }
 }

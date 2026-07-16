@@ -4,11 +4,11 @@
   },
   "llm": {
     "use": "qwen",
-    "model_name": "deepseek-v4-flash",
+    "model_name": "qwen-turbo",
     "context_window": 120000,
     "max_token": 8000,
     "top_p": 0.9,
-    "temperature": 0,
+    "temperature": 0.0,
     "time_out": 300.0
   },
   "text_embed": {
@@ -16,7 +16,6 @@
   },
   "dataset": {
     "data_source": "spider:dev:",
-    "db_path": "../benchmarks/spider/database",
     "data_source_dir": "../files/data_source",
     "need_few_shot": false,
     "need_external": false
@@ -32,19 +31,25 @@
   "task": {
     "task_meta": [
       {
-        "task_id": "generate",
+        "task_id": "dinsql_generate",
         "task_type": "GenerateTask",
         "data_source": "spider:dev:",
         "schema_source": "spider:dev",
-        "dataset_save_path": "../files/datasets/spider_dinsql.json",
+        "dataset_save_path": "../files/datasets/spider_dinsql_dinsql_generate.json",
         "is_save_dataset": true,
-        "eval_type": ["execute_accuracy"],
+        "eval_type": [
+          "execute_accuracy"
+        ],
         "meta": {
-          "task": {"generate_type": "DINSQLGenerator"},
-          "actor": {"save_dir": "../files/pred_sql/spider_dinsql"}
+          "task": {
+            "generate_type": "DINSQLGenerator"
+          },
+          "actor": {
+            "save_dir": "../files/pred_sql/spider_dinsql"
+          }
         },
         "open_parallel": true,
-        "max_workers": 16
+        "max_workers": 8
       }
     ]
   },
@@ -53,10 +58,12 @@
   "generate_num": 1,
   "checkpoint": {
     "enabled": true,
-    "interval": 10,
+    "interval": 50,
     "save_state": true
   },
   "engine": {
-    "exec_process": ["generate"]
+    "exec_process": [
+      "dinsql_generate"
+    ]
   }
 }

@@ -17,7 +17,7 @@ reproduce config. Keep manual notes outside generated blocks.
 | LLM provider | `qwen` |
 | LLM model | `qwen-turbo` |
 | Generate num | `1` |
-| Checkpoint | `enabled, interval=10` |
+| Checkpoint | `enabled, interval=50` |
 
 ## Run
 
@@ -33,17 +33,17 @@ For smoke/debug runs, prefer changing only the third `data_source` segment (`<be
 
 | Task | Type | Actor binding | Eval | Snapshot |
 | --- | --- | --- | --- | --- |
-| resdsql_parse | ParseTask | output_format=dict, parse_type=RESDSQLParser | schema_linking_eval | `../files/datasets/spider_resdsql_parse.json` |
-| resdsql_reduce | ReduceTask | output_format=dict, reduce_type=RESDSQLReducer | reduce_recall, reduce_precision, reduce_rate | `../files/datasets/spider_resdsql_reduce.json` |
-| resdsql_generate | GenerateTask | generate_type=RESDSQLGenerator | execute_accuracy | `../files/datasets/spider_resdsql_generate.json` |
+| resdsql_parse | ParseTask | parse_type=RESDSQLParser | schema_linking_eval | `../files/datasets/spider_resdsql_resdsql_parse.json` |
+| resdsql_reduce | ReduceTask | reduce_type=RESDSQLReducer | reduce_recall, reduce_precision, reduce_rate | `../files/datasets/spider_resdsql_resdsql_reduce.json` |
+| resdsql_generate | GenerateTask | generate_type=RESDSQLGenerator | execute_accuracy | `../files/datasets/spider_resdsql_resdsql_generate.json` |
 
 ## Outputs
 
 | Name | Kind | Path |
 | --- | --- | --- |
-| resdsql_parse | stage | `../files/datasets/spider_resdsql_parse.json` |
-| resdsql_reduce | stage | `../files/datasets/spider_resdsql_reduce.json` |
-| resdsql_generate | stage | `../files/datasets/spider_resdsql_generate.json` |
+| resdsql_parse | stage | `../files/datasets/spider_resdsql_resdsql_parse.json` |
+| resdsql_reduce | stage | `../files/datasets/spider_resdsql_resdsql_reduce.json` |
+| resdsql_generate | stage | `../files/datasets/spider_resdsql_resdsql_generate.json` |
 | resdsql_full | workflow | `../files/datasets/spider_resdsql_full.json` |
 <!-- SQURVE:CONFIG-README:END -->
 

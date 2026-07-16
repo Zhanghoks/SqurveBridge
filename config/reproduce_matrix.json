@@ -1,0 +1,94 @@
+{
+  "methods": [
+    "c3sql",
+    "dinsql",
+    "finsql",
+    "resdsql",
+    "e-sql",
+    "sede",
+    "unisar",
+    "gpt-baseline"
+  ],
+  "databases": [
+    {
+      "directory": "spider",
+      "benchmark_id": "spider",
+      "split": "dev",
+      "root_path": "../benchmarks/spider",
+      "db_type": "sqlite",
+      "database": true,
+      "use_local_database": false,
+      "use_local_external": false
+    },
+    {
+      "directory": "bird",
+      "benchmark_id": "bird",
+      "split": "dev",
+      "root_path": "../benchmarks/bird",
+      "db_type": "sqlite",
+      "database": false,
+      "use_local_database": true,
+      "use_local_external": false
+    },
+    {
+      "directory": "BookSQL",
+      "benchmark_id": "BookSQL",
+      "split": "val",
+      "root_path": "../benchmarks/BookSQL",
+      "db_type": "sqlite",
+      "database": true,
+      "use_local_database": false,
+      "use_local_external": false
+    },
+    {
+      "directory": "bull-en",
+      "benchmark_id": "bull-en",
+      "split": "dev",
+      "root_path": "../benchmarks/bull-en",
+      "db_type": "sqlite",
+      "database": true,
+      "use_local_database": false,
+      "use_local_external": false
+    },
+    {
+      "directory": "bull-cn",
+      "benchmark_id": "bull-cn",
+      "split": "dev",
+      "root_path": "../benchmarks/bull-cn",
+      "db_type": "sqlite",
+      "database": true,
+      "use_local_database": false,
+      "use_local_external": false
+    },
+    {
+      "directory": "ehrsql-2024",
+      "benchmark_id": "ehrsql-2024",
+      "split": "valid",
+      "root_path": "../benchmarks/ehrsql-2024",
+      "db_type": "sqlite",
+      "database": true,
+      "use_local_database": false,
+      "use_local_external": false
+    },
+    {
+      "directory": "ambidb",
+      "benchmark_id": "ambidb",
+      "split": "all",
+      "root_path": "../benchmarks/ambidb",
+      "db_type": "sqlite",
+      "database": true,
+      "use_local_database": false,
+      "use_local_external": false
+    },
+    {
+      "directory": "spider2",
+      "benchmark_id": "spider2",
+      "split": "lite",
+      "root_path": "../benchmarks/spider2",
+      "db_type": "sqlite",
+      "database": false,
+      "use_local_database": true,
+      "use_local_external": true
+    }
+  ]
+}

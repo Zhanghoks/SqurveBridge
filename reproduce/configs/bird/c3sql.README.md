@@ -15,7 +15,7 @@ reproduce config. Keep manual notes outside generated blocks.
 | Data source | `bird:dev:` |
 | Schema source | `bird:dev` |
 | LLM provider | `qwen` |
-| LLM model | `deepseek-v4-flash` |
+| LLM model | `qwen-turbo` |
 | Generate num | `1` |
 | Checkpoint | `enabled, interval=50` |
 
@@ -33,17 +33,17 @@ For smoke/debug runs, prefer changing only the third `data_source` segment (`<be
 
 | Task | Type | Actor binding | Eval | Snapshot |
 | --- | --- | --- | --- | --- |
-| c3sql_reduce | ReduceTask | reduce_type=C3SQLReducer | reduce_recall, reduce_precision, reduce_rate | `../files/datasets/bird_c3sql_reduce.json` |
-| c3sql_parse | ParseTask | parse_type=C3SQLParser | parse_recall, parse_precision, parse_exact_matching | `../files/datasets/bird_c3sql_parse.json` |
-| generate | GenerateTask | generate_type=C3SQLGenerator | execute_accuracy | `../files/datasets/bird_c3sql.json` |
+| c3sql_reduce | ReduceTask | reduce_type=C3SQLReducer | reduce_recall, reduce_precision, reduce_rate | `../files/datasets/bird_c3sql_c3sql_reduce.json` |
+| c3sql_parse | ParseTask | parse_type=C3SQLParser | parse_recall, parse_precision, parse_exact_matching | `../files/datasets/bird_c3sql_c3sql_parse.json` |
+| c3sql_generate | GenerateTask | generate_type=C3SQLGenerator | execute_accuracy | `../files/datasets/bird_c3sql_c3sql_generate.json` |
 
 ## Outputs
 
 | Name | Kind | Path |
 | --- | --- | --- |
-| c3sql_reduce | stage | `../files/datasets/bird_c3sql_reduce.json` |
-| c3sql_parse | stage | `../files/datasets/bird_c3sql_parse.json` |
-| generate | stage | `../files/datasets/bird_c3sql.json` |
+| c3sql_reduce | stage | `../files/datasets/bird_c3sql_c3sql_reduce.json` |
+| c3sql_parse | stage | `../files/datasets/bird_c3sql_c3sql_parse.json` |
+| c3sql_generate | stage | `../files/datasets/bird_c3sql_c3sql_generate.json` |
 | c3sql_full | workflow | `../files/datasets/bird_c3sql_full.json` |
 <!-- SQURVE:CONFIG-README:END -->
 

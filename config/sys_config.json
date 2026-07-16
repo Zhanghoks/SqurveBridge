@@ -73,6 +73,162 @@
           "has_label": true
         }
       ]
+    },
+    {
+      "id": "spider2",
+      "meta_info": "Spider 2.0 enterprise Text-to-SQL benchmark",
+      "root_path": "../benchmarks/spider2",
+      "db_type": "sqlite",
+      "has_sub": true,
+      "external": false,
+      "database": false,
+      "sub_data": [
+        {
+          "sub_id": "lite",
+          "use_local_database": true,
+          "use_local_external": true,
+          "has_label": true
+        },
+        {
+          "sub_id": "snow",
+          "use_local_database": true,
+          "use_local_external": true,
+          "has_label": true
+        }
+      ]
+    },
+    {
+      "id": "ambidb",
+      "meta_info": "Ambiguity-focused Text-to-SQL benchmark",
+      "root_path": "../benchmarks/ambidb",
+      "db_type": "sqlite",
+      "has_sub": true,
+      "external": false,
+      "database": true,
+      "sub_data": [
+        {
+          "sub_id": "all",
+          "use_local_database": true,
+          "use_local_external": false,
+          "has_label": true
+        }
+      ]
+    },
+    {
+      "id": "BookSQL",
+      "meta_info": "Financial-record Text-to-SQL benchmark",
+      "root_path": "../benchmarks/BookSQL",
+      "db_type": "sqlite",
+      "has_sub": true,
+      "external": false,
+      "database": true,
+      "sub_data": [
+        {
+          "sub_id": "train",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": true
+        },
+        {
+          "sub_id": "val",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": true
+        },
+        {
+          "sub_id": "test",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": true
+        }
+      ]
+    },
+    {
+      "id": "bull-en",
+      "meta_info": "Financial Text-to-SQL benchmark in English",
+      "root_path": "../benchmarks/bull-en",
+      "db_type": "sqlite",
+      "has_sub": true,
+      "external": false,
+      "database": true,
+      "sub_data": [
+        {
+          "sub_id": "train",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": true
+        },
+        {
+          "sub_id": "dev",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": true
+        },
+        {
+          "sub_id": "test",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": false
+        }
+      ]
+    },
+    {
+      "id": "bull-cn",
+      "meta_info": "Financial Text-to-SQL benchmark in Chinese",
+      "root_path": "../benchmarks/bull-cn",
+      "db_type": "sqlite",
+      "has_sub": true,
+      "external": false,
+      "database": true,
+      "sub_data": [
+        {
+          "sub_id": "train",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": true
+        },
+        {
+          "sub_id": "dev",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": true
+        },
+        {
+          "sub_id": "test",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": false
+        }
+      ]
+    },
+    {
+      "id": "ehrsql-2024",
+      "meta_info": "Reliable Text-to-SQL benchmark for electronic health records",
+      "root_path": "../benchmarks/ehrsql-2024",
+      "db_type": "sqlite",
+      "has_sub": true,
+      "external": false,
+      "database": true,
+      "sub_data": [
+        {
+          "sub_id": "train",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": true
+        },
+        {
+          "sub_id": "valid",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": true
+        },
+        {
+          "sub_id": "test",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": false
+        }
+      ]
     }
   ],
   "task": {

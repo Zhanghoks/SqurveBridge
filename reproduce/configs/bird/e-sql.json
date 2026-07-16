@@ -4,10 +4,10 @@
   },
   "llm": {
     "use": "qwen",
-    "model_name": "deepseek-v4-flash",
-    "context_window": 128000,
-    "max_token": 2048,
-    "top_p": 1.0,
+    "model_name": "qwen-turbo",
+    "context_window": 120000,
+    "max_token": 8000,
+    "top_p": 0.9,
     "temperature": 0.0,
     "time_out": 300.0
   },
@@ -31,20 +31,22 @@
   "task": {
     "task_meta": [
       {
-        "task_id": "generate",
+        "task_id": "esql_generate",
         "task_type": "GenerateTask",
         "data_source": "bird:dev:",
         "schema_source": "bird:dev",
-        "dataset_save_path": "../files/datasets/bird_esql.json",
+        "dataset_save_path": "../files/datasets/bird_e_sql_esql_generate.json",
         "is_save_dataset": true,
-        "eval_type": ["execute_accuracy"],
+        "eval_type": [
+          "execute_accuracy"
+        ],
         "meta": {
           "task": {
             "generate_type": "ESQLGenerator"
           },
           "actor": {
-            "save_dir": "../files/pred_sql/bird_esql",
-            "bird_root": "../benchmarks/bird/dev",
+            "save_dir": "../files/pred_sql/bird_e_sql",
+            "db_path": "../benchmarks/bird/database",
             "enrichment_level": "complex",
             "enrichment_level_shot_number": 3,
             "generation_level_shot_number": 3,
@@ -67,6 +69,8 @@
     "save_state": true
   },
   "engine": {
-    "exec_process": ["generate"]
+    "exec_process": [
+      "esql_generate"
+    ]
   }
 }

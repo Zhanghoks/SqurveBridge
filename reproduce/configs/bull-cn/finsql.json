@@ -1,0 +1,141 @@
+{
+  "api_key": {
+    "qwen": "${ENV:QWEN_API_KEY}"
+  },
+  "llm": {
+    "use": "qwen",
+    "model_name": "qwen-turbo",
+    "context_window": 120000,
+    "max_token": 8000,
+    "top_p": 0.9,
+    "temperature": 0.0,
+    "time_out": 300.0
+  },
+  "text_embed": {
+    "embed_model_name": "BAAI/bge-large-en-v1.5"
+  },
+  "dataset": {
+    "data_source": "bull-cn:dev:",
+    "data_source_dir": "../files/data_source",
+    "need_few_shot": false,
+    "need_external": false
+  },
+  "database": {
+    "skip_schema_init": false,
+    "schema_source": "bull-cn:dev",
+    "multi_database": false,
+    "vector_store": "../vector_store",
+    "schema_source_dir": "../files/schema_source",
+    "need_build_index": false
+  },
+  "task": {
+    "task_meta": [
+      {
+        "task_id": "finsql_reduce",
+        "task_type": "ReduceTask",
+        "data_source": "bull-cn:dev:",
+        "schema_source": "bull-cn:dev",
+        "dataset_save_path": "../files/datasets/bull_cn_finsql_finsql_reduce.json",
+        "is_save_dataset": true,
+        "eval_type": [
+          "reduce_recall",
+          "reduce_precision",
+          "reduce_rate"
+        ],
+        "meta": {
+          "task": {
+            "reduce_type": "FINSQLReducer"
+          },
+          "actor": {
+            "is_save": true,
+            "save_dir": "../files/instance_schemas/bull_cn_finsql",
+            "topk_table_num": 7,
+            "topk_column_num": 7,
+            "use_chinese": true
+          }
+        },
+        "open_parallel": true,
+        "max_workers": 8
+      },
+      {
+        "task_id": "finsql_generate",
+        "task_type": "GenerateTask",
+        "data_source": "bull-cn:dev:",
+        "schema_source": "bull-cn:dev",
+        "dataset_save_path": "../files/datasets/bull_cn_finsql_finsql_generate.json",
+        "is_save_dataset": true,
+        "eval_type": [
+          "execute_accuracy"
+        ],
+        "meta": {
+          "task": {
+            "generate_type": "FINSQLGenerator"
+          },
+          "actor": {
+            "save_dir": "../files/pred_sql/bull_cn_finsql",
+            "use_cot": true,
+            "use_chinese": true,
+            "n_candidates": 2,
+            "max_attempt_times": 2,
+            "temperature": 0.2,
+            "enable_thinking": false
+          }
+        },
+        "open_parallel": true,
+        "max_workers": 8
+      },
+      {
+        "task_id": "finsql_selector",
+        "task_type": "SelectTask",
+        "data_source": "bull-cn:dev:",
+        "schema_source": "bull-cn:dev",
+        "dataset_save_path": "../files/datasets/bull_cn_finsql_finsql_selector.json",
+        "is_save_dataset": true,
+        "eval_type": [
+          "execute_accuracy"
+        ],
+        "meta": {
+          "task": {
+            "select_type": "FINSQLSelector"
+          },
+          "actor": {
+            "save_dir": "../files/pred_sql/bull_cn_finsql_select",
+            "select_number": 2
+          }
+        },
+        "open_parallel": true,
+        "max_workers": 8
+      }
+    ],
+    "cpx_task_meta": [
+      {
+        "task_id": "finsql_full",
+        "task_lis": [
+          "finsql_reduce",
+          "finsql_generate",
+          "finsql_selector"
+        ],
+        "eval_type": [
+          "execute_accuracy"
+        ],
+        "dataset_save_path": "../files/datasets/bull_cn_finsql_full.json",
+        "is_save_dataset": true,
+        "open_parallel": true,
+        "max_workers": 8
+      }
+    ]
+  },
+  "dataset_save_dir": "../files/datasets/",
+  "sql_save_dir": "../files/pred_sql/",
+  "generate_num": 1,
+  "checkpoint": {
+    "enabled": true,
+    "interval": 50,
+    "save_state": true
+  },
+  "engine": {
+    "exec_process": [
+      "finsql_full"
+    ]
+  }
+}

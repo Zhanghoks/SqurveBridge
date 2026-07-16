@@ -15,9 +15,9 @@ reproduce config. Keep manual notes outside generated blocks.
 | Data source | `spider:dev:` |
 | Schema source | `spider:dev` |
 | LLM provider | `qwen` |
-| LLM model | `deepseek-v4-flash` |
+| LLM model | `qwen-turbo` |
 | Generate num | `1` |
-| Checkpoint | `enabled, interval=10` |
+| Checkpoint | `enabled, interval=50` |
 
 ## Run
 
@@ -33,13 +33,13 @@ For smoke/debug runs, prefer changing only the third `data_source` segment (`<be
 
 | Task | Type | Actor binding | Eval | Snapshot |
 | --- | --- | --- | --- | --- |
-| generate | GenerateTask | generate_type=DINSQLGenerator | execute_accuracy | `../files/datasets/spider_dinsql.json` |
+| dinsql_generate | GenerateTask | generate_type=DINSQLGenerator | execute_accuracy | `../files/datasets/spider_dinsql_dinsql_generate.json` |
 
 ## Outputs
 
 | Name | Kind | Path |
 | --- | --- | --- |
-| generate | stage | `../files/datasets/spider_dinsql.json` |
+| dinsql_generate | stage | `../files/datasets/spider_dinsql_dinsql_generate.json` |
 <!-- SQURVE:CONFIG-README:END -->
 
 ## Project Notes

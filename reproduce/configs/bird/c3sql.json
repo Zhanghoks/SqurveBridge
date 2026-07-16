@@ -1,16 +1,14 @@
 {
   "api_key": {
-    "deepseek": "your_api_key_here",
-    "qwen": "${ENV:QWEN_API_KEY}",
-    "zhipu": "your_api_key_here"
+    "qwen": "${ENV:QWEN_API_KEY}"
   },
   "llm": {
     "use": "qwen",
-    "model_name": "deepseek-v4-flash",
-    "context_window": 64000,
+    "model_name": "qwen-turbo",
+    "context_window": 120000,
     "max_token": 8000,
-    "top_p": 0.8,
-    "temperature": 0.7,
+    "top_p": 0.9,
+    "temperature": 0.0,
     "time_out": 300.0
   },
   "text_embed": {
@@ -33,62 +31,96 @@
   "task": {
     "task_meta": [
       {
-        "task_id": "generate",
-        "task_type": "GenerateTask",
-        "data_source": "bird:dev:",
-        "schema_source": "bird:dev",
-        "dataset_save_path": "../files/datasets/bird_c3sql.json",
-        "is_save_dataset": true,
-        "eval_type": ["execute_accuracy"],
-        "meta": {
-          "task": { "generate_type": "C3SQLGenerator" },
-          "actor": { "save_dir": "../files/pred_sql/bird_c3sql", "n_candidates": 20 }
-        },
-        "open_parallel": true,
-        "max_workers": 16
-      },
-      {
         "task_id": "c3sql_reduce",
         "task_type": "ReduceTask",
         "data_source": "bird:dev:",
         "schema_source": "bird:dev",
-        "dataset_save_path": "../files/datasets/bird_c3sql_reduce.json",
+        "dataset_save_path": "../files/datasets/bird_c3sql_c3sql_reduce.json",
         "is_save_dataset": true,
-        "eval_type": ["reduce_recall", "reduce_precision", "reduce_rate"],
+        "eval_type": [
+          "reduce_recall",
+          "reduce_precision",
+          "reduce_rate"
+        ],
         "meta": {
-          "task": { "reduce_type": "C3SQLReducer" },
-          "actor": { "sc_num": 10, "top_k": 6, "add_fk_neighbors": true }
+          "task": {
+            "reduce_type": "C3SQLReducer"
+          },
+          "actor": {
+            "save_dir": "../files/instance_schemas/bird_c3sql",
+            "sc_num": 10,
+            "top_k": 6,
+            "add_fk_neighbors": true
+          }
         },
         "open_parallel": true,
-        "max_workers": 16
+        "max_workers": 8
       },
       {
         "task_id": "c3sql_parse",
         "task_type": "ParseTask",
         "data_source": "bird:dev:",
         "schema_source": "bird:dev",
-        "dataset_save_path": "../files/datasets/bird_c3sql_parse.json",
+        "dataset_save_path": "../files/datasets/bird_c3sql_c3sql_parse.json",
         "is_save_dataset": true,
-        "eval_type": ["parse_recall", "parse_precision", "parse_exact_matching"],
+        "eval_type": [
+          "parse_recall",
+          "parse_precision",
+          "parse_exact_matching"
+        ],
         "meta": {
-          "task": { "parse_type": "C3SQLParser" },
-          "actor": { "sc_num": 10, "top_k": 5, "add_fk": true, "output_format": "list" }
+          "task": {
+            "parse_type": "C3SQLParser"
+          },
+          "actor": {
+            "save_dir": "../files/schema_links/bird_c3sql",
+            "sc_num": 10,
+            "top_k": 5,
+            "add_fk": true,
+            "output_format": "list"
+          }
         },
         "open_parallel": true,
-        "max_workers": 16
+        "max_workers": 8
+      },
+      {
+        "task_id": "c3sql_generate",
+        "task_type": "GenerateTask",
+        "data_source": "bird:dev:",
+        "schema_source": "bird:dev",
+        "dataset_save_path": "../files/datasets/bird_c3sql_c3sql_generate.json",
+        "is_save_dataset": true,
+        "eval_type": [
+          "execute_accuracy"
+        ],
+        "meta": {
+          "task": {
+            "generate_type": "C3SQLGenerator"
+          },
+          "actor": {
+            "save_dir": "../files/pred_sql/bird_c3sql",
+            "n_candidates": 4
+          }
+        },
+        "open_parallel": true,
+        "max_workers": 8
       }
     ],
     "cpx_task_meta": [
       {
         "task_id": "c3sql_full",
-        "task_name": "C3SQL Three-Stage Pipeline",
-        "task_lis": ["c3sql_reduce", "c3sql_parse", "generate"],
-        "eval_type": ["execute_accuracy"],
+        "task_lis": [
+          "c3sql_reduce",
+          "c3sql_parse",
+          "c3sql_generate"
+        ],
+        "eval_type": [
+          "execute_accuracy"
+        ],
         "dataset_save_path": "../files/datasets/bird_c3sql_full.json",
         "is_save_dataset": true,
         "open_parallel": true,
-        "max_workers": 16,
-        "pipeline_run_mode": "sample"
+        "max_workers": 8
       }
     ]
   },
@@ -101,6 +133,8 @@
     "save_state": true
   },
   "engine": {
-    "exec_process": ["c3sql_full"]
+    "exec_process": [
+      "c3sql_full"
+    ]
   }
 }

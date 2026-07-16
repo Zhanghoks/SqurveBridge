@@ -15,9 +15,9 @@ reproduce config. Keep manual notes outside generated blocks.
 | Data source | `spider:dev:` |
 | Schema source | `spider:dev` |
 | LLM provider | `qwen` |
-| LLM model | `deepseek-v4-flash` |
+| LLM model | `qwen-turbo` |
 | Generate num | `1` |
-| Checkpoint | `enabled, interval=10` |
+| Checkpoint | `enabled, interval=50` |
 
 ## Run
 
@@ -33,17 +33,17 @@ For smoke/debug runs, prefer changing only the third `data_source` segment (`<be
 
 | Task | Type | Actor binding | Eval | Snapshot |
 | --- | --- | --- | --- | --- |
-| finsql_reduce | ReduceTask | reduce_type=FINSQLReducer | reduce_recall, reduce_precision, reduce_rate | `../files/datasets/spider_finsql_reduce.json` |
-| finsql_generate | GenerateTask | generate_type=FINSQLGenerator | execute_accuracy | `../files/datasets/spider_finsql_generate.json` |
-| finsql_selector | SelectTask | select_type=FINSQLSelector | execute_accuracy | `../files/datasets/spider_finsql_select.json` |
+| finsql_reduce | ReduceTask | reduce_type=FINSQLReducer | reduce_recall, reduce_precision, reduce_rate | `../files/datasets/spider_finsql_finsql_reduce.json` |
+| finsql_generate | GenerateTask | generate_type=FINSQLGenerator | execute_accuracy | `../files/datasets/spider_finsql_finsql_generate.json` |
+| finsql_selector | SelectTask | select_type=FINSQLSelector | execute_accuracy | `../files/datasets/spider_finsql_finsql_selector.json` |
 
 ## Outputs
 
 | Name | Kind | Path |
 | --- | --- | --- |
-| finsql_reduce | stage | `../files/datasets/spider_finsql_reduce.json` |
-| finsql_generate | stage | `../files/datasets/spider_finsql_generate.json` |
-| finsql_selector | stage | `../files/datasets/spider_finsql_select.json` |
+| finsql_reduce | stage | `../files/datasets/spider_finsql_finsql_reduce.json` |
+| finsql_generate | stage | `../files/datasets/spider_finsql_finsql_generate.json` |
+| finsql_selector | stage | `../files/datasets/spider_finsql_finsql_selector.json` |
 | finsql_full | workflow | `../files/datasets/spider_finsql_full.json` |
 <!-- SQURVE:CONFIG-README:END -->
 

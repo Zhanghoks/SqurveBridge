@@ -15,7 +15,7 @@ reproduce config. Keep manual notes outside generated blocks.
 | Data source | `bird:dev:` |
 | Schema source | `bird:dev` |
 | LLM provider | `qwen` |
-| LLM model | `deepseek-v4-flash` |
+| LLM model | `qwen-turbo` |
 | Generate num | `1` |
 | Checkpoint | `enabled, interval=50` |
 
@@ -33,13 +33,13 @@ For smoke/debug runs, prefer changing only the third `data_source` segment (`<be
 
 | Task | Type | Actor binding | Eval | Snapshot |
 | --- | --- | --- | --- | --- |
-| generate | GenerateTask | generate_type=ESQLGenerator | execute_accuracy | `../files/datasets/bird_esql.json` |
+| esql_generate | GenerateTask | generate_type=ESQLGenerator | execute_accuracy | `../files/datasets/bird_e_sql_esql_generate.json` |
 
 ## Outputs
 
 | Name | Kind | Path |
 | --- | --- | --- |
-| generate | stage | `../files/datasets/bird_esql.json` |
+| esql_generate | stage | `../files/datasets/bird_e_sql_esql_generate.json` |
 <!-- SQURVE:CONFIG-README:END -->
 
 ## Project Notes
