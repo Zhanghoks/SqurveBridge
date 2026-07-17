@@ -147,6 +147,7 @@ def build_space(
     root: Path,
     output: Path,
     *,
+    include_benchmarks: bool = False,
     require_benchmarks: bool = False,
 ) -> list[str]:
     """Build a clean Space directory and return its sorted relative file list."""
@@ -170,10 +171,11 @@ def build_space(
         _require_file(source)
         shutil.copy2(source, output / relative)
 
-    # External benchmark payloads are local-only so they are never committed
-    # with questions or reference SQL. A full Space bundle includes every
-    # installed SQLite database and only the matching schema JSON files.
-    _copy_benchmark_assets(root, output, require_benchmarks=require_benchmarks)
+    # Production Docker builds obtain all benchmark ZIPs from GitHub LFS and
+    # extract them in-image. Local full-bundle checks may opt in to copying the
+    # same SQLite/schema assets directly.
+    if include_benchmarks or require_benchmarks:
+        _copy_benchmark_assets(root, output, require_benchmarks=require_benchmarks)
 
     space_source = root / SPACE_DIRECTORY
     _require_directory(space_source)
@@ -201,6 +203,11 @@ def main() -> int:
     )
     parser.add_argument("--output", default="build/hf-space")
     parser.add_argument(
+        "--include-benchmarks",
+        action="store_true",
+        help="copy installed SQLite/schema assets into the upload context",
+    )
+    parser.add_argument(
         "--require-benchmarks",
         action="store_true",
         help="fail if any full Live Demo benchmark asset is not installed",
@@ -209,7 +216,12 @@ def main() -> int:
 
     root = Path(__file__).resolve().parents[1]
     output = root / args.output
-    files = build_space(root, output, require_benchmarks=args.require_benchmarks)
+    files = build_space(
+        root,
+        output,
+        include_benchmarks=args.include_benchmarks,
+        require_benchmarks=args.require_benchmarks,
+    )
     print(
         f"Built Hugging Face Space bundle with {len(files)} files: "
         f"{output.resolve()}"

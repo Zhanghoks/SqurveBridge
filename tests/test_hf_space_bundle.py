@@ -19,7 +19,6 @@ RUNTIME_DIRECTORIES = (
     "templates",
     "reproduce",
     "config",
-    "benchmarks/spider",
     "evidence/reported-results",
     "tools",
 )
@@ -74,6 +73,8 @@ class HuggingFaceBundleContractTests(unittest.TestCase):
         self.assertIn("FROM node:22-bookworm-slim AS pi-builder", dockerfile)
         self.assertIn("bash demo/build_embedded_pi.sh", dockerfile)
         self.assertIn("COPY --from=pi-builder /build/pi /app/pi", dockerfile)
+        self.assertIn("git lfs pull --include=\"benchmarks/packages/*.zip\"", dockerfile)
+        self.assertIn("tools/extract_space_assets.py", dockerfile)
         self.assertIn("node --version", dockerfile)
         self.assertNotIn("SQURVE_LLM_PROVIDER=", dockerfile)
         self.assertNotIn("SQURVE_LLM_MODEL=", dockerfile)
@@ -143,7 +144,7 @@ class HuggingFaceBundleContractTests(unittest.TestCase):
             _write_minimal_runtime(root)
             _write_reference_assets(root)
 
-            build_space(root, output)
+            build_space(root, output, include_benchmarks=True)
 
             for relative in SPACE_BENCHMARK_DATABASE_DIRECTORIES:
                 with self.subTest(relative=relative):
@@ -160,7 +161,7 @@ class HuggingFaceBundleTests(unittest.TestCase):
         _require_full_runtime(cls.root)
         cls._temporary_directory = tempfile.TemporaryDirectory()
         cls.output = Path(cls._temporary_directory.name) / "space"
-        cls.files = build_space(cls.root, cls.output)
+        cls.files = build_space(cls.root, cls.output, include_benchmarks=True)
         cls.staged_files = sorted(
             (path for path in cls.output.rglob("*") if path.is_file()),
             key=lambda path: path.relative_to(cls.output).as_posix(),
@@ -183,6 +184,7 @@ class HuggingFaceBundleTests(unittest.TestCase):
             "reproduce/run.py",
             "config/sys_config.json",
             "tools/security_scan.py",
+            "tools/extract_space_assets.py",
             "evidence/reported-results",
             "LICENSE",
             "pyproject.toml",
