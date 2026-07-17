@@ -29,10 +29,15 @@ class SpaceApiTests(unittest.TestCase):
         self.assertTrue(response.json["deployment"]["features"]["agent_chat"])
         self.assertTrue(response.json["deployment"]["features"]["session_sql_auth"])
 
-    def test_database_catalog_exposes_a_public_spider_reference_without_paths(self):
-        records = [("college_2", "/tmp/college_2.sqlite", "/tmp/schema.json")]
+    def test_database_catalog_exposes_public_reference_benchmarks_without_paths(self):
+        records = [
+            ("college_2", "/tmp/college_2.sqlite", "/tmp/spider.json"),
+            ("superhero", "/tmp/superhero.sqlite", "/tmp/bird.json"),
+            ("ccks_macro", "/tmp/ccks_macro.sqlite", "/tmp/bull.json"),
+            ("mimic_iv", "/tmp/mimic_iv.sqlite", "/tmp/ehr.json"),
+        ]
         with patch.object(self.api_server, "get_available_databases", return_value=records), patch.object(
-            self.api_server, "database_benchmark", return_value="spider"
+            self.api_server, "database_benchmark", side_effect=["spider", "bird", "bull-en", "ehrsql-2024"]
         ), patch("demo.api_server.Path.is_file", return_value=True), patch(
             "demo.api_server.Path.stat", return_value=Mock(st_size=2048)
         ), patch("demo.api_server.Path.read_text", return_value="[]"), patch(
@@ -46,14 +51,35 @@ class SpaceApiTests(unittest.TestCase):
             response = self.client.get("/api/databases")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json["databases"], [{
-            "id": "college_2",
-            "benchmark": "spider",
-            "tables": ["classroom"],
-            "size_bytes": 2048,
-        }])
+        self.assertEqual(response.json["databases"], [
+            {"id": "college_2", "benchmark": "spider", "tables": ["classroom"], "size_bytes": 2048},
+            {"id": "superhero", "benchmark": "bird", "tables": ["classroom"], "size_bytes": 2048},
+            {"id": "ccks_macro", "benchmark": "bull-en", "tables": ["classroom"], "size_bytes": 2048},
+            {"id": "mimic_iv", "benchmark": "ehrsql-2024", "tables": ["classroom"], "size_bytes": 2048},
+        ])
         self.assertNotIn("db_path", response.get_data(as_text=True))
         self.assertNotIn("schema_path", response.get_data(as_text=True))
+
+    def test_builtin_database_references_include_every_installed_database(self):
+        from demo import gradio_demo
+
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            gradio_demo, "_project_root", Path(directory)
+        ):
+            for benchmark, database_relative, schema_relative in gradio_demo.BUILTIN_BENCHMARK_DATABASES:
+                database = Path(directory) / database_relative / f"{benchmark}.sqlite"
+                database.parent.mkdir(parents=True, exist_ok=True)
+                database.touch()
+                schema = Path(directory) / schema_relative
+                schema.parent.mkdir(parents=True, exist_ok=True)
+                schema.write_text("[]", encoding="utf-8")
+
+            references = gradio_demo._builtin_database_references()
+
+        self.assertEqual(
+            {(db_id, benchmark) for db_id, benchmark, _db_path, _schema_path in references},
+            {("spider", "spider"), ("bird", "bird"), ("bull-en", "bull-en"), ("ehrsql-2024", "ehrsql-2024")},
+        )
 
     def test_hosted_space_rejects_local_only_mutations(self):
         with patch.dict(os.environ, {"SQURVE_DEPLOYMENT_TARGET": "hf-space"}, clear=False):

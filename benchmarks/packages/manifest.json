@@ -29,6 +29,50 @@
         "bird/dev/database_description/california_schools/db_description.csv"
       ]
     },
+    "bull-en": {
+      "version": "BULL-EN Live Demo database snapshot",
+      "archive": "benchmarks/packages/bull-en.zip",
+      "top_level": "bull-en",
+      "source": "https://bull-text-to-sql-benchmark.github.io/",
+      "license_notice": "BULL data remains subject to the terms published by its authors. This archive contains only SQLite databases and schema metadata for interactive research demonstration.",
+      "sha256": "c67f58985f516665eb3ffce07d6b2d97c8fe6eb8fa7735ab0153507ba40250db",
+      "archive_size": 10299312,
+      "uncompressed_size": 50750877,
+      "member_count": 4,
+      "allowed_suffixes": [
+        ".json",
+        ".sqlite"
+      ],
+      "dataset_counts": {},
+      "sqlite_count": 3,
+      "required_files": [
+        "bull-en/dev/schema.json",
+        "bull-en/database/ccks_fund.sqlite",
+        "bull-en/database/ccks_macro.sqlite",
+        "bull-en/database/ccks_stock.sqlite"
+      ]
+    },
+    "ehrsql-2024": {
+      "version": "EHRSQL-2024 MIMIC-IV Demo database snapshot",
+      "archive": "benchmarks/packages/ehrsql-2024.zip",
+      "top_level": "ehrsql-2024",
+      "source": "https://github.com/glee4810/ehrsql-2024",
+      "license_notice": "EHRSQL is CC-BY-4.0 and the bundled MIMIC-IV Demo database is subject to ODbL v1.0; preserve upstream attribution and data-use terms.",
+      "sha256": "e7fa71dd8aee21f6a1612114aa1e6736eeb47b8f6ef2b012234ffa861bef158d",
+      "archive_size": 11069146,
+      "uncompressed_size": 37038248,
+      "member_count": 2,
+      "allowed_suffixes": [
+        ".json",
+        ".sqlite"
+      ],
+      "dataset_counts": {},
+      "sqlite_count": 1,
+      "required_files": [
+        "ehrsql-2024/valid/schema.json",
+        "ehrsql-2024/database/mimic_iv/mimic_iv.sqlite"
+      ]
+    },
     "spider": {
       "version": "Spider 1.0 dev/test (SqurveBridge normalized snapshot)",
       "archive": "benchmarks/packages/spider.zip",

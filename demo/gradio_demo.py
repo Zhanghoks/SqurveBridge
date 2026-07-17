@@ -442,8 +442,29 @@ def _compute_db_size_from_schema_path(schema_path: str, db_id: Optional[str] = N
     return 0
 
 
+BUILTIN_BENCHMARK_DATABASES = (
+    ("spider", "benchmarks/spider/database", "benchmarks/spider/dev/schema.json"),
+    ("bird", "benchmarks/bird/dev/database", "benchmarks/bird/dev/schema.json"),
+    ("bull-en", "benchmarks/bull-en/database", "benchmarks/bull-en/dev/schema.json"),
+    ("ehrsql-2024", "benchmarks/ehrsql-2024/database", "benchmarks/ehrsql-2024/valid/schema.json"),
+)
+
+
+def _builtin_database_references() -> List[Tuple[str, str, str, str]]:
+    """Return installed read-only benchmark databases without question data."""
+    references = []
+    for benchmark, database_relative, schema_relative in BUILTIN_BENCHMARK_DATABASES:
+        database_root = _project_root / database_relative
+        schema_path = _project_root / schema_relative
+        if not database_root.is_dir() or not schema_path.is_file():
+            continue
+        for database_path in sorted(database_root.rglob("*.sqlite")):
+            references.append((database_path.stem, benchmark, str(database_path), str(schema_path)))
+    return references
+
+
 def get_available_databases() -> List[Tuple[str, str, str]]:
-    """Return uploaded databases plus the read-only Spider reference database."""
+    """Return uploaded databases plus available read-only benchmark references."""
     base_root = get_uploaded_db_root()
     manifest = load_upload_manifest(base_root)
     out = []
@@ -456,20 +477,17 @@ def get_available_databases() -> List[Tuple[str, str, str]]:
         out.append((e["db_id"], db_path, str(schema_path)))
         seen.add(e["db_id"])
 
-    # Hosted deployments cannot accept user uploads.  Register one small,
-    # real Spider database that is already part of the reviewed benchmark
-    # bundle so the public Live SQL surface has a genuine read-only target.
-    spider_id = "college_2"
-    spider_path = _project_root / "benchmarks" / "spider" / "database" / f"{spider_id}.sqlite"
-    spider_schema = _project_root / "benchmarks" / "spider" / "dev" / "schema.json"
-    if spider_id not in seen and spider_path.is_file() and spider_schema.is_file():
-        out.append((spider_id, str(spider_path), str(spider_schema)))
+    # Hosted deployments cannot accept user uploads. Installed benchmark
+    # databases are read-only and are bundled without question/SQL payloads.
+    for db_id, _benchmark, db_path, schema_path in _builtin_database_references():
+        if db_id not in seen:
+            out.append((db_id, db_path, schema_path))
     return out
 
 
 def database_benchmark(db_id: str) -> Optional[str]:
     """Return the benchmark label for a built-in database, if any."""
-    return "spider" if db_id == "college_2" else None
+    return next((benchmark for reference_id, benchmark, _db_path, _schema_path in _builtin_database_references() if reference_id == db_id), None)
 
 
 def create_demo(config_path: Optional[str] = None):

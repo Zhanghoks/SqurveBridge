@@ -2,7 +2,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.build_hf_space import build_space
+from tools.build_hf_space import (
+    SPACE_BENCHMARK_DATABASE_DIRECTORIES,
+    SPACE_BENCHMARK_SCHEMA_FILES,
+    build_space,
+)
 from tools.security_scan import scan_paths
 
 
@@ -36,6 +40,17 @@ def _write_minimal_runtime(root: Path) -> None:
     (deploy / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
     (deploy / "README.space.md").write_text("# Space\n", encoding="utf-8")
     (deploy / "Dockerfile.dockerignore").write_text("node_modules\n", encoding="utf-8")
+
+
+def _write_reference_assets(root: Path) -> None:
+    for relative in SPACE_BENCHMARK_DATABASE_DIRECTORIES:
+        path = root / relative / "reference.sqlite"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(relative, encoding="utf-8")
+    for relative in SPACE_BENCHMARK_SCHEMA_FILES:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(relative, encoding="utf-8")
 
 
 def _require_full_runtime(root: Path) -> None:
@@ -119,6 +134,23 @@ class HuggingFaceBundleContractTests(unittest.TestCase):
             self.assertFalse((output / "demo-app" / "node_modules").exists())
             self.assertFalse((output / "demo-app" / "dist").exists())
             self.assertFalse((output / "demo" / ".DS_Store").exists())
+
+    def test_space_includes_only_installed_reference_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "root"
+            output = Path(directory) / "space"
+            root.mkdir()
+            _write_minimal_runtime(root)
+            _write_reference_assets(root)
+
+            build_space(root, output)
+
+            for relative in SPACE_BENCHMARK_DATABASE_DIRECTORIES:
+                with self.subTest(relative=relative):
+                    self.assertTrue((output / relative / "reference.sqlite").is_file())
+            for relative in SPACE_BENCHMARK_SCHEMA_FILES:
+                with self.subTest(relative=relative):
+                    self.assertTrue((output / relative).is_file())
 
 
 class HuggingFaceBundleTests(unittest.TestCase):
@@ -251,6 +283,29 @@ class HuggingFaceBundleTests(unittest.TestCase):
 
         self.assertGreater(len(source_databases), 0)
         self.assertEqual(bundled_databases, source_databases)
+
+    def test_bundle_includes_all_installed_benchmark_databases_and_schemas(self) -> None:
+        for relative in SPACE_BENCHMARK_DATABASE_DIRECTORIES:
+            source_directory = self.root / relative
+            bundled_directory = self.output / relative
+            source_files = sorted(
+                path.relative_to(source_directory).as_posix()
+                for path in source_directory.rglob("*.sqlite")
+            )
+            bundled_files = sorted(
+                path.relative_to(bundled_directory).as_posix()
+                for path in bundled_directory.rglob("*.sqlite")
+            )
+            with self.subTest(relative=relative):
+                self.assertGreater(len(source_files), 0)
+                self.assertEqual(bundled_files, source_files)
+
+        for relative in SPACE_BENCHMARK_SCHEMA_FILES:
+            with self.subTest(relative=relative):
+                self.assertEqual(
+                    (self.output / relative).read_bytes(),
+                    (self.root / relative).read_bytes(),
+                )
 
     def test_manifest_is_sorted_complete_and_security_clean(self) -> None:
         staged_manifest = [

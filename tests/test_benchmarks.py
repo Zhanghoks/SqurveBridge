@@ -95,9 +95,14 @@ class BenchmarkArchiveTests(unittest.TestCase):
 
     def test_manifest_has_only_approved_archive_paths(self) -> None:
         manifest = benchmarks._load_manifest()
-        self.assertEqual(set(manifest["benchmarks"]), {"bird", "spider"})
+        self.assertEqual(set(manifest["benchmarks"]), {"bird", "bull-en", "ehrsql-2024", "spider"})
         archives = {entry["archive"] for entry in manifest["benchmarks"].values()}
-        self.assertEqual(archives, {"benchmarks/packages/bird.zip", "benchmarks/packages/spider.zip"})
+        self.assertEqual(archives, {
+            "benchmarks/packages/bird.zip",
+            "benchmarks/packages/bull-en.zip",
+            "benchmarks/packages/ehrsql-2024.zip",
+            "benchmarks/packages/spider.zip",
+        })
 
 
 if __name__ == "__main__":

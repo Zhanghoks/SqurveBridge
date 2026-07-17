@@ -98,9 +98,13 @@ affiliations.*
 # Installed benchmark payloads are generated from the versioned LFS archives.
 benchmarks/spider/
 benchmarks/bird/
+benchmarks/bull-en/
+benchmarks/ehrsql-2024/
 !benchmarks/packages/
 !benchmarks/packages/manifest.json
 !benchmarks/packages/README.md
+!benchmarks/packages/bull-en.zip
+!benchmarks/packages/ehrsql-2024.zip
 
 # Optional local state
 .worktrees/

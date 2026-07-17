@@ -17,11 +17,25 @@ RUNTIME_DIRECTORIES = (
     "templates",
     "reproduce",
     "config",
-    "benchmarks/spider",
     "evidence/reported-results",
     "tools",
 )
 RUNTIME_FILES = ("LICENSE", "pyproject.toml", "requirements.txt")
+SPACE_BENCHMARK_DATABASE_DIRECTORIES = (
+    "benchmarks/spider/database",
+    "benchmarks/bird/dev/database",
+    "benchmarks/bull-en/database",
+    "benchmarks/ehrsql-2024/database",
+)
+SPACE_BENCHMARK_SCHEMA_FILES = (
+    "benchmarks/spider/dev/schema.json",
+    "benchmarks/bird/dev/schema.json",
+    "benchmarks/bull-en/dev/schema.json",
+    "benchmarks/ehrsql-2024/valid/schema.json",
+)
+SPACE_BENCHMARK_FILES = (
+    *SPACE_BENCHMARK_SCHEMA_FILES,
+)
 
 SPACE_DIRECTORY = "deploy/huggingface"
 SPACE_OVERLAYS = {
@@ -105,7 +119,36 @@ def _clear_output(output: Path) -> None:
     output.mkdir(parents=True)
 
 
-def build_space(root: Path, output: Path) -> list[str]:
+def _copy_benchmark_assets(root: Path, output: Path, *, require_benchmarks: bool) -> None:
+    """Copy all installed SQLite databases plus schemas, excluding question/SQL data."""
+    for relative in SPACE_BENCHMARK_DATABASE_DIRECTORIES:
+        source_directory = root / relative
+        if not source_directory.is_dir():
+            if require_benchmarks:
+                _require_directory(source_directory)
+            continue
+        for source in source_directory.rglob("*.sqlite"):
+            destination = output / source.relative_to(root)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+
+    for relative in SPACE_BENCHMARK_SCHEMA_FILES:
+        source = root / relative
+        if not source.is_file():
+            if require_benchmarks:
+                _require_file(source)
+            continue
+        destination = output / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+
+
+def build_space(
+    root: Path,
+    output: Path,
+    *,
+    require_benchmarks: bool = False,
+) -> list[str]:
     """Build a clean Space directory and return its sorted relative file list."""
 
     root = root.resolve()
@@ -126,6 +169,11 @@ def build_space(root: Path, output: Path) -> list[str]:
         source = root / relative
         _require_file(source)
         shutil.copy2(source, output / relative)
+
+    # External benchmark payloads are local-only so they are never committed
+    # with questions or reference SQL. A full Space bundle includes every
+    # installed SQLite database and only the matching schema JSON files.
+    _copy_benchmark_assets(root, output, require_benchmarks=require_benchmarks)
 
     space_source = root / SPACE_DIRECTORY
     _require_directory(space_source)
@@ -152,11 +200,16 @@ def main() -> int:
         description="Build the clean Hugging Face Space upload context."
     )
     parser.add_argument("--output", default="build/hf-space")
+    parser.add_argument(
+        "--require-benchmarks",
+        action="store_true",
+        help="fail if any full Live Demo benchmark asset is not installed",
+    )
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
     output = root / args.output
-    files = build_space(root, output)
+    files = build_space(root, output, require_benchmarks=args.require_benchmarks)
     print(
         f"Built Hugging Face Space bundle with {len(files)} files: "
         f"{output.resolve()}"
