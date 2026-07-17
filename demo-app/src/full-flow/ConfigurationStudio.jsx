@@ -36,9 +36,11 @@ export default function ConfigurationStudio({
     configs.some(config => matches(config, method, database)),
   ).length
   const liveDatabaseIds = new Set(databases.map(database => String(database.id).toLowerCase()))
+  const hasLiveDatabase = database => liveDatabaseIds.has(database.toLowerCase())
+    || databases.some(item => String(item.benchmark || '').toLowerCase() === database.toLowerCase())
   const liveRunnable = sqlAuth?.configured
     ? connections.filter(({ method, database }) =>
-      liveDatabaseIds.has(database.toLowerCase()) && configs.some(config => matches(config, method, database)),
+      hasLiveDatabase(database) && configs.some(config => matches(config, method, database)),
     ).length
     : 0
 
@@ -152,7 +154,7 @@ export default function ConfigurationStudio({
           </div>
           <div>
             <dt>{t('configure.databaseAsset')}</dt>
-            <dd>{liveDatabaseIds.has(focusedDatabase.toLowerCase()) ? t('status.ready') : t('status.unavailable')}</dd>
+            <dd>{hasLiveDatabase(focusedDatabase) ? t('status.ready') : t('status.unavailable')}</dd>
           </div>
           <div>
             <dt>{t('configure.sqlAuth')}</dt>

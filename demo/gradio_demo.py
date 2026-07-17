@@ -443,17 +443,33 @@ def _compute_db_size_from_schema_path(schema_path: str, db_id: Optional[str] = N
 
 
 def get_available_databases() -> List[Tuple[str, str, str]]:
-    """Returns [(db_id, db_path, schema_path), ...] from manifest."""
+    """Return uploaded databases plus the read-only Spider reference database."""
     base_root = get_uploaded_db_root()
     manifest = load_upload_manifest(base_root)
     out = []
+    seen = set()
     for e in manifest:
         db_path = e.get("db_path", "")
         if not Path(db_path).exists():
             continue
         schema_path = e.get("schema_path") or (Path(e.get("schema_base_dir", "")) / "schema.json")
         out.append((e["db_id"], db_path, str(schema_path)))
+        seen.add(e["db_id"])
+
+    # Hosted deployments cannot accept user uploads.  Register one small,
+    # real Spider database that is already part of the reviewed benchmark
+    # bundle so the public Live SQL surface has a genuine read-only target.
+    spider_id = "college_2"
+    spider_path = _project_root / "benchmarks" / "spider" / "database" / f"{spider_id}.sqlite"
+    spider_schema = _project_root / "benchmarks" / "spider" / "dev" / "schema.json"
+    if spider_id not in seen and spider_path.is_file() and spider_schema.is_file():
+        out.append((spider_id, str(spider_path), str(spider_schema)))
     return out
+
+
+def database_benchmark(db_id: str) -> Optional[str]:
+    """Return the benchmark label for a built-in database, if any."""
+    return "spider" if db_id == "college_2" else None
 
 
 def create_demo(config_path: Optional[str] = None):

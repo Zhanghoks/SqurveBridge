@@ -29,6 +29,32 @@ class SpaceApiTests(unittest.TestCase):
         self.assertTrue(response.json["deployment"]["features"]["agent_chat"])
         self.assertTrue(response.json["deployment"]["features"]["session_sql_auth"])
 
+    def test_database_catalog_exposes_a_public_spider_reference_without_paths(self):
+        records = [("college_2", "/tmp/college_2.sqlite", "/tmp/schema.json")]
+        with patch.object(self.api_server, "get_available_databases", return_value=records), patch.object(
+            self.api_server, "database_benchmark", return_value="spider"
+        ), patch("demo.api_server.Path.is_file", return_value=True), patch(
+            "demo.api_server.Path.stat", return_value=Mock(st_size=2048)
+        ), patch("demo.api_server.Path.read_text", return_value="[]"), patch(
+            "demo.api_server.Path.write_text"
+        ), patch("demo.api_server.json.loads", return_value=[{
+            "db_id": "college_2",
+            "table_names_original": ["classroom"],
+            "column_names_original": [[-1, "*"], [0, "building"]],
+            "column_types": ["text", "text"],
+        }]):
+            response = self.client.get("/api/databases")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["databases"], [{
+            "id": "college_2",
+            "benchmark": "spider",
+            "tables": ["classroom"],
+            "size_bytes": 2048,
+        }])
+        self.assertNotIn("db_path", response.get_data(as_text=True))
+        self.assertNotIn("schema_path", response.get_data(as_text=True))
+
     def test_hosted_space_rejects_local_only_mutations(self):
         with patch.dict(os.environ, {"SQURVE_DEPLOYMENT_TARGET": "hf-space"}, clear=False):
             for method, path in (

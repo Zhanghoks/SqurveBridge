@@ -45,7 +45,8 @@ const actorNames = config => (config?.stages || [])
 
 const databaseIdFor = (databases, focusedDatabase) =>
   (databases || []).find(
-    database => String(database.id).toLowerCase() === String(focusedDatabase).toLowerCase(),
+    database => String(database.id).toLowerCase() === String(focusedDatabase).toLowerCase()
+      || String(database.benchmark || '').toLowerCase() === String(focusedDatabase).toLowerCase(),
   )?.id || ''
 
 const phaseState = (phase, runPhase, failedPhase) => {

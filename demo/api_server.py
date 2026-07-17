@@ -31,6 +31,7 @@ from demo.gradio_demo import (
     ACTOR_BY_TYPE,
     WORKFLOW_SKELETONS,
     SqurveDemo,
+    database_benchmark,
     get_available_databases,
     get_router_config_path,
     get_uploaded_db_root,
@@ -269,7 +270,11 @@ def _database_records() -> list[dict]:
         try:
             schema_file = Path(schema_path)
             schema = json.loads(schema_file.read_text(encoding="utf-8"))
-            item = schema[0] if isinstance(schema, list) else schema
+            schemas = schema if isinstance(schema, list) else [schema]
+            item = next(
+                (candidate for candidate in schemas if candidate.get("db_id") == db_id),
+                schemas[0],
+            )
             if len(item.get("column_names_original", [])) != len(item.get("column_types", [])):
                 item = sqlite_to_schema(db_path, db_id=db_id)
                 schema_file.write_text(json.dumps([item], ensure_ascii=False, indent=2), encoding="utf-8")
@@ -282,6 +287,7 @@ def _database_records() -> list[dict]:
             "schema_path": schema_path,
             "tables": tables,
             "size_bytes": Path(db_path).stat().st_size if Path(db_path).exists() else 0,
+            "benchmark": database_benchmark(db_id),
         })
     return records
 
@@ -612,7 +618,13 @@ def capabilities():
 
 @app.get("/api/databases")
 def databases():
-    return jsonify({"databases": _database_records()})
+    public_fields = ("id", "tables", "size_bytes", "benchmark")
+    return jsonify({
+        "databases": [
+            {field: database[field] for field in public_fields if database.get(field) is not None}
+            for database in _database_records()
+        ]
+    })
 
 
 @app.post("/api/databases/upload")

@@ -160,6 +160,25 @@ test('runs query then execute for the focused connection', async () => {
   }
 })
 
+test('uses a benchmark-labelled Spider reference database for the focused Spider config', async () => {
+  const calls = []
+  renderRun({
+    databases: [{ id: 'college_2', benchmark: 'spider' }],
+    postJson: async (path, body) => {
+      calls.push([path, body])
+      return path === '/api/query'
+        ? { sql: 'SELECT 1', trace: [] }
+        : { columns: ['1'], rows: [[1]], row_count: 1, elapsed_ms: 1 }
+    },
+  })
+  const user = userEvent.setup()
+  await user.type(screen.getByLabelText('Natural-language question'), 'Count rows')
+  await user.click(screen.getByRole('button', { name: 'Run Reproduce' }))
+
+  assert.equal(calls[0][1].db_id, 'college_2')
+  assert.equal(calls[1][1].db_id, 'college_2')
+})
+
 test('preserves the question and sanitizes a rejected query error', async () => {
   const postJson = async () => {
     throw new Error('Provider rejected api_key=sk-live-secret with Authorization: Bearer sk-live-secret')
