@@ -1,9 +1,13 @@
-import { DATABASES, METHODS } from './model.js'
-import ActorWorkflow from './ActorWorkflow.jsx'
+import { useState } from 'react'
+import CatalogCard from './CatalogCard.jsx'
+import ConfigureAgentPanel from './ConfigureAgentPanel.jsx'
+import FlashcardDialog from './FlashcardDialog.jsx'
+import { DATABASE_CATALOG, METHOD_CATALOG } from './catalog.js'
 
 export default function ConfigurationStudio({
   selectedMethods,
   selectedDatabases,
+  selectedConnections,
   focusedMethod,
   focusedDatabase,
   focusedConfig,
@@ -18,98 +22,116 @@ export default function ConfigurationStudio({
   onSampleModeChange,
   onSampleSeedChange,
   sqlAuth,
+  api,
+  postJson,
+  hostedReadOnly = true,
   t,
 }) {
-  const selectedConnections = selectedMethods.length * selectedDatabases.length
+  const [flashcard, setFlashcard] = useState(null)
+  const connections = selectedConnections || []
   const matches = (config, method, database) =>
     String(config.method).toLowerCase().replaceAll('_', '-') === method.toLowerCase().replaceAll(' ', '-')
     && String(config.dataset).toLowerCase() === database.toLowerCase()
-  const configBacked = selectedMethods.flatMap(method =>
-    selectedDatabases.filter(database => configs.some(config => matches(config, method, database))),
+  const configBacked = connections.filter(({ method, database }) =>
+    configs.some(config => matches(config, method, database)),
   ).length
   const liveDatabaseIds = new Set(databases.map(database => String(database.id).toLowerCase()))
   const liveRunnable = sqlAuth?.configured
-    ? selectedMethods.flatMap(method => selectedDatabases.filter(database =>
+    ? connections.filter(({ method, database }) =>
       liveDatabaseIds.has(database.toLowerCase()) && configs.some(config => matches(config, method, database)),
-    )).length
+    ).length
     : 0
+
   return <section id="configure" className="flow-module flow-glass configuration-studio">
     <header className="flow-module-header">
       <div>
         <span>{t('process.configure')}</span>
         <h2>{t('configure.title')}</h2>
-        <p>{t('configure.description')}</p>
+        <p>{t(hostedReadOnly ? 'configure.hostedDescription' : 'configure.description')}</p>
       </div>
     </header>
 
+    <div className="configure-controls-row">
+      <fieldset>
+        <legend>{t('configure.model')}</legend>
+        <p>{sqlAuth?.configured
+          ? `${sqlAuth.provider || ''}${sqlAuth.model ? ` · ${sqlAuth.model}` : ''}`
+          : t('status.unavailable')}</p>
+      </fieldset>
+      <fieldset className="configuration-sampling">
+        <legend>{t('configure.sampling')}</legend>
+        <label>
+          {t('configure.sampleLimit')}
+          <input
+            type="number"
+            min="1"
+            value={sampleLimit}
+            onChange={event => onSampleLimitChange(Number(event.target.value))}
+          />
+        </label>
+        <label>
+          {t('configure.sampleMode')}
+          <select value={sampleMode} onChange={event => onSampleModeChange(event.target.value)}>
+            <option value="slice">{t('configure.sampleSlice')}</option>
+            <option value="random">{t('configure.sampleRandom')}</option>
+          </select>
+        </label>
+        <label>
+          {t('configure.sampleSeed')}
+          <input
+            type="number"
+            value={sampleSeed}
+            onChange={event => onSampleSeedChange(Number(event.target.value))}
+          />
+        </label>
+      </fieldset>
+    </div>
+
     <div className="flow-configuration-layout">
-      <div className="configuration-grid">
-        <fieldset>
-          <legend>{t('configure.model')}</legend>
-          <p>{sqlAuth?.configured
-            ? `${sqlAuth.provider || ''}${sqlAuth.model ? ` · ${sqlAuth.model}` : ''}`
-            : t('status.unavailable')}</p>
-        </fieldset>
-
-        <fieldset className="configuration-methods">
-          <legend>{t('configure.methods')}</legend>
-          <div>
-            {METHODS.map(method => <button
-              key={method}
-              type="button"
-              aria-label={t('configure.selectMethod', { name: method })}
-              aria-pressed={selectedMethods.includes(method)}
-              className={`${selectedMethods.includes(method) ? 'selected' : ''}${focusedMethod === method ? ' focused' : ''}`}
-              onClick={() => onToggleMethod(method)}
-            >
-              {method}
-            </button>)}
+      <div className="catalog-workspaces" data-testid="catalog-workspaces">
+        <section className="catalog-workspace" aria-labelledby="catalog-methods-title">
+          <header>
+            <h3 id="catalog-methods-title">{t('configure.methods')}</h3>
+            <p>{t('catalog.methodsHint')}</p>
+          </header>
+          <div className="catalog-card-list">
+            {METHOD_CATALOG.map(entry => (
+              <CatalogCard
+                key={entry.name}
+                name={entry.name}
+                teaser={t(`catalog.method.${entry.slug}.teaser`)}
+                selected={selectedMethods.includes(entry.name)}
+                focused={focusedMethod === entry.name}
+                selectLabel={t('configure.selectMethod', { name: entry.name })}
+                openLabel={t('catalog.openMethodFlashcard', { name: entry.name })}
+                onToggleSelect={() => onToggleMethod(entry.name)}
+                onOpenFlashcard={() => setFlashcard({ kind: 'method', entry })}
+              />
+            ))}
           </div>
-        </fieldset>
+        </section>
 
-        <fieldset className="configuration-databases">
-          <legend>{t('configure.databases')}</legend>
-          <div>
-            {DATABASES.map(database => <button
-              key={database}
-              type="button"
-              aria-label={t('configure.selectDatabase', { name: database })}
-              aria-pressed={selectedDatabases.includes(database)}
-              className={`${selectedDatabases.includes(database) ? 'selected' : ''}${focusedDatabase === database ? ' focused' : ''}`}
-              onClick={() => onToggleDatabase(database)}
-            >
-              {database}
-            </button>)}
+        <section className="catalog-workspace" aria-labelledby="catalog-databases-title">
+          <header>
+            <h3 id="catalog-databases-title">{t('configure.databases')}</h3>
+            <p>{t('catalog.databasesHint')}</p>
+          </header>
+          <div className="catalog-card-list">
+            {DATABASE_CATALOG.map(entry => (
+              <CatalogCard
+                key={entry.name}
+                name={entry.name}
+                teaser={t(`catalog.database.${entry.slug}.teaser`)}
+                selected={selectedDatabases.includes(entry.name)}
+                focused={focusedDatabase === entry.name}
+                selectLabel={t('configure.selectDatabase', { name: entry.name })}
+                openLabel={t('catalog.openDatabaseFlashcard', { name: entry.name })}
+                onToggleSelect={() => onToggleDatabase(entry.name)}
+                onOpenFlashcard={() => setFlashcard({ kind: 'database', entry })}
+              />
+            ))}
           </div>
-        </fieldset>
-
-        <fieldset className="configuration-sampling">
-          <legend>{t('configure.sampling')}</legend>
-          <label>
-            {t('configure.sampleLimit')}
-            <input
-              type="number"
-              min="1"
-              value={sampleLimit}
-              onChange={event => onSampleLimitChange(Number(event.target.value))}
-            />
-          </label>
-          <label>
-            {t('configure.sampleMode')}
-            <select value={sampleMode} onChange={event => onSampleModeChange(event.target.value)}>
-              <option value="slice">{t('configure.sampleSlice')}</option>
-              <option value="random">{t('configure.sampleRandom')}</option>
-            </select>
-          </label>
-          <label>
-            {t('configure.sampleSeed')}
-            <input
-              type="number"
-              value={sampleSeed}
-              onChange={event => onSampleSeedChange(Number(event.target.value))}
-            />
-          </label>
-        </fieldset>
+        </section>
       </div>
 
       <aside className="focused-configuration" data-testid="focused-configuration">
@@ -118,7 +140,7 @@ export default function ConfigurationStudio({
         <dl>
           <div>
             <dt>{t('configure.selectedConnections')}</dt>
-            <dd>{selectedConnections}</dd>
+            <dd>{connections.length}</dd>
           </div>
           <div>
             <dt>{t('configure.configBacked')}</dt>
@@ -140,12 +162,32 @@ export default function ConfigurationStudio({
         {focusedConfig
           ? <code>{focusedConfig.config_path}</code>
           : <small>{t('status.unavailable')}</small>}
-        <ActorWorkflow
-          focusedConfig={focusedConfig}
-          t={t}
-          testId="configuration-actor-workflow"
-        />
+        <p className="configure-compose-hint">{t('configure.composeHint')}</p>
       </aside>
     </div>
+
+    {api && postJson && <ConfigureAgentPanel
+      api={api}
+      postJson={postJson}
+      hostedReadOnly={hostedReadOnly}
+      t={t}
+    />}
+
+    <FlashcardDialog
+      open={Boolean(flashcard)}
+      kind={flashcard?.kind}
+      entry={flashcard?.entry}
+      selected={flashcard
+        ? (flashcard.kind === 'method'
+          ? selectedMethods.includes(flashcard.entry.name)
+          : selectedDatabases.includes(flashcard.entry.name))
+        : false}
+      t={t}
+      onClose={() => setFlashcard(null)}
+      onToggleSelect={name => {
+        if (flashcard?.kind === 'method') onToggleMethod(name)
+        else onToggleDatabase(name)
+      }}
+    />
   </section>
 }

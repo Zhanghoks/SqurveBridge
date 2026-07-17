@@ -123,3 +123,26 @@ test('selects an authenticated Pi model and logs out', async () => {
   await user.click(screen.getAllByRole('button', { name: 'Close' }).at(-1))
   assert.equal(closed, true)
 })
+
+test('submits a custom model id for an authenticated provider', async () => {
+  const PiAuthDialog = await loadDialog()
+  const commands = []
+  const user = userEvent.setup()
+  render(React.createElement(PiAuthDialog, {
+    open: true,
+    state: {
+      ...baseState,
+      providers: [{ ...baseState.providers[0], configured: true, credential_type: 'api_key' }],
+      models: [{ provider: 'anthropic', id: 'claude-sonnet', name: 'Claude Sonnet', configured: true, selected: false }],
+    },
+    send: command => commands.push(command),
+    onClose: () => {},
+  }))
+
+  await user.type(screen.getByLabelText('Custom model ID'), 'claude-custom-latest')
+  await user.click(screen.getByRole('button', { name: 'Use custom model' }))
+
+  assert.deepEqual(commands.at(-1), {
+    type: 'model_select', provider: 'anthropic', model: 'claude-custom-latest',
+  })
+})

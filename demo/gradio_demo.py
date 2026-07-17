@@ -634,7 +634,7 @@ def create_demo(config_path: Optional[str] = None):
                         question = gr.Textbox(
                             label="Natural language question",
                             lines=3,
-                            placeholder="e.g. How many singers are there? | List all stadiums with capacity > 5000 | What is the average age of singers from France?",
+                            placeholder="e.g. List item names | Count active records | Show the average value by category",
                         )
 
                         gr.Markdown("### Generation mode")

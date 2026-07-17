@@ -74,6 +74,7 @@ export default function RunWorkspace({
   onConfigureSql,
   onRunStateChange,
   t,
+  credentialMode = 'session',
 }) {
   const [question, setQuestion] = useState('')
   const [runState, setRunState] = useState(INITIAL_RUN_STATE)
@@ -186,10 +187,10 @@ export default function RunWorkspace({
         {focusedConfig && !databaseId && <p>{t('run.databaseUnavailable')}</p>}
         {!sqlAuth?.configured && <button
           type="button"
-          aria-label={t('run.configureModelAction')}
+          aria-label={t(credentialMode === 'local' ? 'run.configureLocalModelAction' : 'run.configureModelAction')}
           onClick={onConfigureSql}
         >
-          {t('run.configureModel')}
+          {t(credentialMode === 'local' ? 'run.configureLocalModel' : 'run.configureModel')}
         </button>}
         <button
           type="button"

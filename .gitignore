@@ -66,6 +66,10 @@ tmp/
 # Local agent guidance (machine/user-specific, not repository SSOT)
 AGENTS.local.md
 
+# Superdesign session scratch files
+.superdesign/tmp/
+output/
+
 # Local paper workspace migrated from Squrve 2.0
 paper/
 

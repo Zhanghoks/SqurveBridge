@@ -5,8 +5,9 @@ import ExperimentBoard from './ExperimentBoard.jsx'
 import Archive from './Archive.jsx'
 import MatrixStudio from './MatrixStudio.jsx'
 import SqlAuthDialog from './SqlAuthDialog.jsx'
-import { deploymentTarget, featureEnabled, studioSurface } from './runtimeMode.js'
+import { deploymentTarget, featureEnabled } from './runtimeMode.js'
 import { detectLocale, translate } from './i18n/index.js'
+import { normalizePublicGitHubUrl } from './full-flow/model.js'
 
 const AgentHarness = lazy(() => import('./AgentHarness.jsx'))
 
@@ -65,9 +66,22 @@ function Topbar({ health, capabilities, refresh, busy, hosted = false, showProvi
   return <header className="topbar"><div><strong>Squrve-native runtime</strong><span>{hosted ? 'Hugging Face Space' : 'Local demo session'}</span></div><div className="runtime-state"><Status tone={tone}>{label}</Status>{sessionSqlAuth && <button className="button compact secondary" type="button" onClick={() => setSqlAuthOpen(true)}>Configure SQL API</button>}{showProviderConfig && <ProviderConfig health={health} capabilities={capabilities} refresh={refresh} />}<button className="icon-button" onClick={refresh} disabled={busy} title="Refresh runtime" aria-label="Refresh runtime">↻</button></div>{sessionSqlAuth && <SqlAuthDialog open={sqlAuthOpen} api={api} status={sqlAuth} onStatusChange={onSqlAuthChange} onClose={() => setSqlAuthOpen(false)} />}</header>
 }
 
-function ProviderConfig({ health, capabilities, refresh }) {
+function ProviderConfig({
+  health,
+  capabilities,
+  refresh,
+  controlledOpen,
+  onOpenChange,
+  showTrigger = true,
+}) {
   const providers = capabilities?.llm_providers || []
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen ?? internalOpen
+  const setOpen = value => {
+    const next = typeof value === 'function' ? value(open) : value
+    if (controlledOpen === undefined) setInternalOpen(next)
+    onOpenChange?.(next)
+  }
   const [provider, setProvider] = useState('')
   const [model, setModel] = useState('')
   const [apiKey, setApiKey] = useState('')
@@ -81,19 +95,17 @@ function ProviderConfig({ health, capabilities, refresh }) {
   useEffect(() => {
     const current = health?.provider?.provider
     const next = providers.find(item => item.id === current)?.id || providers.find(item => item.configured)?.id || providers[0]?.id || ''
-    if (next) setProvider(next)
-  }, [health?.provider?.provider, providers.map(item => item.id).join('|')])
-
-  useEffect(() => {
-    if (!selected) return
-    const preferred = health?.provider?.provider === selected.id ? health?.provider?.model : null
-    setModel(selected.models.includes(preferred) ? preferred : selected.default_model)
-  }, [provider, selected?.models?.join('|'), health?.provider?.model])
+    if (!next) return
+    setProvider(next)
+    const preferred = health?.provider?.provider === next ? health?.provider?.model : null
+    const catalog = providers.find(item => item.id === next)
+    setModel(preferred || catalog?.default_model || '')
+  }, [health?.provider?.provider, health?.provider?.model, providers.map(item => item.id).join('|')])
 
   useEffect(() => {
     if (!open) return
     const onPointer = event => {
-      if (!panelRef.current?.contains(event.target)) setOpen(false)
+      if (showTrigger && !panelRef.current?.contains(event.target)) setOpen(false)
     }
     const onKey = event => { if (event.key === 'Escape') setOpen(false) }
     document.addEventListener('mousedown', onPointer)
@@ -102,12 +114,28 @@ function ProviderConfig({ health, capabilities, refresh }) {
       document.removeEventListener('mousedown', onPointer)
       document.removeEventListener('keydown', onKey)
     }
-  }, [open])
+  }, [open, showTrigger])
+
+  const selectProvider = nextId => {
+    setProvider(nextId)
+    const catalog = providers.find(item => item.id === nextId)
+    const preferred = health?.provider?.provider === nextId ? health?.provider?.model : null
+    setModel(preferred || catalog?.default_model || '')
+    setMessage('')
+    setError('')
+  }
+
+  const close = () => {
+    setApiKey('')
+    setMessage('')
+    setError('')
+    setOpen(false)
+  }
 
   const save = async () => {
     setBusy(true); setError(''); setMessage('')
     try {
-      const payload = { provider, model, persist }
+      const payload = { provider, model: model.trim(), persist }
       if (apiKey.trim()) payload.api_key = apiKey.trim()
       const data = await postJson('/api/provider', payload)
       setApiKey('')
@@ -120,15 +148,59 @@ function ProviderConfig({ health, capabilities, refresh }) {
     }
   }
 
+  const fields = <>
+    <label className="field"><span>Provider</span><select aria-label="Provider" value={provider} onChange={event => selectProvider(event.target.value)}>{providers.map(item => <option key={item.id} value={item.id}>{item.id}{item.configured ? ' · configured' : ' · needs key'}</option>)}</select></label>
+    <label className="field model-id-field"><span>Model</span><input aria-label="Model" value={model} onChange={event => setModel(event.target.value)} list="local-llm-model-suggestions" placeholder="Enter a model ID" autoComplete="off" spellCheck="false" /><datalist id="local-llm-model-suggestions">{(selected?.models || []).map(item => <option key={item} value={item} />)}</datalist><small>Choose a suggestion or enter any model ID supported by this provider.</small></label>
+    <label className="field"><span>API key{selected?.env_var ? ` · ${selected.env_var}` : ''}</span><input type="password" aria-label={selected?.env_var ? `API key · ${selected.env_var}` : 'API key'} autoComplete="off" spellCheck="false" value={apiKey} onChange={event => setApiKey(event.target.value)} placeholder={selected?.configured ? 'Leave blank to keep current key' : 'Paste API key'} /></label>
+    <label className="persist-toggle"><input type="checkbox" checked={persist} onChange={event => setPersist(event.target.checked)} /><span>Write to repo-root .env</span></label>
+  </>
+
+  if (!showTrigger) {
+    if (!open) return null
+    return <div
+      className="flow-provider-backdrop"
+      role="presentation"
+      onMouseDown={event => { if (event.target === event.currentTarget) close() }}
+    >
+      <section
+        className="flow-provider-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="LLM provider configuration"
+        aria-labelledby="flow-provider-title"
+        ref={panelRef}
+      >
+        <div className="flow-provider-header">
+          <div>
+            <span>Local credentials</span>
+            <h2 id="flow-provider-title">Configure LLM</h2>
+          </div>
+          <button type="button" className="flow-provider-close" aria-label="Close" onClick={close}>×</button>
+        </div>
+        <p className="flow-provider-intro">Choose a provider and model ID. Keys stay on localhost and are never returned by the API.</p>
+        <div className="flow-provider-body">
+          <div className="flow-provider-status">
+            <span>{health?.provider?.configured ? 'Connected' : 'Not connected'}</span>
+            {health?.provider?.configured && <strong>{health.provider.provider} / {health.provider.model}</strong>}
+          </div>
+          {fields}
+          <div className="flow-provider-actions">
+            <button type="button" className="flow-provider-primary" disabled={busy || !provider || !model.trim()} onClick={save}>{busy ? 'Saving…' : 'Save'}</button>
+            <button type="button" className="flow-provider-secondary" onClick={close}>Close</button>
+          </div>
+          {message && <p className="flow-provider-note">{message}</p>}
+          {error && <p className="error-banner" role="alert">{error}</p>}
+        </div>
+      </section>
+    </div>
+  }
+
   return <div className="provider-config" ref={panelRef}>
     <button className="button compact secondary" type="button" aria-expanded={open} onClick={() => setOpen(current => !current)}>Configure LLM</button>
     {open && <div className="provider-config-panel" role="dialog" aria-label="LLM provider configuration">
       <div className="panel-title"><div><span>LLM credentials</span><small>Keys stay on localhost · never returned by API</small></div></div>
-      <label className="field"><span>Provider</span><select value={provider} onChange={event => setProvider(event.target.value)}>{providers.map(item => <option key={item.id} value={item.id}>{item.id}{item.configured ? ' · configured' : ' · needs key'}</option>)}</select></label>
-      <label className="field"><span>Model</span><select value={model} onChange={event => setModel(event.target.value)}>{(selected?.models || []).map(item => <option key={item} value={item}>{item}</option>)}</select></label>
-      <label className="field"><span>API key{selected?.env_var ? ` · ${selected.env_var}` : ''}</span><input type="password" autoComplete="off" spellCheck="false" value={apiKey} onChange={event => setApiKey(event.target.value)} placeholder={selected?.configured ? 'Leave blank to keep current key' : 'Paste API key'} /></label>
-      <label className="persist-toggle"><input type="checkbox" checked={persist} onChange={event => setPersist(event.target.checked)} /><span>Write to repo-root .env</span></label>
-      <div className="provider-config-actions"><button className="button primary compact" disabled={busy || !provider || !model} onClick={save}>{busy ? 'Saving…' : 'Save'}</button><button className="button compact" type="button" onClick={() => setOpen(false)}>Close</button></div>
+      {fields}
+      <div className="provider-config-actions"><button className="button primary compact" disabled={busy || !provider || !model.trim()} onClick={save}>{busy ? 'Saving…' : 'Save'}</button><button className="button compact" type="button" onClick={close}>Close</button></div>
       {message && <p className="provider-config-note">{message}</p>}
       {error && <p className="error-banner">{error}</p>}
     </div>}
@@ -192,8 +264,9 @@ function Studio({ health, capabilities, databases, selectedDb, setSelectedDb, sh
     }
   }, [hosted, sqlAuth?.provider, sqlAuth?.model, providers.map(item => item.id).join('|'), provider, health?.provider?.provider])
   useEffect(() => {
-    if (!hosted && providerConfig && !providerConfig.models.includes(model)) setModel(providerConfig.default_model)
-  }, [hosted, provider, providerConfig?.models?.join('|'), model])
+    if (hosted || !providerConfig || model) return
+    setModel(providerConfig.default_model || '')
+  }, [hosted, provider, providerConfig?.default_model, model])
 
   const configPreview = useMemo(() => ({
     database: selectedDb || null,
@@ -214,7 +287,7 @@ function Studio({ health, capabilities, databases, selectedDb, setSelectedDb, sh
 
   return <div className="workspace studio-workspace"><PageHeading eyebrow="Squrve run configuration" title="SQL Studio" status={<Status tone={error ? 'danger' : result ? 'success' : busy ? 'running' : 'neutral'}>{phase}</Status>} />
     <div className="config-builder-grid"><section className="tool-panel config-block"><div className="config-step"><i>01</i><div><span>Database</span><small>Execution target</small></div></div><DatabaseSelector databases={databases} value={selectedDb} onChange={setSelectedDb} />{currentDb ? <ul className="schema-chips">{currentDb.tables.slice(0, 8).map(table => <li key={table}>{table}</li>)}</ul> : <Empty title="Select an integrated database" />}</section>
-      <section className="tool-panel config-block"><div className="config-step"><i>02</i><div><span>LLM Provider</span><small>{hosted ? 'Browser session credential' : 'Credential stays in local .env'}</small></div></div>{hosted ? <div className="session-auth-summary"><span>{sqlAuth?.configured ? 'Connected for this session' : 'Configure SQL API from the runtime header'}</span>{sqlAuth?.configured && <><strong>{sqlAuth.provider}</strong><code>{sqlAuth.model}</code></>}<Status tone={sqlAuth?.configured ? 'success' : 'danger'}>{sqlAuth?.configured ? 'session credential available' : 'credential required'}</Status></div> : <><label className="field"><span>Provider</span><select value={provider} onChange={event => setProvider(event.target.value)}>{providers.map(item => <option key={item.id} value={item.id}>{item.id}{item.configured ? ' · configured' : ' · setup required'}</option>)}</select></label><label className="field"><span>Model</span><select value={model} onChange={event => setModel(event.target.value)}>{(providerConfig?.models || []).map(item => <option key={item}>{item}</option>)}</select></label><Status tone={providerConfig?.configured ? 'success' : 'danger'}>{providerConfig?.configured ? 'credential available' : 'credential required'}</Status></>}</section>
+      <section className="tool-panel config-block"><div className="config-step"><i>02</i><div><span>LLM Provider</span><small>{hosted ? 'Browser session credential' : 'Credential stays in local .env'}</small></div></div>{hosted ? <div className="session-auth-summary"><span>{sqlAuth?.configured ? 'Connected for this session' : 'Configure SQL API from the runtime header'}</span>{sqlAuth?.configured && <><strong>{sqlAuth.provider}</strong><code>{sqlAuth.model}</code></>}<Status tone={sqlAuth?.configured ? 'success' : 'danger'}>{sqlAuth?.configured ? 'session credential available' : 'credential required'}</Status></div> : <><label className="field"><span>Provider</span><select value={provider} onChange={event => { const next = event.target.value; setProvider(next); const catalog = providers.find(item => item.id === next); setModel(catalog?.default_model || '') }}>{providers.map(item => <option key={item.id} value={item.id}>{item.id}{item.configured ? ' · configured' : ' · setup required'}</option>)}</select></label><label className="field model-id-field"><span>Model</span><input aria-label="Model" value={model} onChange={event => setModel(event.target.value)} list="studio-llm-model-suggestions" placeholder="Enter a model ID" autoComplete="off" spellCheck="false" /><datalist id="studio-llm-model-suggestions">{(providerConfig?.models || []).map(item => <option key={item} value={item} />)}</datalist><small>Choose a suggestion or enter any model ID supported by this provider.</small></label><Status tone={providerConfig?.configured ? 'success' : 'danger'}>{providerConfig?.configured ? 'credential available' : 'credential required'}</Status></>}</section>
       <section className="tool-panel config-block actor-config-block"><div className="config-step"><i>03</i><div><span>Actor Workflow</span><small>{workflow.join(' → ')}</small></div></div><ActorComposer {...{ capabilities, workflowIndex, setWorkflowIndex, actorSelections, setActorSelections }} /></section></div>
     <div className="run-config-grid"><section className="tool-panel config-preview"><div className="config-step"><i>04</i><div><span>Run Config</span><small>Database + LLM + Actor pipeline</small></div></div><pre>{JSON.stringify(configPreview, null, 2)}</pre></section><section className="tool-panel run-input"><label className="field"><span>Natural-language input</span><textarea value={question} onChange={event => setQuestion(event.target.value)} placeholder="Ask a question for this configured workflow." /></label><button className="button primary" disabled={busy || !selectedDb || !question.trim() || !sqlReady || selectedActors.length !== workflow.length} onClick={runConfig}>{busy ? 'Running Squrve config…' : 'Run config'}</button>{error && <p className="error-banner">{error}</p>}</section></div>
     {(sql || result) && <section className="tool-panel studio-result"><div className="result-summary"><div><span>Generated SQL</span><code>{sql}</code></div><div><span>Actor path</span><b>{trace.map(item => item.actor_name).join(' → ') || selectedActors.join(' → ')}</b></div></div><div className="result-meta"><span>Read-only database execution</span>{result && <b>{result.row_count} rows · {result.elapsed_ms} ms</b>}</div><ResultTable result={result} /></section>}
@@ -258,8 +331,8 @@ function WorkspaceStudio({ capabilities, databases, showAgentHarness = true, liv
     if (registered.length) return [...registered].sort((a, b) => a.id.localeCompare(b.id)).map(item => ({ dataset: item.id, splits: item.splits, defaultSplit: item.default_split }))
     return [...new Set(configs.map(item => item.dataset))].sort().map(dataset => ({ dataset, splits: [...new Set(configs.filter(item => item.dataset === dataset).map(item => item.split))], defaultSplit: configs.find(item => item.dataset === dataset)?.split || '' }))
   }, [capabilities, configs])
-  const githubReady = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/?$/.test(candidateUrl.trim().replace(/\.git\/?$/, ''))
-  const normalizedCandidateUrl = candidateUrl.trim().replace(/\.git\/?$/, '').replace(/\/$/, '')
+  const normalizedCandidateUrl = normalizePublicGitHubUrl(candidateUrl)
+  const githubReady = Boolean(normalizedCandidateUrl)
   const comparisonJobs = jobs.filter(job => job.comparison_id === comparisonId)
   const running = comparisonJobs.some(job => job.status === 'running')
   const missingSelected = showAgentHarness ? selected.filter(key => !configs.some(item => keyOf(item) === key)) : []
@@ -522,35 +595,54 @@ function Adapt({ jobs, setPage, refreshSession }) {
 }
 
 function App() {
-  const [page, setPage] = useState('studio')
   const [health, setHealth] = useState(null)
   const [capabilities, setCapabilities] = useState(null)
   const [databases, setDatabases] = useState([])
-  const [selectedDb, setSelectedDb] = useState('')
   const [busy, setBusy] = useState(false)
   const [sqlAuth, setSqlAuth] = useState(null)
   const [sqlAuthOpen, setSqlAuthOpen] = useState(false)
+  const [localProviderOpen, setLocalProviderOpen] = useState(false)
   const [bootError, setBootError] = useState(false)
   const [bootLocale] = useState(() => detectLocale(
     navigator.language,
     window.localStorage.getItem('squrve-demo-locale'),
   ))
   const hosted = deploymentTarget(capabilities) === 'hf-space'
-  const selectedStudio = studioSurface(capabilities)
-  const showProviderConfig = featureEnabled(capabilities, 'provider_configuration')
   const sessionSqlAuth = hosted && featureEnabled(capabilities, 'session_sql_auth')
-  const showAgentHarness = featureEnabled(capabilities, 'agent_chat')
-  const liveEvaluation = featureEnabled(capabilities, 'live_evaluation')
   const refresh = async () => { setBusy(true); setBootError(false); try { const [healthData, capabilityData, databaseData] = await Promise.all([api('/api/health'), api('/api/capabilities'), api('/api/databases')]); const hostedData = deploymentTarget(capabilityData) === 'hf-space' && featureEnabled(capabilityData, 'session_sql_auth') ? await api('/api/sql-auth') : null; setHealth(healthData); setCapabilities(capabilityData); setDatabases(databaseData.databases); setSqlAuth(hostedData) } catch (error) { setBootError(true); setHealth({ status: 'error', provider: { configured: false, ready: false, message: error.message } }) } finally { setBusy(false) } }
   useEffect(() => { refresh() }, [])
   if (!capabilities) return <main className="deployment-gate" role={bootError ? 'alert' : 'status'}>
     {translate(bootLocale, bootError ? 'boot.error' : 'boot.loading')}
   </main>
-  if (hosted) return <div className="hosted-matrix-shell">
-    <MatrixStudio capabilities={capabilities} databases={databases} sqlAuth={sqlAuth} api={api} postJson={postJson} onConfigureSql={() => setSqlAuthOpen(true)} />
-    <SqlAuthDialog open={sqlAuthOpen} api={api} status={sqlAuth} onStatusChange={setSqlAuth} onClose={() => setSqlAuthOpen(false)} />
+  const localSqlAuth = {
+    configured: Boolean(health?.provider?.configured && health?.provider?.ready),
+    provider: health?.provider?.provider || '',
+    model: health?.provider?.model || '',
+  }
+  const activeSqlAuth = hosted ? sqlAuth : localSqlAuth
+  const configureSql = hosted
+    ? () => setSqlAuthOpen(true)
+    : () => setLocalProviderOpen(true)
+  return <div className="hosted-matrix-shell">
+    <MatrixStudio
+      capabilities={capabilities}
+      databases={databases}
+      sqlAuth={activeSqlAuth}
+      api={api}
+      postJson={postJson}
+      onConfigureSql={configureSql}
+      credentialMode={hosted ? 'session' : 'local'}
+    />
+    {sessionSqlAuth && <SqlAuthDialog open={sqlAuthOpen} api={api} status={sqlAuth} onStatusChange={setSqlAuth} onClose={() => setSqlAuthOpen(false)} />}
+    {!hosted && <ProviderConfig
+      health={health}
+      capabilities={capabilities}
+      refresh={refresh}
+      controlledOpen={localProviderOpen}
+      onOpenChange={setLocalProviderOpen}
+      showTrigger={false}
+    />}
   </div>
-  return <div className="app-shell"><ShellNav page={page} setPage={setPage} /><main><Topbar health={health} capabilities={capabilities} refresh={refresh} busy={busy} hosted={hosted} showProviderConfig={showProviderConfig} sessionSqlAuth={sessionSqlAuth} sqlAuth={sqlAuth} onSqlAuthChange={setSqlAuth} />{hosted && <div className="hosted-demo-notice">Hugging Face Live Demo · Bring your own SQL and Pi credentials · session only</div>}{page === 'board' ? <ExperimentBoard {...{ capabilities, liveEvaluation, api, postJson, Status, PageHeading, Empty }} /> : page === 'archive' ? <Archive {...{ api, Status, PageHeading, Empty }} /> : selectedStudio === 'live-sql' ? <Studio {...{ health, capabilities, databases, selectedDb, setSelectedDb, showAgentHarness, hosted, sqlAuth }} /> : <WorkspaceStudio {...{ capabilities, databases, showAgentHarness, liveEvaluation }} />}</main></div>
 }
 
 const root = globalThis.__SQURVE_DEMO_ROOT__ || createRoot(document.getElementById('root'))

@@ -1,0 +1,151 @@
+/** Public intro catalog for Configure workspace. Only recorded repo facts. */
+
+export const METHOD_CATALOG = [
+  {
+    name: 'C3SQL',
+    slug: 'c3sql',
+    pipeline: ['ReduceTask', 'ParseTask', 'GenerateTask'],
+    actors: ['C3SQLReducer', 'C3SQLParser', 'C3SQLGenerator'],
+    configPath: 'reproduce/configs/spider/c3sql.json',
+    sourcePath: 'core/actor/generator/C3SQLGenerate.py',
+    paperUrl: null,
+    sourceUrl: null,
+  },
+  {
+    name: 'DINSQL',
+    slug: 'dinsql',
+    pipeline: ['GenerateTask'],
+    actors: ['DINSQLGenerator'],
+    configPath: 'reproduce/configs/spider/dinsql.json',
+    sourcePath: 'core/actor/generator/DINSQLGenerate.py',
+    paperUrl: null,
+    sourceUrl: null,
+  },
+  {
+    name: 'FinSQL',
+    slug: 'finsql',
+    pipeline: ['ReduceTask', 'GenerateTask', 'SelectTask'],
+    actors: ['FINSQLReducer', 'FINSQLGenerator', 'FINSQLSelector'],
+    configPath: 'reproduce/configs/spider/finsql.json',
+    sourcePath: 'core/actor/generator/FinSQLGenerate.py',
+    paperUrl: null,
+    sourceUrl: null,
+  },
+  {
+    name: 'RESDSQL',
+    slug: 'resdsql',
+    pipeline: ['ParseTask', 'ReduceTask', 'GenerateTask'],
+    actors: ['RESDSQLParser', 'RESDSQLReducer', 'RESDSQLGenerator'],
+    configPath: 'reproduce/configs/spider/resdsql.json',
+    sourcePath: 'core/actor/generator/RESDSQLGenerate.py',
+    paperUrl: null,
+    sourceUrl: null,
+  },
+  {
+    name: 'E-SQL',
+    slug: 'e-sql',
+    pipeline: ['GenerateTask'],
+    actors: ['ESQLGenerator'],
+    configPath: 'reproduce/configs/spider/e-sql.json',
+    sourcePath: 'core/actor/generator/ESQLGenerate.py',
+    paperUrl: 'https://arxiv.org/abs/2409.16751',
+    paperLabel: 'arXiv:2409.16751',
+    sourceUrl: null,
+  },
+  {
+    name: 'SEDE',
+    slug: 'sede',
+    pipeline: ['ReduceTask', 'GenerateTask'],
+    actors: ['SEDEReducer', 'SEDEGenerator'],
+    configPath: 'reproduce/configs/spider/sede.json',
+    sourcePath: 'core/actor/generator/SEDEGenerate.py',
+    paperUrl: null,
+    sourceUrl: null,
+  },
+  {
+    name: 'UNISAR',
+    slug: 'unisar',
+    pipeline: ['ReduceTask', 'GenerateTask', 'SelectTask'],
+    actors: ['UNISARBooksqlReducer', 'UNISARBooksqlGenerator', 'UNISARBooksqlSelector'],
+    configPath: 'reproduce/configs/spider/unisar.json',
+    sourcePath: 'core/actor/generator/UNISARBooksqlGenerate.py',
+    paperUrl: null,
+    sourceUrl: null,
+  },
+  {
+    name: 'GPT Baseline',
+    slug: 'gpt-baseline',
+    pipeline: ['GenerateTask'],
+    actors: ['EHRGenerator'],
+    configPath: 'reproduce/configs/spider/gpt-baseline.json',
+    sourcePath: 'core/actor/generator/EHRGenerate.py',
+    paperUrl: null,
+    sourceUrl: null,
+  },
+]
+
+export const DATABASE_CATALOG = [
+  {
+    name: 'Spider',
+    slug: 'spider',
+    defaultSplit: 'dev',
+    sourceUrl: 'https://github.com/taoyds/spider',
+    packagePath: 'benchmarks/packages/spider.zip',
+  },
+  {
+    name: 'BIRD',
+    slug: 'bird',
+    defaultSplit: 'dev',
+    sourceUrl: 'https://bird-bench.github.io/',
+    packagePath: 'benchmarks/packages/bird.zip',
+  },
+  {
+    name: 'BookSQL',
+    slug: 'booksql',
+    defaultSplit: 'val',
+    sourceUrl: 'https://github.com/Exploration-Lab/BookSQL',
+    mirrorUrl: 'https://huggingface.co/datasets/Exploration-Lab/BookSQL',
+    packagePath: null,
+  },
+  {
+    name: 'BULL-EN',
+    slug: 'bull-en',
+    defaultSplit: 'dev',
+    sourceUrl: null,
+    packagePath: null,
+  },
+  {
+    name: 'BULL-CN',
+    slug: 'bull-cn',
+    defaultSplit: 'dev',
+    sourceUrl: null,
+    packagePath: null,
+  },
+  {
+    name: 'EHRSQL-2024',
+    slug: 'ehrsql-2024',
+    defaultSplit: 'valid',
+    sourceUrl: 'https://github.com/glee4810/ehrsql-2024',
+    packagePath: null,
+  },
+  {
+    name: 'AmbiDB',
+    slug: 'ambidb',
+    defaultSplit: 'all',
+    sourceUrl: null,
+    packagePath: null,
+  },
+  {
+    name: 'Spider2',
+    slug: 'spider2',
+    defaultSplit: 'lite',
+    sourceUrl: null,
+    packagePath: null,
+  },
+]
+
+export const getMethodCatalogEntry = name =>
+  METHOD_CATALOG.find(item => item.name === name) || null
+
+export const getDatabaseCatalogEntry = name =>
+  DATABASE_CATALOG.find(item => item.name === name) || null

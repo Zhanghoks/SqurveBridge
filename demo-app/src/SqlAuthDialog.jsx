@@ -24,7 +24,7 @@ export default function SqlAuthDialog({ open, api, status, onStatusChange, onClo
     const selected = providers.find(item => item.id === (status?.provider || provider)) || providers[0]
     if (!selected) return
     setProvider(selected.id)
-    setModel(status?.provider === selected.id && selected.models.includes(status?.model)
+    setModel(status?.provider === selected.id && status?.model
       ? status.model
       : selected.default_model)
   }, [status, providers.map(item => `${item.id}:${item.models.join(',')}`).join('|')])
@@ -126,7 +126,7 @@ export default function SqlAuthDialog({ open, api, status, onStatusChange, onClo
             <span>{currentStatus?.configured ? 'Connected' : 'Not connected'}</span>
             {currentStatus?.configured && <strong>{currentStatus.provider} / {currentStatus.model}</strong>}
           </div>
-          <label className="field"><span>Model</span><select value={model} onChange={event => setModel(event.target.value)}>{(selectedProvider?.models || []).map(item => <option key={item} value={item}>{item}</option>)}</select></label>
+          <label className="field model-id-field"><span>Model</span><input aria-label="Model" value={model} onChange={event => setModel(event.target.value)} list="sql-model-suggestions" placeholder="Enter a model ID" autoComplete="off" spellCheck="false" /><datalist id="sql-model-suggestions">{(selectedProvider?.models || []).map(item => <option key={item} value={item} />)}</datalist><small>Choose a suggestion or enter any model ID supported by this provider.</small></label>
           <label className="field api-key-field"><span>API key</span><div><input type={revealed ? 'text' : 'password'} autoComplete="new-password" spellCheck="false" value={apiKey} onChange={event => setApiKey(event.target.value)} placeholder={`Paste ${provider || 'provider'} API key`} /><button type="button" aria-label={revealed ? 'Hide API key' : 'Show API key'} onClick={() => setRevealed(value => !value)}>{revealed ? 'Hide' : 'Show'}</button></div></label>
           <div className="auth-dialog-actions">
             <button className="button secondary" type="button" disabled={Boolean(busy) || !provider || !model || !apiKey.trim()} onClick={() => submit('test')}>{busy === 'test' ? 'Testing…' : 'Test connection'}</button>

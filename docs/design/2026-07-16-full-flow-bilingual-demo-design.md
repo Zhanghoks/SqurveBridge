@@ -28,13 +28,18 @@ The Demo must present SqurveBridge as a configuration-driven, composable and evi
 
 ## Information architecture
 
-The page is one continuous workspace with a sticky process rail:
+The Demo is a multi-page workspace with a sticky left process rail:
 
 ```text
-01 Configure · 02 Compose · 03 Run · 04 Inspect · 05 Diagnose · 06 Improve
+01 Configure
+02 Compose
+03 Run
+04 Inspect
+05 Diagnose
+06 Improve
 ```
 
-The rail scrolls to sections and indicates the current section. It is not a separate application navigation sidebar.
+Clicking a rail item switches the main stage to that page. Hash routes (`#compose`, `#run`, …) stay in sync for deep links. The stage footer provides Previous / Next. On narrow viewports the rail becomes a horizontal strip above the stage.
 
 ### 01 Configure / 配置工作台
 
@@ -59,10 +64,13 @@ Summary:
 - LLM connection state;
 - compact Actor workflow preview.
 
-The configuration module uses a two-column layout:
+The configuration module uses a catalog workspace layout:
 
-- left: interactive controls;
-- right: glass configuration summary and focused workflow.
+- left: method flashcard tiles;
+- right: database flashcard tiles;
+- aside: focused connection summary and Actor workflow.
+
+Clicking a tile opens a modal flashcard with three narrative sections — **what it is**, **origin**, and **introduction** — plus recorded pipeline/source metadata. Selection remains a separate control on the tile (and inside the flashcard footer) so browsing does not force selection.
 
 `Configure SQL API` opens the existing session-scoped authentication dialog. Secrets are never rendered back into the page.
 
@@ -75,19 +83,19 @@ Left side:
 - eight method nodes;
 - eight database nodes;
 - many-to-many SVG connection graph;
-- additive method and database selection;
-- visible focused connection;
-- ready, selected and unavailable states.
+- edge interaction: click empty curve to connect, click another selected curve to inspect, click the active curve again to remove;
+- hover tooltip naming the hovered pair;
+- dim idle curves when any connection is selected; brighten only the focused edge.
 
-Right side:
+Right side (workflow inspector):
 
+- connection switcher list with prev/next when multiple pairs are selected;
+- remove control per connection;
+- active connection label;
 - Actor DAG for the focused config;
-- stage type and Actor class;
-- stage evaluation type;
-- checkpoint/output contract;
-- config file path.
+- integration provenance drawer.
 
-The connection graph answers “which combinations exist.” The Actor DAG answers “how this focused combination runs.”
+The connection graph answers “which combinations exist.” The switcher answers “which pair am I inspecting.” The Actor DAG answers “how this focused combination runs.”
 
 ### Integration provenance drawer
 
@@ -209,30 +217,31 @@ The layout must be tested with longer Chinese copy and must not rely on fixed te
 
 ## Visual system
 
-Direction: `Midnight Glass Research Workspace`.
+Direction: `Claude-aligned Graphite Research Workspace`.
 
-Background:
+Inspired by Claude Code / high-end developer tooling (not neon SaaS glass):
 
-- deep navy/blue-gray canvas;
-- restrained radial light fields;
-- no decorative images;
-- no venue or submission branding.
-
-Glass surfaces:
-
-- translucent module shells;
-- `backdrop-filter` used only on major surfaces and sticky navigation;
-- 1px light border;
-- soft layered shadow;
-- opaque or near-opaque controls, tables and code surfaces for readability.
+- layered charcoal canvas (`#141416` → `#1a1a1c`), never pure black void;
+- solid raised panels (`#212124` / `#26262a`) with hairline borders;
+- warm Claude accent (`#da7756`) for focus, selection and primary actions;
+- muted text hierarchy (`#e8e8ea` / `#8a8a93` / `#5c5c66`);
+- monospace reserved for technical metadata; Inter for UI chrome;
+- glass/blur only on sticky/overlay shells, modest blur — content panes stay opaque for readability;
+- no purple neon, no bright daylight wash, no decorative orbs.
 
 Color semantics:
 
-- blue: selection, focus and primary actions;
+- warm Claude orange: selection, focus and primary actions;
 - green: runnable configuration or completed execution;
 - amber: downloading, waiting or human review;
 - red: failure;
-- neutral gray: unavailable or inactive.
+- muted gray: unavailable or inactive.
+
+Product emphasis:
+
+- brand wordmark and “Dynamic Text-to-SQL orchestration” subtitle are hero-level in the header;
+- sticky process rail reads as a continuous Configure → Improve ribbon;
+- Compose elevates the Method × Database matrix and Actor workflow as the primary visual idea.
 
 Typography:
 

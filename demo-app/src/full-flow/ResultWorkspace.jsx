@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { resolveInspectArtifacts } from './sampleRunArtifacts.js'
 
 const TAB_IDS = ['sql', 'result', 'trace', 'metrics', 'logs']
 
@@ -27,26 +28,66 @@ function ResultTable({ result, empty }) {
   </div>
 }
 
+function MetricsPanel({ metrics, empty }) {
+  if (!metrics || typeof metrics !== 'object' || !Object.keys(metrics).length) {
+    return <EmptyEvidence>{empty}</EmptyEvidence>
+  }
+  return <dl className="inspect-metrics" data-testid="inspect-metrics">
+    {Object.entries(metrics).map(([key, value]) => <div key={key}>
+      <dt>{key}</dt>
+      <dd><code>{typeof value === 'number' ? String(value) : JSON.stringify(value)}</code></dd>
+    </div>)}
+  </dl>
+}
+
+function LogsPanel({ logs, empty }) {
+  if (!Array.isArray(logs) || !logs.length) {
+    return <EmptyEvidence>{empty}</EmptyEvidence>
+  }
+  return <ol className="inspect-logs" data-testid="inspect-logs">
+    {logs.map((line, index) => <li key={`${index}-${line}`}>
+      <code>{line}</code>
+    </li>)}
+  </ol>
+}
+
+function TracePanel({ trace, empty }) {
+  if (!trace?.length) {
+    return <EmptyEvidence>{empty}</EmptyEvidence>
+  }
+  return <div className="inspect-trace" data-testid="inspect-trace">
+    <ol>
+      {trace.map((item, index) => {
+        const label = item.actor_name || item.actor || item.stage || `#${index + 1}`
+        return (
+          <li key={`${label}-${index}`}>
+            <span>{item.stage || String(index + 1)}</span>
+            <strong>{label}</strong>
+            {item.status ? <small>{item.status}</small> : null}
+            {item.elapsed_ms != null ? <em>{item.elapsed_ms} ms</em> : null}
+          </li>
+        )
+      })}
+    </ol>
+  </div>
+}
+
 export default function ResultWorkspace({ runState, t }) {
   const [selectedTab, setSelectedTab] = useState('sql')
-  const state = runState || {}
-  const hasRunEvidence = Boolean(state.sql || state.result || state.trace?.length)
+  const state = resolveInspectArtifacts(runState)
+  const showPanels = Boolean(state.sql || state.result || state.trace?.length || state.phase === 'failed')
 
   const content = {
     sql: state.sql
-      ? <code>{state.sql}</code>
+      ? <div className="inspect-sql" data-testid="inspect-sql">
+        {state.question ? <p className="inspect-question"><span>{t('inspect.question')}</span> {state.question}</p> : null}
+        <code>{state.sql}</code>
+      </div>
       : <EmptyEvidence>{t('inspect.noSql')}</EmptyEvidence>,
     result: <ResultTable result={state.result} empty={t('inspect.noResult')} />,
-    trace: state.trace?.length
-      ? <div>
-        <ul>{state.trace.map((item, index) => <li key={index}>
-          {item.actor_name || item.actor || item.stage || `#${index + 1}`}
-        </li>)}</ul>
-        <pre>{JSON.stringify(state.trace, null, 2)}</pre>
-      </div>
-      : <EmptyEvidence>{t('inspect.noTrace')}</EmptyEvidence>,
-    metrics: <EmptyEvidence>{t('inspect.evidenceRequired')}</EmptyEvidence>,
-    logs: <EmptyEvidence>{t('inspect.evidenceRequired')}</EmptyEvidence>,
+    trace: <TracePanel trace={state.trace} empty={t('inspect.noTrace')} />,
+    metrics: <MetricsPanel metrics={state.metrics} empty={t('inspect.evidenceRequired')} />,
+    logs: <LogsPanel logs={state.logs} empty={t('inspect.evidenceRequired')} />,
   }
 
   return <section id="inspect" className="flow-module flow-glass result-workspace">
@@ -74,10 +115,16 @@ export default function ResultWorkspace({ runState, t }) {
           <dt>{t('inspect.contextActors')}</dt>
           <dd>{state.context.actors?.join(' → ') || t('status.unavailable')}</dd>
         </div>
+        {state.artifact_ref ? (
+          <div>
+            <dt>{t('inspect.artifactRef')}</dt>
+            <dd><code>{state.artifact_ref}</code></dd>
+          </div>
+        ) : null}
       </dl>
     </aside>}
 
-    {!hasRunEvidence && state.phase !== 'failed'
+    {!showPanels
       ? <EmptyEvidence>{t('inspect.empty')}</EmptyEvidence>
       : <>
         <div role="tablist" aria-label={t('inspect.title')}>

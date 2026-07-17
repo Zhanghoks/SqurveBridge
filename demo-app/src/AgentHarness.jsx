@@ -153,7 +153,11 @@ export default function AgentHarness({ api, postJson, Status, candidateUrl = '',
 
   useEffect(() => { endRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' }) }, [chat.messages, chat.tools])
 
-  const skills = chat.skills.length ? chat.skills.filter(name => DEFAULT_SKILLS.includes(name)) : DEFAULT_SKILLS
+  const skills = chat.profile === 'hosted-readonly'
+    ? []
+    : chat.skills.length
+      ? chat.skills.filter(name => DEFAULT_SKILLS.includes(name))
+      : DEFAULT_SKILLS
   const running = ['starting', 'thinking', 'ready'].includes(chat.status) && Boolean(sessionRef.current)
   const busy = chat.status === 'thinking'
   const authenticated = Boolean(auth.selectedModel)

@@ -112,3 +112,31 @@ test('renders a sanitized API error without clearing a key that was not saved', 
   assert.equal(screen.getByLabelText('API key').value, 'rejected-secret')
   assert.equal(document.body.textContent.includes('rejected-secret'), false)
 })
+
+test('accepts a custom SQL model id while keeping catalog suggestions', async () => {
+  const SqlAuthDialog = await loadDialog()
+  const calls = []
+  const api = async (path, options = {}) => {
+    calls.push({ path, options })
+    const payload = JSON.parse(options.body)
+    return { status: 'ok', validated: true, provider: payload.provider, model: payload.model }
+  }
+  const user = userEvent.setup()
+  render(React.createElement(SqlAuthDialog, {
+    open: true,
+    api,
+    status: { configured: false, providers },
+    onStatusChange: () => {},
+    onClose: () => {},
+  }))
+
+  const modelInput = screen.getByLabelText('Model')
+  assert.equal(modelInput.tagName, 'INPUT')
+  assert.equal(modelInput.getAttribute('list'), 'sql-model-suggestions')
+  await user.clear(modelInput)
+  await user.type(modelInput, 'qwen-custom-latest')
+  await user.type(screen.getByLabelText('API key'), 'custom-model-secret')
+  await user.click(screen.getByRole('button', { name: 'Test connection' }))
+
+  assert.equal(JSON.parse(calls.at(-1).options.body).model, 'qwen-custom-latest')
+})

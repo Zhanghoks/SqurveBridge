@@ -49,6 +49,8 @@ const translations = {
   'inspect.noResult': 'No execution result was returned.',
   'inspect.noTrace': 'No trace was returned.',
   'inspect.runContext': 'Run context',
+  'inspect.question': 'Question',
+  'inspect.artifactRef': 'Artifact ref',
   'inspect.contextDatabase': 'Live database',
   'inspect.contextConfig': 'Configuration',
   'inspect.contextActors': 'Actors',
@@ -98,13 +100,13 @@ test('runs query then execute for the focused connection', async () => {
     calls.push([path, body])
     if (path === '/api/query') {
       return {
-        sql: 'SELECT name FROM singer',
+        sql: 'SELECT sku FROM demo_inventory',
         trace: [{ actor_name: 'DINSQLGenerator' }],
       }
     }
     return {
-      columns: ['name'],
-      rows: [['Alice']],
+      columns: ['sku'],
+      rows: [['SKU-001']],
       row_count: 1,
       elapsed_ms: 4,
     }
@@ -115,12 +117,12 @@ test('runs query then execute for the focused connection', async () => {
   })
   const user = userEvent.setup()
 
-  await user.type(screen.getByLabelText('Natural-language question'), 'List singer names')
+  await user.type(screen.getByLabelText('Natural-language question'), 'List demo inventory SKUs')
   await user.click(screen.getByRole('button', { name: 'Run Reproduce' }))
 
   assert.deepEqual(calls, [
     ['/api/query', {
-      question: 'List singer names',
+      question: 'List demo inventory SKUs',
       db_id: 'Spider',
       mode: 'workflow',
       actors: ['DINSQLGenerator'],
@@ -130,12 +132,12 @@ test('runs query then execute for the focused connection', async () => {
     }],
     ['/api/execute', {
       db_id: 'Spider',
-      sql: 'SELECT name FROM singer',
+      sql: 'SELECT sku FROM demo_inventory',
     }],
   ])
-  assert.ok(await screen.findByText('SELECT name FROM singer'))
+  assert.ok(await screen.findByText('SELECT sku FROM demo_inventory'))
   assert.equal(states.at(-1).phase, 'completed')
-  assert.equal(states.at(-1).result.rows[0][0], 'Alice')
+  assert.equal(states.at(-1).result.rows[0][0], 'SKU-001')
   assert.deepEqual(states.map(state => state.phase), [
     'generatingSql',
     'executingSql',
@@ -166,10 +168,10 @@ test('preserves the question and sanitizes a rejected query error', async () => 
   const user = userEvent.setup()
   const question = screen.getByLabelText('Natural-language question')
 
-  await user.type(question, 'Which singer is oldest?')
+  await user.type(question, 'Which demo item was added first?')
   await user.click(screen.getByRole('button', { name: 'Run Reproduce' }))
 
-  assert.equal(question.value, 'Which singer is oldest?')
+  assert.equal(question.value, 'Which demo item was added first?')
   assert.ok(await screen.findByRole('alert'))
   assert.equal(document.body.textContent.includes('sk-live-secret'), false)
   assert.match(screen.getByRole('alert').textContent, /Provider rejected/)
@@ -210,7 +212,7 @@ test('marks the actual stage that failed instead of completing later stages', as
   renderRun({ postJson })
   const user = userEvent.setup()
 
-  await user.type(screen.getByLabelText('Natural-language question'), 'List singer names')
+  await user.type(screen.getByLabelText('Natural-language question'), 'List demo inventory SKUs')
   await user.click(screen.getByRole('button', { name: 'Run Reproduce' }))
   rejectQuery(new Error('Query failed'))
 
@@ -258,7 +260,7 @@ test('disables execution when the focused catalog database has no live database 
 
   await userEvent.setup().type(
     screen.getByLabelText('Natural-language question'),
-    'List singer names',
+    'List demo inventory SKUs',
   )
 
   assert.equal(screen.getByRole('button', { name: 'Run Reproduce' }).disabled, true)
@@ -269,11 +271,11 @@ test('result tabs show only returned evidence and keep metrics and logs empty', 
   render(React.createElement(ResultWorkspace, {
     runState: {
       phase: 'completed',
-      sql: 'SELECT name FROM singer',
+      sql: 'SELECT sku FROM demo_inventory',
       trace: [{ actor_name: 'DINSQLGenerator' }],
       result: {
-        columns: ['name'],
-        rows: [['Alice']],
+        columns: ['sku'],
+        rows: [['SKU-001']],
         row_count: 1,
         elapsed_ms: 4,
       },
@@ -291,6 +293,7 @@ test('result tabs show only returned evidence and keep metrics and logs empty', 
   }))
   const user = userEvent.setup()
 
+  assert.equal(screen.queryByTestId('inspect-sample-banner'), null)
   assert.match(screen.getByTestId('run-context').textContent, /DINSQL/)
   assert.match(screen.getByTestId('run-context').textContent, /Spider/)
   assert.match(screen.getByTestId('run-context').textContent, /dinsql\.json/)
@@ -298,16 +301,38 @@ test('result tabs show only returned evidence and keep metrics and logs empty', 
   for (const tab of screen.getAllByRole('tab')) {
     assert.equal(tab.tabIndex, 0)
   }
-  assert.ok(screen.getByText('SELECT name FROM singer'))
+  assert.ok(screen.getByText('SELECT sku FROM demo_inventory'))
   await user.click(screen.getByRole('tab', { name: 'Result' }))
-  assert.ok(screen.getByRole('cell', { name: 'Alice' }))
+  assert.ok(screen.getByRole('cell', { name: 'SKU-001' }))
   await user.click(screen.getByRole('tab', { name: 'Trace' }))
+  assert.ok(screen.getByTestId('inspect-trace'))
   assert.equal(screen.getAllByText('DINSQLGenerator').length, 2)
   await user.click(screen.getByRole('tab', { name: 'Metrics' }))
-  assert.match(document.querySelector('#inspect').textContent, /Evidence is required/)
+  assert.match(screen.getByTestId('inspect-metrics').textContent, /row_count/)
+  assert.match(screen.getByTestId('inspect-metrics').textContent, /elapsed_ms/)
   await user.click(screen.getByRole('tab', { name: 'Logs' }))
   assert.match(document.querySelector('#inspect').textContent, /Evidence is required/)
   assert.doesNotMatch(document.querySelector('#inspect').textContent, /Loading data|Generating SQL|Executing SQL/)
+})
+
+test('keeps inspection empty before a live run', () => {
+  render(React.createElement(ResultWorkspace, {
+    runState: {
+      phase: 'ready',
+      sql: '',
+      trace: [],
+      result: null,
+      error: '',
+      busy: false,
+      context: null,
+    },
+    t,
+  }))
+
+  assert.equal(screen.queryByTestId('inspect-sample-banner'), null)
+  assert.equal(screen.queryByTestId('run-context'), null)
+  assert.match(document.querySelector('#inspect').textContent, /Run a workflow/)
+  assert.equal(screen.queryByRole('tab'), null)
 })
 
 test('renders duplicate SQL column labels without duplicate React key warnings', async () => {

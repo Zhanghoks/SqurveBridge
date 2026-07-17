@@ -174,6 +174,27 @@ test('Pi auth protocol accepts an API key without emitting the secret', async ()
   assert.deepEqual(pi.session.prompts, ['hello'])
 })
 
+test('Pi auth protocol selects a custom model id for an authenticated provider', async () => {
+  const { createPiAuthProtocol } = await bridgeModule()
+  const events = []
+  const pi = fakePiAuth()
+  pi.credentials.set('anthropic', { type: 'api_key', key: 'secret' })
+  const protocol = createPiAuthProtocol({ ...pi, emit: event => events.push(event) })
+
+  await protocol.handle({
+    type: 'model_select', provider: 'anthropic', model: 'claude-custom-latest',
+  })
+
+  assert.equal(pi.session.selected.provider, 'anthropic')
+  assert.equal(pi.session.selected.id, 'claude-custom-latest')
+  assert.equal(pi.session.selected.name, 'claude-custom-latest')
+  assert.equal(
+    events.findLast(event => event.type === 'model_catalog').models
+      .some(model => model.id === 'claude-custom-latest' && model.selected),
+    true,
+  )
+})
+
 test('Pi auth protocol relays native OAuth events and prompt types', async () => {
   const { createPiAuthProtocol } = await bridgeModule()
   const events = []

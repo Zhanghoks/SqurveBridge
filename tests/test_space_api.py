@@ -41,6 +41,12 @@ class SpaceApiTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 403, path)
                 self.assertEqual(response.json["reason"], "local_only")
 
+    def test_hosted_space_rejects_raw_archive_file_content(self):
+        with patch.dict(os.environ, {"SQURVE_DEPLOYMENT_TARGET": "hf-space"}, clear=False):
+            response = self.client.get("/api/archive/public-run/files/scores.json")
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json["reason"], "local_only")
+
     def test_hosted_space_exposes_the_squrve_provider_catalog_for_byok(self):
         environment = {
             "SQURVE_DEPLOYMENT_TARGET": "hf-space",
@@ -54,6 +60,29 @@ class SpaceApiTests(unittest.TestCase):
         self.assertEqual(set(providers), set(self.api_server._provider_models))
         self.assertIn("qwen-plus", providers["qwen"]["models"])
         self.assertNotIn("env_var", providers["qwen"])
+
+    def test_public_query_trace_excludes_runtime_inputs_outputs_and_errors(self):
+        trace = self.api_server._serialize_public_query_trace([{
+            "actor_name": "C3SQLGenerator",
+            "actor_class": "C3SQLGenerator",
+            "stage_name": "generate",
+            "elapsed_s": 0.125,
+            "inputs": {"question": "private benchmark question"},
+            "result": "SELECT private_column FROM private_table",
+            "row_delta": {"added": {"pred_sql": "private SQL"}},
+            "error": "Bearer private-token",
+            "timestamp_ms": 123,
+        }])
+
+        self.assertEqual(trace, [{
+            "actor_name": "C3SQLGenerator",
+            "stage": "generate",
+            "status": "failed",
+            "elapsed_ms": 125.0,
+        }])
+        serialized = json.dumps(trace)
+        for forbidden in ("question", "SELECT", "row_delta", "Bearer", "timestamp"):
+            self.assertNotIn(forbidden, serialized)
 
     def test_hosted_sql_auth_is_cookie_scoped_and_secret_free(self):
         payload = {"provider": "qwen", "model": "qwen-plus", "api_key": "sql-secret-a"}
@@ -89,6 +118,23 @@ class SpaceApiTests(unittest.TestCase):
         self.assertEqual(tested.status_code, 200)
         self.assertEqual(tested.json["validated"], True)
         self.assertFalse(status.json["configured"])
+
+    def test_hosted_sql_auth_accepts_a_custom_provider_model_id(self):
+        payload = {
+            "provider": "qwen",
+            "model": "qwen-custom-latest",
+            "api_key": "custom-model-secret",
+        }
+        with patch.dict(
+            os.environ, {"SQURVE_DEPLOYMENT_TARGET": "hf-space"}, clear=False
+        ), patch.object(self.api_server, "_validate_sql_credential", return_value=None):
+            saved = self.client.put("/api/sql-auth", json=payload)
+            status = self.client.get("/api/sql-auth")
+
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(status.json["provider"], "qwen")
+        self.assertEqual(status.json["model"], "qwen-custom-latest")
+        self.assertNotIn("custom-model-secret", saved.get_data(as_text=True))
 
     def test_disconnecting_sql_auth_removes_the_session_credential(self):
         payload = {"provider": "qwen", "model": "qwen-plus", "api_key": "disconnect-secret"}
@@ -347,6 +393,7 @@ class SpaceApiTests(unittest.TestCase):
             },
             "weakness_profile": {
                 "summary": "schema linking",
+                "status": "recorded",
                 "nested": forbidden,
             },
             "evolution_record": {
@@ -387,7 +434,6 @@ class SpaceApiTests(unittest.TestCase):
         self.assertEqual(run["errors"]["execution_error"], {
             "count": 2,
             "pct": 0.5,
-            "sample_ids": ["dev_1", "dev_2"],
         })
         self.assertEqual(run["by_hardness"]["hard"]["cf1_join"], 0.4)
         self.assertEqual(run["by_hardness"]["hard"]["cf1_where"], 0.7)
@@ -425,21 +471,13 @@ class SpaceApiTests(unittest.TestCase):
             "output_tokens": 30,
             "cost_usd": 0.004,
         })
-        self.assertEqual(run["weakness_profile"]["summary"], "schema linking")
+        self.assertNotIn("summary", run["weakness_profile"])
+        self.assertEqual(run["weakness_profile"]["status"], "recorded")
         self.assertEqual(
             run["evolution_record"]["candidate_change"]["status"],
             "recorded",
         )
-        self.assertEqual(run["samples"], [{
-            "instance_id": "dev_1",
-            "db_id": "concert_singer [redacted]",
-            "hardness": "hard [redacted]",
-            "ex": 0,
-            "error_root": "execution_error",
-            "error_sub": "failure at [redacted] [redacted]",
-            "sl_recall": 0.5,
-            "act_elapsed_s": 0.9,
-        }])
+        self.assertNotIn("samples", run)
         serialized = response.get_data(as_text=True)
         for forbidden in (
             "question", "gold_sql", "pred_sql", "private benchmark question",
@@ -447,6 +485,7 @@ class SpaceApiTests(unittest.TestCase):
             "abc.def", private_path, "internal.example.test",
             standalone_secret, arbitrary_url, *unix_paths,
             "private patch summary", "private source excerpt", "private code snippet",
+            "dev_1", "dev_2",
         ):
             self.assertNotIn(forbidden, serialized)
 

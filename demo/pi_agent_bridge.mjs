@@ -170,7 +170,11 @@ export function createPiAuthProtocol({ authStorage, modelRegistry, session, emit
   }
 
   function modelCatalog() {
-    return modelRegistry.getAll().map(model => ({
+    const registered = modelRegistry.getAll()
+    const models = activeModel && !registered.some(model => (
+      model.provider === activeModel.provider && model.id === activeModel.id
+    )) ? [...registered, activeModel] : registered
+    return models.map(model => ({
       provider: model.provider,
       id: model.id,
       name: model.name || model.id,
@@ -317,8 +321,12 @@ export function createPiAuthProtocol({ authStorage, modelRegistry, session, emit
     }
     if (command.type === 'model_select') {
       const provider = String(command.provider || '')
-      const modelId = String(command.model || '')
-      const model = modelRegistry.find(provider, modelId)
+      const modelId = String(command.model || '').trim()
+      const registeredModel = modelRegistry.find(provider, modelId)
+      const providerTemplate = modelRegistry.getAll().find(model => model.provider === provider)
+      const model = registeredModel || (modelId && providerTemplate
+        ? { ...providerTemplate, id: modelId, name: modelId }
+        : null)
       if (!model) {
         emit({ type: 'auth_error', code: 'unsupported_model', message: 'The selected Pi model is unsupported.' })
         return

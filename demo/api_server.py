@@ -214,7 +214,7 @@ def _credential_from_payload(payload: dict) -> SqlCredential:
     api_key = payload.get("api_key")
     if provider not in _provider_models:
         raise SqlAuthError("unsupported_provider")
-    if model not in _provider_models[provider]:
+    if not model or len(model) > 200 or any(ord(character) < 32 for character in model):
         raise SqlAuthError("unsupported_model")
     if not isinstance(api_key, str) or not api_key.strip():
         raise SqlAuthError("credential_required")
@@ -399,12 +399,17 @@ def _clear_demo_instances() -> None:
         _demo_instances.clear()
 
 
+def _validate_model_id(model: str) -> str:
+    cleaned = (model or "").strip()
+    if not cleaned or len(cleaned) > 200 or any(ord(character) < 32 for character in cleaned):
+        raise ValueError("model must be a non-empty model ID (max 200 characters)")
+    return cleaned
+
+
 def _apply_provider_config(provider: str, model: str, api_key: str | None = None, persist: bool = True) -> dict:
     if provider not in _provider_models:
         raise ValueError(f"Unsupported LLM provider: {provider}")
-    models = _provider_models[provider]
-    if model not in models:
-        raise ValueError(f"Unsupported model for {provider}: {model}")
+    model = _validate_model_id(model)
 
     env_name = PROVIDER_ENV_VARS.get(provider)
     if not env_name:
@@ -413,13 +418,25 @@ def _apply_provider_config(provider: str, model: str, api_key: str | None = None
     key = (api_key or "").strip() or None
     if key:
         os.environ[env_name] = key
-        if persist:
-            _upsert_dotenv({env_name: key})
-        _clear_demo_instances()
     elif not resolve_api_key(provider, None):
         raise ValueError(
             f"{provider} api_key is missing; paste a key here or set {env_name} in repo-root .env"
         )
+
+    os.environ["SQURVE_LLM_PROVIDER"] = provider
+    os.environ["SQURVE_LLM_MODEL"] = model
+    if persist:
+        updates = {
+            "SQURVE_LLM_PROVIDER": provider,
+            "SQURVE_LLM_MODEL": model,
+        }
+        if key:
+            updates[env_name] = key
+        _upsert_dotenv(updates)
+    if key:
+        _clear_demo_instances()
+    elif _runtime_llm.get("provider") != provider or _runtime_llm.get("model") != model:
+        _clear_demo_instances()
 
     _runtime_llm.update(provider=provider, model=model)
     _provider_validation.update(verified=False, error=None)
@@ -430,8 +447,16 @@ def _provider_status() -> dict:
     load_dotenv(_project_root / ".env")
     config = _router_config()
     llm = dict(config.get("llm") or {})
-    provider = _runtime_llm.get("provider") or llm.get("use")
-    model = _runtime_llm.get("model") or llm.get("model_name")
+    provider = (
+        _runtime_llm.get("provider")
+        or os.environ.get("SQURVE_LLM_PROVIDER")
+        or llm.get("use")
+    )
+    model = (
+        _runtime_llm.get("model")
+        or os.environ.get("SQURVE_LLM_MODEL")
+        or llm.get("model_name")
+    )
     if provider:
         llm["use"] = provider
     if model:
@@ -454,16 +479,20 @@ def _llm_provider_catalog() -> list[dict]:
         return _sql_provider_catalog()
     load_dotenv(_project_root / ".env")
     default = _provider_status()
-    return [
-        {
+    catalog = []
+    for provider, catalog_models in _provider_models.items():
+        models = list(catalog_models)
+        active_model = default["model"] if provider == default["provider"] else None
+        if active_model and active_model not in models:
+            models = [active_model, *models]
+        catalog.append({
             "id": provider,
             "configured": bool(resolve_api_key(provider, None)),
             "models": models,
-            "default_model": default["model"] if provider == default["provider"] and default["model"] in models else models[0],
+            "default_model": active_model or models[0],
             "env_var": PROVIDER_ENV_VARS[provider],
-        }
-        for provider, models in _provider_models.items()
-    ]
+        })
+    return catalog
 
 
 @app.get("/api/health")
@@ -659,6 +688,7 @@ def query():
         generate_type=generator,
     )
     if result.get("status") == "success":
+        result["trace"] = _serialize_public_query_trace(result.get("trace"))
         if not hosted:
             _provider_validation.update(verified=True, error=None)
         result["run_config"] = {
@@ -872,7 +902,6 @@ _PRIVATE_VALUE_PATTERNS = (
     re.compile(r"(?<![\w.])/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+"),
     re.compile(r"(?i)\b[A-Z]:\\(?:[^\\\s]+\\)*[^\\\s]+"),
 )
-_CONTROLLED_STRING = re.compile(r"^[A-Za-z0-9 _.,:+@()/-]{0,160}$")
 _PUBLIC_IDENTIFIER = re.compile(r"^[A-Za-z0-9_.:@+-]{1,160}$")
 _PUBLIC_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}(?:[T ][0-9:.+-]+Z?)?$")
 _PUBLIC_ARTIFACT_REF = re.compile(r"^(?:session:)?[A-Za-z0-9_.:@+-]+(?:/[A-Za-z0-9_.@+-]+)*$")
@@ -883,9 +912,15 @@ _EVOLUTION_STAGES = {
 }
 _EVOLUTION_FIELDS = {
     "artifact", "artifact_ref", "status", "state", "outcome", "decision",
-    "summary", "metric", "value", "score", "count", "stage", "actor", "id",
-    "name", "root", "category", "before", "after", "delta", "accepted",
+    "metric", "value", "score", "count", "stage", "actor", "id",
+    "root", "category", "delta", "accepted",
 }
+_EVOLUTION_ARTIFACT_FIELDS = {"artifact", "artifact_ref"}
+_EVOLUTION_IDENTIFIER_FIELDS = {
+    "status", "state", "outcome", "decision", "metric", "stage",
+    "actor", "id", "root", "category",
+}
+_EVOLUTION_NUMERIC_FIELDS = {"value", "score", "count", "delta", "accepted"}
 
 
 def _forbidden_comparison_key(key: object) -> bool:
@@ -940,6 +975,32 @@ def _public_artifact_ref(value) -> str | None:
     return sanitized if isinstance(sanitized, str) and _PUBLIC_ARTIFACT_REF.fullmatch(sanitized) else "[redacted]"
 
 
+def _serialize_public_query_trace(value) -> list[dict]:
+    """Expose stage metadata without actor inputs, outputs, errors, or row contents."""
+    if not isinstance(value, list):
+        return []
+    trace = []
+    for record in value[:100]:
+        if not isinstance(record, dict):
+            continue
+        actor = _public_identifier(record.get("actor_name") or record.get("actor_class"))
+        stage = _public_identifier(record.get("stage_name") or record.get("stage"))
+        elapsed_s = record.get("elapsed_s")
+        public = {
+            "actor_name": actor,
+            "stage": stage,
+            "status": "failed" if record.get("error") else "completed",
+        }
+        if isinstance(elapsed_s, (int, float)) and not isinstance(elapsed_s, bool):
+            public["elapsed_ms"] = round(float(elapsed_s) * 1000, 3)
+        trace.append({
+            key: item
+            for key, item in public.items()
+            if item not in {None, "[redacted]"}
+        })
+    return trace
+
+
 def _serialize_aggregate_metrics(value) -> dict:
     if not isinstance(value, dict):
         return {}
@@ -965,11 +1026,6 @@ def _serialize_error_distribution(value) -> dict:
         for field in ("count", "pct"):
             if stats.get(field) is None or isinstance(stats.get(field), (bool, int, float)):
                 public[field] = stats.get(field)
-        if isinstance(stats.get("sample_ids"), list):
-            public["sample_ids"] = [
-                identifier for item in stats["sample_ids"][:200]
-                if (identifier := _public_identifier(item)) != "[redacted]"
-            ]
         result[root_id] = public
     return result
 
@@ -1131,20 +1187,21 @@ def _sanitize_evolution_record(value, *, stages: bool = False):
         elif isinstance(item, list):
             result[normalized] = [
                 sanitized for entry in item[:100]
-                if (sanitized := _sanitize_evolution_scalar(entry)) is not None
+                if (sanitized := _sanitize_evolution_scalar(entry, normalized)) is not None
             ]
         else:
-            result[normalized] = _sanitize_evolution_scalar(item)
+            result[normalized] = _sanitize_evolution_scalar(item, normalized)
     return result
 
 
-def _sanitize_evolution_scalar(value):
-    if value is None or isinstance(value, (bool, int, float)):
-        return value
-    sanitized = _sanitize_public_scalar(value)
-    if isinstance(sanitized, str) and _CONTROLLED_STRING.fullmatch(sanitized):
-        return sanitized
-    return "[redacted]" if isinstance(sanitized, str) else None
+def _sanitize_evolution_scalar(value, field):
+    if field in _EVOLUTION_NUMERIC_FIELDS:
+        return value if value is None or isinstance(value, (bool, int, float)) else None
+    if field in _EVOLUTION_ARTIFACT_FIELDS:
+        return _public_artifact_ref(value)
+    if field in _EVOLUTION_IDENTIFIER_FIELDS:
+        return _public_identifier(value)
+    return None
 
 
 def _serialize_comparison_run(
@@ -1186,19 +1243,6 @@ def _serialize_comparison_run(
         "token": _sanitize_numeric_tree(raw_aggregate.get("token") or {}) or {},
         "errors": _serialize_error_distribution(raw_aggregate.get("error_root_distribution") or {}),
         "latency": _sanitize_numeric_tree(_latency_summary(scores, job)) or {},
-        "samples": [
-            {
-                "instance_id": _sanitize_public_scalar(row.get("instance_id")),
-                "db_id": _sanitize_public_scalar(row.get("db_id")),
-                "hardness": _sanitize_public_scalar(row.get("hardness")),
-                "ex": _sanitize_public_scalar(row.get("ex")),
-                "error_root": _sanitize_public_scalar(row.get("error_root")),
-                "error_sub": _sanitize_public_scalar(row.get("error_sub")),
-                "sl_recall": _sanitize_public_scalar(row.get("sl_recall")),
-                "act_elapsed_s": _sanitize_public_scalar(row.get("act_elapsed_s")),
-            }
-            for row in (scores.get("per_sample") or [])
-        ],
     }
     for field in ("weakness_profile", "evolution_record"):
         if field in scores and scores[field] is not None:

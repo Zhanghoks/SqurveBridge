@@ -41,6 +41,9 @@ class DemoDeploymentTests(unittest.TestCase):
         self.assertTrue(hosted_route_allowed("PUT", "/api/sql-auth", env))
         self.assertTrue(hosted_route_allowed("DELETE", "/api/sql-auth", env))
         self.assertTrue(hosted_route_allowed("GET", "/api/archive", env))
+        self.assertFalse(hosted_route_allowed(
+            "GET", "/api/archive/public-run/files/scores.json", env
+        ))
         self.assertFalse(hosted_route_allowed("POST", "/api/provider", env))
         self.assertFalse(hosted_route_allowed("POST", "/api/databases/upload", env))
         self.assertFalse(hosted_route_allowed("POST", "/api/evaluations", env))

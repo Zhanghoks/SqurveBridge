@@ -5,6 +5,7 @@ export default function DemoHeader({
   onConfigureSql,
   t,
   configCount,
+  credentialMode = 'session',
 }) {
   const nextLocale = locale === 'zh-CN' ? 'en-US' : 'zh-CN'
   const languageLabel = locale === 'zh-CN'
@@ -29,7 +30,7 @@ export default function DemoHeader({
     </div>
     <div className="flow-header-actions">
       <button type="button" onClick={onConfigureSql}>
-        {t('header.configureApi')}
+        {t(credentialMode === 'local' ? 'header.configureLocalApi' : 'header.configureApi')}
       </button>
       <button
         type="button"

@@ -6,6 +6,7 @@ export default function PiAuthDialog({ open, state, send, onClose }) {
   const [providerId, setProviderId] = useState(state.providers[0]?.id || '')
   const [input, setInput] = useState('')
   const [selectedOption, setSelectedOption] = useState('')
+  const [customModel, setCustomModel] = useState('')
   const [revealed, setRevealed] = useState(false)
 
   useEffect(() => {
@@ -63,6 +64,14 @@ export default function PiAuthDialog({ open, state, send, onClose }) {
     onClose()
   }
 
+  const selectCustomModel = event => {
+    event.preventDefault()
+    const model = customModel.trim()
+    if (!model) return
+    send({ type: 'model_select', provider: activeProviderId, model })
+    setCustomModel('')
+  }
+
   return <div className="auth-dialog-backdrop" role="presentation">
     <section className="auth-dialog pi-auth-dialog" role="dialog" aria-modal="true" aria-labelledby="pi-auth-title">
       <div className="auth-dialog-header pi-auth-header">
@@ -102,7 +111,7 @@ export default function PiAuthDialog({ open, state, send, onClose }) {
             <div className="pi-auth-prompt-actions"><button className="button primary" type="submit" disabled={state.prompt.kind === 'select' ? !selectedOption : !input.trim()}>Continue</button><button className="button" type="button" onClick={cancel}>Cancel login</button></div>
           </form>}
 
-          {provider?.configured && <div className="pi-model-picker"><div><span>Model</span><small>Select a model from Pi's native catalog</small></div>{models.length ? <div>{models.map(model => <button type="button" key={model.id} className={model.selected ? 'active' : ''} onClick={() => send({ type: 'model_select', provider: model.provider, model: model.id })}><strong>{model.name}</strong><code>{model.id}</code>{model.selected && <small>selected</small>}</button>)}</div> : <p>No authenticated models are available for this provider.</p>}</div>}
+          {provider?.configured && <div className="pi-model-picker"><div><span>Model</span><small>Choose a catalog model or enter a provider-compatible model ID</small></div>{models.length ? <div>{models.map(model => <button type="button" key={model.id} className={model.selected ? 'active' : ''} onClick={() => send({ type: 'model_select', provider: model.provider, model: model.id })}><strong>{model.name}</strong><code>{model.id}</code>{model.selected && <small>selected</small>}</button>)}</div> : <p>No catalog models are available for this provider.</p>}<form className="pi-custom-model" onSubmit={selectCustomModel}><label htmlFor="pi-custom-model-id">Custom model ID</label><div><input id="pi-custom-model-id" value={customModel} onChange={event => setCustomModel(event.target.value)} placeholder="e.g. model-name-latest" autoComplete="off" /><button className="button secondary" type="submit" disabled={!customModel.trim()}>Use custom model</button></div><small>The model must be compatible with this provider's configured API.</small></form></div>}
           {state.error && <p className="error-banner" role="alert">{state.error}</p>}
         </main>
       </div>

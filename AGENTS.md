@@ -4,6 +4,12 @@
 
 `core/` contains Squrve runtime extensions and native Text-to-SQL Actors. Reproducible experiments live in `reproduce/`; benchmark contracts are in `benchmarks/`, and deterministic utilities in `tools/`. The Flask/Pi backend is in `demo/`, the React/Vite interface in `demo-app/`, and the reviewed Pi upstream source in `pi/`. Deployment overlays live in `deploy/`, examples in `evidence/`, and Python regressions in `tests/`. Agent workflow contracts use `skills/`, `templates/`, and `harness/`.
 
+This repository is the authoritative source for the real interactive demo
+deployed as a configured Hugging Face Space. The separate
+`squrvebridge-live-demo` repository is only the paper presentation
+website on Vercel; never move this repository's runtime or Demo App into that
+paper-site repository.
+
 ## Build, Test, and Development Commands
 
 - `python -m unittest discover -s tests -p 'test_*.py' -v` runs all Python regressions.
@@ -27,6 +33,20 @@ Python tests use `unittest` and follow `tests/test_<feature>.py`. Frontend tests
 
 Recent history uses concise Conventional Commit-style subjects: `feat:`, `fix:`, and `release:`. Keep one logical change per commit. Pull requests should explain motivation, affected workflows, verification commands, and compatibility risks; include screenshots for UI changes and link the relevant issue when available. Method Actor integrations require a feature branch or worktree; never modify `main` silently.
 
-## Security & Anonymous Submission
+## Security & Publication Privacy
 
-Never commit credentials, personal identity, private URLs, absolute workstation paths, manuscript details, or unpublished claims. Use repository-relative links. Before publication, run `python tools/anonymity_scan.py` and `python tools/security_scan.py`. SqurveBridge is the public project; Squrve is its upstream foundation.
+Never commit credentials, non-public personal information, personal contact
+details, private URLs, absolute workstation paths, private manuscript details,
+submission/venue/review information, internal roadmap material, benchmark
+questions or SQL, provider payloads, or unpublished claims. User-approved
+author names and affiliations are allowed.
+Space secrets belong only in encrypted Hugging Face settings; never put them in
+Git, example configs, browser storage, logs, screenshots, or fixtures. Use
+repository-relative links. Before publication, run
+`python tools/anonymity_scan.py`, `python tools/security_scan.py`, and the
+release gate. Also run `python tools/security_scan.py --history` and manually
+inspect commit authors, deleted-but-reachable files, untracked files, benchmark
+redistribution rights, raw question/SQL fixtures, sample identifiers, and
+provider/model metadata. The configured GitHub and Hugging Face namespaces are
+approved publication targets and are not themselves privacy findings.
+SqurveBridge is the public project; Squrve is its upstream foundation.

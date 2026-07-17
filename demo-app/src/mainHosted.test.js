@@ -107,6 +107,62 @@ test('hosted App exposes session SQL configuration instead of local env configur
   assert.ok(screen.getByRole('dialog', { name: 'Configure SQL API' }))
 })
 
+test('local App renders the same full-flow surface as the hosted deployment', async () => {
+  const responses = {
+    '/api/health': {
+      status: 'ok',
+      provider: {
+        configured: true,
+        ready: true,
+        verified: true,
+        provider: 'qwen',
+        model: 'qwen-plus',
+      },
+    },
+    '/api/capabilities': {
+      llm_providers: [{
+        id: 'qwen',
+        configured: true,
+        models: ['qwen-plus'],
+        default_model: 'qwen-plus',
+      }],
+      actors: {},
+      workflows: [[]],
+      reproduce_configs: [],
+      deployment: {
+        target: 'local',
+        features: {
+          live_sql: true,
+          session_sql_auth: false,
+          provider_configuration: true,
+          agent_chat: true,
+          live_evaluation: true,
+        },
+      },
+    },
+    '/api/databases': { databases: [] },
+    '/api/comparisons/latest/results': { runs: [] },
+    '/api/archive': { runs: [] },
+  }
+  globalThis.fetch = async path => ({
+    ok: true,
+    statusText: 'OK',
+    json: async () => path.startsWith('/api/comparisons/latest/results')
+      ? responses['/api/comparisons/latest/results']
+      : responses[path] || {},
+  })
+
+  render(React.createElement(HostedApp))
+
+  assert.ok(await screen.findByRole('heading', { name: 'Configuration Studio' }))
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Configure LLM' }))
+  assert.ok(screen.getByRole('dialog', { name: 'Configure LLM' }))
+  assert.ok(document.querySelector('.flow-provider-dialog'))
+  assert.doesNotMatch(document.body.textContent, /Hugging Face Live Demo/i)
+  assert.equal(screen.queryByText('Experiment Board'), null)
+  assert.ok(document.querySelector('.flow-demo'))
+})
+
 test('does not expose the local console while capabilities are pending', async () => {
   let resolveFetch
   globalThis.fetch = () => new Promise(resolve => { resolveFetch = resolve })

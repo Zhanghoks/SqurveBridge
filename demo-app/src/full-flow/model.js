@@ -12,6 +12,56 @@ export const buildReadyKeys = configs => new Set((configs || []).map(item => con
 export const buildConnections = (methods, databases) => methods.flatMap(
   method => databases.map(database => ({ method, database, key: configKey(method, database) })),
 )
+export const connectionKeyOf = connection => configKey(connection.method, connection.database)
+export const hasConnection = (connections, method, database) =>
+  (connections || []).some(item => connectionKeyOf(item) === configKey(method, database))
+export const withConnectionKeys = connections => (connections || []).map(item => ({
+  ...item,
+  key: connectionKeyOf(item),
+}))
+export const toggleConnection = (connections, method, database) => {
+  const current = connections || []
+  if (hasConnection(current, method, database)) {
+    if (current.length === 1) return current
+    return current.filter(item => connectionKeyOf(item) !== configKey(method, database))
+  }
+  return [...current, { method, database }]
+}
+export const ensureConnection = (connections, method, database) => (
+  hasConnection(connections, method, database)
+    ? connections
+    : [...(connections || []), { method, database }]
+)
+export const selectedMethodsFromConnections = connections =>
+  METHODS.filter(method => (connections || []).some(item => item.method === method))
+export const selectedDatabasesFromConnections = connections =>
+  DATABASES.filter(database => (connections || []).some(item => item.database === database))
+export const toggleMethodConnections = (connections, method) => {
+  const current = connections || []
+  const selectedDatabases = selectedDatabasesFromConnections(current)
+  if (current.some(item => item.method === method)) {
+    const next = current.filter(item => item.method !== method)
+    return next.length ? next : current
+  }
+  const targets = selectedDatabases.length ? selectedDatabases : [DATABASES[0]]
+  return targets.reduce(
+    (next, database) => ensureConnection(next, method, database),
+    current,
+  )
+}
+export const toggleDatabaseConnections = (connections, database) => {
+  const current = connections || []
+  const selectedMethods = selectedMethodsFromConnections(current)
+  if (current.some(item => item.database === database)) {
+    const next = current.filter(item => item.database !== database)
+    return next.length ? next : current
+  }
+  const sources = selectedMethods.length ? selectedMethods : [METHODS[0]]
+  return sources.reduce(
+    (next, method) => ensureConnection(next, method, database),
+    current,
+  )
+}
 export const resolveFocusedConfig = (configs, method, database) =>
   (configs || []).find(item => configKey(item.method, item.dataset) === configKey(method, database)) || null
 export const workflowStages = config => (config?.stages || []).map(stage => ({
@@ -19,3 +69,27 @@ export const workflowStages = config => (config?.stages || []).map(stage => ({
   type: stage.type,
   actor: stage.actor,
 }))
+
+export const normalizePublicGitHubUrl = value => {
+  try {
+    const parsed = new URL(String(value || '').trim())
+    if (
+      parsed.protocol !== 'https:'
+      || parsed.hostname.toLowerCase() !== 'github.com'
+      || parsed.username
+      || parsed.password
+      || parsed.search
+      || parsed.hash
+      || parsed.port
+    ) return ''
+    const parts = parsed.pathname.split('/').filter(Boolean)
+    if (parts.length !== 2) return ''
+    const owner = parts[0]
+    const repository = parts[1].replace(/\.git$/i, '')
+    const publicSegment = /^[A-Za-z0-9_.-]+$/
+    if (!publicSegment.test(owner) || !publicSegment.test(repository)) return ''
+    return `https://github.com/${owner}/${repository}`
+  } catch {
+    return ''
+  }
+}

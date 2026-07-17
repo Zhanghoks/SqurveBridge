@@ -50,4 +50,6 @@ def hosted_route_allowed(
     normalized = (method.upper(), path.rstrip("/") or "/")
     if normalized in _HOSTED_FORBIDDEN:
         return False
+    if path.startswith("/api/archive/") and "/files/" in path:
+        return False
     return not any(path.startswith(prefix) for prefix in _HOSTED_FORBIDDEN_PREFIXES)

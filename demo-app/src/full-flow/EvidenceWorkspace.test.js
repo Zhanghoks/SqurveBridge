@@ -121,7 +121,7 @@ test('renders only persisted diagnostic fields from the selected comparison run'
         latency: { p95_s: 1.2 },
         samples: [{
           instance_id: 'dev_1',
-          db_id: 'concert_singer',
+          db_id: 'synthetic_inventory',
           hardness: 'hard',
           ex: 0,
           error_root: 'execution_error',
