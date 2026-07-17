@@ -32,6 +32,7 @@ from demo.gradio_demo import (
     WORKFLOW_SKELETONS,
     SqurveDemo,
     database_benchmark,
+    database_schema_id,
     get_available_databases,
     get_router_config_path,
     get_uploaded_db_root,
@@ -272,11 +273,11 @@ def _database_records() -> list[dict]:
             schema = json.loads(schema_file.read_text(encoding="utf-8"))
             schemas = schema if isinstance(schema, list) else [schema]
             item = next(
-                (candidate for candidate in schemas if candidate.get("db_id") == db_id),
+                (candidate for candidate in schemas if candidate.get("db_id") == database_schema_id(db_path)),
                 schemas[0],
             )
             if len(item.get("column_names_original", [])) != len(item.get("column_types", [])):
-                item = sqlite_to_schema(db_path, db_id=db_id)
+                item = sqlite_to_schema(db_path, db_id=database_schema_id(db_path))
                 schema_file.write_text(json.dumps([item], ensure_ascii=False, indent=2), encoding="utf-8")
             tables = item.get("table_names_original") or item.get("table_names") or []
         except (OSError, ValueError, TypeError):
@@ -489,13 +490,11 @@ def _llm_provider_catalog() -> list[dict]:
     for provider, catalog_models in _provider_models.items():
         models = list(catalog_models)
         active_model = default["model"] if provider == default["provider"] else None
-        if active_model and active_model not in models:
-            models = [active_model, *models]
         catalog.append({
             "id": provider,
             "configured": bool(resolve_api_key(provider, None)),
             "models": models,
-            "default_model": active_model or models[0],
+            "default_model": active_model if active_model in models else models[0],
             "env_var": PROVIDER_ENV_VARS[provider],
         })
     return catalog

@@ -453,13 +453,18 @@ BUILTIN_BENCHMARK_DATABASES = (
 def _builtin_database_references() -> List[Tuple[str, str, str, str]]:
     """Return installed read-only benchmark databases without question data."""
     references = []
+    seen_ids = set()
     for benchmark, database_relative, schema_relative in BUILTIN_BENCHMARK_DATABASES:
         database_root = _project_root / database_relative
         schema_path = _project_root / schema_relative
         if not database_root.is_dir() or not schema_path.is_file():
             continue
         for database_path in sorted(database_root.rglob("*.sqlite")):
-            references.append((database_path.stem, benchmark, str(database_path), str(schema_path)))
+            db_id = database_path.stem
+            if db_id in seen_ids:
+                db_id = f"{benchmark}__{db_id}"
+            seen_ids.add(db_id)
+            references.append((db_id, benchmark, str(database_path), str(schema_path)))
     return references
 
 
@@ -488,6 +493,11 @@ def get_available_databases() -> List[Tuple[str, str, str]]:
 def database_benchmark(db_id: str) -> Optional[str]:
     """Return the benchmark label for a built-in database, if any."""
     return next((benchmark for reference_id, benchmark, _db_path, _schema_path in _builtin_database_references() if reference_id == db_id), None)
+
+
+def database_schema_id(db_path: str) -> str:
+    """Return the source benchmark identifier used inside a schema JSON file."""
+    return Path(db_path).stem
 
 
 def create_demo(config_path: Optional[str] = None):

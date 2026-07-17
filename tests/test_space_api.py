@@ -81,6 +81,25 @@ class SpaceApiTests(unittest.TestCase):
             {("spider", "spider"), ("bird", "bird"), ("bull-en", "bull-en"), ("ehrsql-2024", "ehrsql-2024")},
         )
 
+    def test_builtin_database_references_namespace_colliding_ids(self):
+        from demo import gradio_demo
+
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            gradio_demo, "_project_root", Path(directory)
+        ):
+            for benchmark, database_relative, schema_relative in gradio_demo.BUILTIN_BENCHMARK_DATABASES:
+                database = Path(directory) / database_relative / "formula_1.sqlite"
+                database.parent.mkdir(parents=True, exist_ok=True)
+                database.touch()
+                schema = Path(directory) / schema_relative
+                schema.parent.mkdir(parents=True, exist_ok=True)
+                schema.write_text("[]", encoding="utf-8")
+
+            references = gradio_demo._builtin_database_references()
+
+        self.assertIn(("formula_1", "spider"), {(db_id, benchmark) for db_id, benchmark, _db_path, _schema_path in references})
+        self.assertIn(("bird__formula_1", "bird"), {(db_id, benchmark) for db_id, benchmark, _db_path, _schema_path in references})
+
     def test_hosted_space_rejects_local_only_mutations(self):
         with patch.dict(os.environ, {"SQURVE_DEPLOYMENT_TARGET": "hf-space"}, clear=False):
             for method, path in (
