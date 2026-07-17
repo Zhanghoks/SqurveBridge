@@ -1,8 +1,10 @@
 FROM node:20-bookworm-slim AS frontend
-WORKDIR /build
+WORKDIR /build/demo-app
 COPY demo-app/package.json demo-app/package-lock.json ./
 RUN npm ci
 COPY demo-app/ ./
+COPY config/ /build/config/
+COPY reproduce/configs/ /build/reproduce/configs/
 RUN npm test && npm run build
 
 FROM node:22-bookworm-slim AS pi-builder
@@ -24,7 +26,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && python3 -m venv /opt/venv
 COPY . /app
-COPY --from=frontend /build/dist /app/demo-app/dist
+COPY --from=frontend /build/demo-app/dist /app/demo-app/dist
 COPY --from=pi-builder /build/pi /app/pi
 RUN python -m pip install --upgrade pip \
     && python -m pip install -r deploy/huggingface/requirements.txt \
