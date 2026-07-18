@@ -79,7 +79,7 @@ def _source_files(slug: str) -> list[Path]:
             continue
         if path.name in EXCLUDED_NAMES or any(path.name.endswith(suffix) for suffix in EXCLUDED_SUFFIXES):
             continue
-        if path.name == "data_clean.py" or "__pycache__" in path.parts:
+        if "__pycache__" in path.parts:
             continue
         files.append(path)
     if not files:

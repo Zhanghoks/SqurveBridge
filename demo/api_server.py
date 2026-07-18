@@ -348,7 +348,7 @@ def _benchmark_catalog() -> list[dict]:
     catalog = []
     preferred_splits = ("dev", "valid", "val", "test", "train")
     # Only expose benchmarks that can support a local, labeled 100-row evaluation.
-    hidden_benchmarks = {"ambidb", "spider2", "spider_dk", "SquRL"}
+    hidden_benchmarks = {"spider_dk", "SquRL"}
     for record in records:
         benchmark_id = str(record.get("id", "")).strip()
         if not benchmark_id or benchmark_id in hidden_benchmarks:

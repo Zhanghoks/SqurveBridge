@@ -78,7 +78,7 @@ class SpaceApiTests(unittest.TestCase):
 
         self.assertEqual(
             {(db_id, benchmark) for db_id, benchmark, _db_path, _schema_path in references},
-            {("spider", "spider"), ("bird", "bird"), ("bull-en", "bull-en"), ("ehrsql-2024", "ehrsql-2024")},
+            {(benchmark, benchmark) for benchmark, _database, _schema in gradio_demo.BUILTIN_BENCHMARK_DATABASES},
         )
 
     def test_builtin_database_references_namespace_colliding_ids(self):

@@ -35,8 +35,6 @@ test-results/
 *.har
 *.zip
 *.mp4
-!benchmarks/packages/spider.zip
-!benchmarks/packages/bird.zip
 npm-debug.log*
 yarn-error.log*
 
@@ -100,7 +98,7 @@ benchmarks/spider/
 benchmarks/bird/
 benchmarks/bull-en/
 benchmarks/ehrsql-2024/
-benchmarks/AmbiDB/
+benchmarks/ambidb/
 benchmarks/BookSQL/
 benchmarks/bull-cn/
 benchmarks/spider2/
@@ -109,6 +107,10 @@ benchmarks/spider2/
 !benchmarks/packages/README.md
 !benchmarks/packages/bull-en.zip
 !benchmarks/packages/ehrsql-2024.zip
+!benchmarks/packages/ambidb.zip
+!benchmarks/packages/BookSQL.zip
+!benchmarks/packages/bull-cn.zip
+!benchmarks/packages/spider2.zip
 
 # Optional local state
 .worktrees/

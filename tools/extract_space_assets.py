@@ -8,7 +8,16 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 
-ARCHIVES = ("spider.zip", "bird.zip", "bull-en.zip", "ehrsql-2024.zip")
+ARCHIVES = (
+    "ambidb.zip",
+    "BookSQL.zip",
+    "bird.zip",
+    "bull-cn.zip",
+    "bull-en.zip",
+    "ehrsql-2024.zip",
+    "spider.zip",
+    "spider2.zip",
+)
 def _safe_member(name: str) -> PurePosixPath:
     path = PurePosixPath(name)
     if not name or path.is_absolute() or ".." in path.parts or "\\" in name:

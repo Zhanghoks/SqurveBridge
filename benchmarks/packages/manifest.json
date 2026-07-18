@@ -1,6 +1,60 @@
 {
   "schema_version": 1,
   "benchmarks": {
+    "BookSQL": {
+      "version": "BookSQL complete benchmark snapshot",
+      "archive": "benchmarks/packages/BookSQL.zip",
+      "top_level": "BookSQL",
+      "source": "https://paperswithcode.com/dataset/booksql",
+      "license_notice": "BookSQL data remains subject to the terms published by its authors. This archive contains the complete benchmark payload for research evaluation.",
+      "sha256": "3334f19f258b15a23246777e8eaad095bacefa4d884e402b931c3482232a7412",
+      "archive_size": 35940002,
+      "uncompressed_size": 208280499,
+      "member_count": 7,
+      "allowed_suffixes": [
+        ".json",
+        ".sqlite"
+      ],
+      "dataset_counts": {
+        "train": 70828,
+        "val": 7605,
+        "test": 21567
+      },
+      "sqlite_count": 1,
+      "required_files": [
+        "BookSQL/train/dataset.json",
+        "BookSQL/train/schema.json",
+        "BookSQL/val/dataset.json",
+        "BookSQL/val/schema.json",
+        "BookSQL/test/dataset.json",
+        "BookSQL/test/schema.json",
+        "BookSQL/database/accounting/accounting.sqlite"
+      ]
+    },
+    "ambidb": {
+      "version": "AmbiDB complete benchmark snapshot",
+      "archive": "benchmarks/packages/ambidb.zip",
+      "top_level": "ambidb",
+      "source": "https://huggingface.co/datasets/satissss/AmbiDB",
+      "license_notice": "AmbiDB data remains subject to the terms published by its authors. This archive contains the complete benchmark payload for research evaluation.",
+      "sha256": "718a0d33ecce71341776ab653ed72a1b7943d7bfed801fc46ec42e4b62cb0d10",
+      "archive_size": 325479,
+      "uncompressed_size": 3149660,
+      "member_count": 12,
+      "allowed_suffixes": [
+        ".json",
+        ".py",
+        ".sqlite"
+      ],
+      "dataset_counts": {},
+      "sqlite_count": 9,
+      "required_files": [
+        "ambidb/dataset.json",
+        "ambidb/schema.json",
+        "ambidb/data_clean.py",
+        "ambidb/database/academic_research_data.sqlite"
+      ]
+    },
     "bird": {
       "version": "BIRD dev (SqurveBridge normalized snapshot)",
       "archive": "benchmarks/packages/bird.zip",
@@ -27,6 +81,38 @@
         "bird/dev/few_shot_examples.json",
         "bird/dev/database/california_schools.sqlite",
         "bird/dev/database_description/california_schools/db_description.csv"
+      ]
+    },
+    "bull-cn": {
+      "version": "BULL-CN complete benchmark snapshot",
+      "archive": "benchmarks/packages/bull-cn.zip",
+      "top_level": "bull-cn",
+      "source": "https://bull-text-to-sql-benchmark.github.io/",
+      "license_notice": "BULL data remains subject to the terms published by its authors. This archive contains the complete benchmark payload for research evaluation.",
+      "sha256": "13d3a9a283f5044799abbb23f691e15229d662b453391674eecbd1bf004f109f",
+      "archive_size": 10652482,
+      "uncompressed_size": 52966902,
+      "member_count": 9,
+      "allowed_suffixes": [
+        ".json",
+        ".sqlite"
+      ],
+      "dataset_counts": {
+        "dev": 1000,
+        "test": 1000,
+        "train": 3966
+      },
+      "sqlite_count": 3,
+      "required_files": [
+        "bull-cn/dev/dataset.json",
+        "bull-cn/dev/schema.json",
+        "bull-cn/test/dataset.json",
+        "bull-cn/test/schema.json",
+        "bull-cn/train/dataset.json",
+        "bull-cn/train/schema.json",
+        "bull-cn/database/ccks_fund.sqlite",
+        "bull-cn/database/ccks_macro.sqlite",
+        "bull-cn/database/ccks_stock.sqlite"
       ]
     },
     "bull-en": {
@@ -116,6 +202,32 @@
         "spider/test/dataset.json",
         "spider/test/schema.json",
         "spider/database/concert_singer.sqlite"
+      ]
+    },
+    "spider2": {
+      "version": "Spider 2.0 Lite complete benchmark snapshot",
+      "archive": "benchmarks/packages/spider2.zip",
+      "top_level": "spider2",
+      "source": "https://github.com/xlang-ai/Spider2",
+      "license_notice": "Spider 2.0 is released under the upstream MIT license; preserve attribution and the upstream task/data-use guidance.",
+      "sha256": "b2ce4d6bc09b246e4dc63290e8a0b25690455b41f845400c34a488724f1b1b3e",
+      "archive_size": 485830295,
+      "uncompressed_size": 2026836160,
+      "member_count": 174,
+      "allowed_suffixes": [
+        ".json",
+        ".md",
+        ".py",
+        ".sqlite"
+      ],
+      "dataset_counts": {},
+      "sqlite_count": 30,
+      "required_files": [
+        "spider2/lite/dataset.json",
+        "spider2/lite/schema.json",
+        "spider2/lite/process.py",
+        "spider2/lite/database/IPL.sqlite",
+        "spider2/lite/external/basketball.md"
       ]
     }
   }

@@ -24,14 +24,22 @@ RUNTIME_FILES = ("LICENSE", "pyproject.toml", "requirements.txt")
 SPACE_BENCHMARK_DATABASE_DIRECTORIES = (
     "benchmarks/spider/database",
     "benchmarks/bird/dev/database",
+    "benchmarks/ambidb/database",
+    "benchmarks/BookSQL/database",
+    "benchmarks/bull-cn/database",
     "benchmarks/bull-en/database",
     "benchmarks/ehrsql-2024/database",
+    "benchmarks/spider2/lite/database",
 )
 SPACE_BENCHMARK_SCHEMA_FILES = (
     "benchmarks/spider/dev/schema.json",
     "benchmarks/bird/dev/schema.json",
+    "benchmarks/ambidb/schema.json",
+    "benchmarks/BookSQL/val/schema.json",
+    "benchmarks/bull-cn/dev/schema.json",
     "benchmarks/bull-en/dev/schema.json",
     "benchmarks/ehrsql-2024/valid/schema.json",
+    "benchmarks/spider2/lite/schema.json",
 )
 SPACE_BENCHMARK_FILES = (
     *SPACE_BENCHMARK_SCHEMA_FILES,

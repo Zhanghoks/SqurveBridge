@@ -445,8 +445,12 @@ def _compute_db_size_from_schema_path(schema_path: str, db_id: Optional[str] = N
 BUILTIN_BENCHMARK_DATABASES = (
     ("spider", "benchmarks/spider/database", "benchmarks/spider/dev/schema.json"),
     ("bird", "benchmarks/bird/dev/database", "benchmarks/bird/dev/schema.json"),
+    ("ambidb", "benchmarks/ambidb/database", "benchmarks/ambidb/schema.json"),
+    ("BookSQL", "benchmarks/BookSQL/database", "benchmarks/BookSQL/val/schema.json"),
+    ("bull-cn", "benchmarks/bull-cn/database", "benchmarks/bull-cn/dev/schema.json"),
     ("bull-en", "benchmarks/bull-en/database", "benchmarks/bull-en/dev/schema.json"),
     ("ehrsql-2024", "benchmarks/ehrsql-2024/database", "benchmarks/ehrsql-2024/valid/schema.json"),
+    ("spider2", "benchmarks/spider2/lite/database", "benchmarks/spider2/lite/schema.json"),
 )
 
 

@@ -17,12 +17,11 @@ class SpaceAssetExtractionTests(unittest.TestCase):
             archives.mkdir()
             for archive_name in ARCHIVES:
                 benchmark = archive_name.removesuffix(".zip")
-                schema_split = "valid" if benchmark == "ehrsql-2024" else "dev"
                 with zipfile.ZipFile(archives / archive_name, "w") as archive:
                     archive.writestr(f"{benchmark}/database/sample.sqlite", b"SQLite format 3\x00")
-                    archive.writestr(f"{benchmark}/{schema_split}/schema.json", "[]")
-                    archive.writestr(f"{benchmark}/{schema_split}/dataset.json", "[{\"sql\": \"SELECT 1\"}]")
+                    archive.writestr(f"{benchmark}/schema.json", "[]")
+                    archive.writestr(f"{benchmark}/dataset.json", "[{\"sql\": \"SELECT 1\"}]")
 
-            self.assertEqual(extract_space_assets(archives, output), 12)
-            self.assertEqual(len(list(output.rglob("dataset.json"))), 4)
-            self.assertEqual(len(list(output.rglob("*.sqlite"))), 4)
+            self.assertEqual(extract_space_assets(archives, output), len(ARCHIVES) * 3)
+            self.assertEqual(len(list(output.rglob("dataset.json"))), len(ARCHIVES))
+            self.assertEqual(len(list(output.rglob("*.sqlite"))), len(ARCHIVES))

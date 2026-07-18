@@ -161,7 +161,7 @@ class HuggingFaceBundleTests(unittest.TestCase):
         _require_full_runtime(cls.root)
         cls._temporary_directory = tempfile.TemporaryDirectory()
         cls.output = Path(cls._temporary_directory.name) / "space"
-        cls.files = build_space(cls.root, cls.output, include_benchmarks=True)
+        cls.files = build_space(cls.root, cls.output)
         cls.staged_files = sorted(
             (path for path in cls.output.rglob("*") if path.is_file()),
             key=lambda path: path.relative_to(cls.output).as_posix(),
@@ -218,7 +218,6 @@ class HuggingFaceBundleTests(unittest.TestCase):
                 "Dockerfile",
                 "LICENSE",
                 "README.md",
-                "benchmarks",
                 "config",
                 "core",
                 "demo",
@@ -245,7 +244,7 @@ class HuggingFaceBundleTests(unittest.TestCase):
             "tmp",
             "artifacts",
             "paper",
-            "benchmarks/packages",
+            "benchmarks",
             "demo-app/node_modules",
             "demo-app/dist",
         )
@@ -271,43 +270,11 @@ class HuggingFaceBundleTests(unittest.TestCase):
                 self.assertFalse(path.name.startswith("._"))
                 self.assertNotIn(path.suffix.lower(), {".pyc", ".pyo"})
 
-    def test_bundle_preserves_every_spider_runtime_database(self) -> None:
-        source_database_root = self.root / "benchmarks" / "spider" / "database"
-        bundled_database_root = self.output / "benchmarks" / "spider" / "database"
-        source_databases = sorted(
-            path.relative_to(source_database_root).as_posix()
-            for path in source_database_root.rglob("*.sqlite")
-        )
-        bundled_databases = sorted(
-            path.relative_to(bundled_database_root).as_posix()
-            for path in bundled_database_root.rglob("*.sqlite")
-        )
-
-        self.assertGreater(len(source_databases), 0)
-        self.assertEqual(bundled_databases, source_databases)
-
-    def test_bundle_includes_all_installed_benchmark_databases_and_schemas(self) -> None:
-        for relative in SPACE_BENCHMARK_DATABASE_DIRECTORIES:
-            source_directory = self.root / relative
-            bundled_directory = self.output / relative
-            source_files = sorted(
-                path.relative_to(source_directory).as_posix()
-                for path in source_directory.rglob("*.sqlite")
-            )
-            bundled_files = sorted(
-                path.relative_to(bundled_directory).as_posix()
-                for path in bundled_directory.rglob("*.sqlite")
-            )
-            with self.subTest(relative=relative):
-                self.assertGreater(len(source_files), 0)
-                self.assertEqual(bundled_files, source_files)
-
-        for relative in SPACE_BENCHMARK_SCHEMA_FILES:
-            with self.subTest(relative=relative):
-                self.assertEqual(
-                    (self.output / relative).read_bytes(),
-                    (self.root / relative).read_bytes(),
-                )
+    def test_bundle_defers_all_benchmark_payloads_to_the_docker_lfs_build(self) -> None:
+        self.assertFalse((self.output / "benchmarks").exists())
+        dockerfile = (self.output / "Dockerfile").read_text(encoding="utf-8")
+        self.assertIn('git lfs pull --include="benchmarks/packages/*.zip"', dockerfile)
+        self.assertIn("tools/extract_space_assets.py", dockerfile)
 
     def test_manifest_is_sorted_complete_and_security_clean(self) -> None:
         staged_manifest = [

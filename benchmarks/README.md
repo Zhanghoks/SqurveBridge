@@ -1,9 +1,10 @@
 # Local benchmark assets
 
 Benchmark payloads are installed locally and are excluded from Git.  The public
-repository contains only code, registration metadata, and approved Spider/BIRD
-packages; it never contains benchmark questions, reference SQL, or unreviewed
-external databases.
+repository contains only code, registration metadata, and approved Git LFS
+benchmark packages. The packages contain the complete upstream evaluation
+payloads, including questions, labels/reference SQL, databases, and supporting
+documentation where supplied upstream.
 
 The Live Demo exposes every installed database as a read-only target:
 
@@ -11,8 +12,12 @@ The Live Demo exposes every installed database as a read-only target:
 | --- | --- | --- | --- |
 | Spider | All installed SQLite databases | `benchmarks/spider/` | Installed package |
 | BIRD | All installed SQLite databases | `benchmarks/bird/` | Installed package |
-| BULL-EN | All installed SQLite databases | `benchmarks/bull-en/` | Local reference asset |
-| EHRSQL-2024 | All installed SQLite databases | `benchmarks/ehrsql-2024/` | Local reference asset |
+| AmbiDB | All installed SQLite databases | `benchmarks/ambidb/` | Installed package |
+| BookSQL | All installed SQLite databases | `benchmarks/BookSQL/` | Installed package |
+| BULL-CN | All installed SQLite databases | `benchmarks/bull-cn/` | Installed package |
+| BULL-EN | All installed SQLite databases | `benchmarks/bull-en/` | Installed package |
+| EHRSQL-2024 | All installed SQLite databases | `benchmarks/ehrsql-2024/` | Installed package |
+| Spider 2.0 Lite | All installed SQLite databases | `benchmarks/spider2/` | Installed package |
 
 The packaged benchmark archives contain the complete evaluation payloads,
 including questions and reference SQL where supplied upstream. The Space Docker
