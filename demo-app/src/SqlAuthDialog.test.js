@@ -26,6 +26,7 @@ const providers = [
     endpoints: [
       { id: 'china', label: 'China (Beijing)' },
       { id: 'international', label: 'International (Singapore)' },
+      { id: 'china_workspace', label: 'China (Beijing) · workspace', requires_workspace: true },
     ],
   },
   { id: 'deepseek', models: ['deepseek-chat'], default_model: 'deepseek-chat' },
@@ -169,5 +170,31 @@ test('sends only an allowlisted Qwen API region identifier', async () => {
 
   const payload = JSON.parse(calls.at(-1).options.body)
   assert.equal(payload.endpoint_id, 'international')
+  assert.equal(Object.hasOwn(payload, 'base_url'), false)
+})
+
+test('sends a workspace id instead of accepting a custom Qwen base URL', async () => {
+  const SqlAuthDialog = await loadDialog()
+  const calls = []
+  const api = async (path, options = {}) => {
+    calls.push({ path, options })
+    return { status: 'ok', validated: true, provider: 'qwen', model: 'qwen-plus' }
+  }
+  const user = userEvent.setup()
+  render(React.createElement(SqlAuthDialog, {
+    open: true,
+    api,
+    status: { configured: false, providers },
+    onStatusChange: () => {},
+    onClose: () => {},
+  }))
+
+  await user.selectOptions(screen.getByLabelText('API region'), 'china_workspace')
+  await user.type(screen.getByLabelText('Workspace ID'), 'llm-valid-123')
+  await user.type(screen.getByLabelText('API key'), 'workspace-test-key')
+  await user.click(screen.getByRole('button', { name: 'Test connection' }))
+
+  const payload = JSON.parse(calls.at(-1).options.body)
+  assert.equal(payload.workspace_id, 'llm-valid-123')
   assert.equal(Object.hasOwn(payload, 'base_url'), false)
 })

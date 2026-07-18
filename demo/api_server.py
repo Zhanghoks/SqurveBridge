@@ -7,6 +7,7 @@ import ipaddress
 import json
 import os
 import re
+import signal
 import sqlite3
 import subprocess
 import sys
@@ -42,8 +43,10 @@ from reproduce.lib.env_config import (
     PROVIDER_ENV_VARS,
     api_key_ready,
     load_dotenv,
+    prepare_runtime_llm_config,
     resolve_api_key,
 )
+from reproduce.lib.paths import config_repo_path
 from tools.profile_weakness import build_weakness_json
 from tools.evidence import EvidenceError, verify_bundle
 from demo.pi_api import register_pi_routes
@@ -106,6 +109,10 @@ _provider_models = {
 _QWEN_ENDPOINTS = {
     "china": "https://dashscope.aliyuncs.com/compatible-mode/v1",
     "international": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+}
+_QWEN_WORKSPACE_REGIONS = {
+    "china_workspace": "cn-beijing",
+    "singapore_workspace": "ap-southeast-1",
 }
 
 
@@ -221,10 +228,12 @@ def _sql_provider_catalog() -> list[dict[str, object]]:
         }
         if provider == "qwen":
             item["endpoints"] = [
-                {"id": "china", "label": "China (Beijing)"},
-                {"id": "international", "label": "International (Singapore)"},
+                {"id": "china_workspace", "label": "China (Beijing) · workspace", "requires_workspace": True},
+                {"id": "singapore_workspace", "label": "Singapore · workspace", "requires_workspace": True},
+                {"id": "china", "label": "China (Beijing) · shared legacy"},
+                {"id": "international", "label": "Singapore · shared legacy"},
             ]
-            item["default_endpoint_id"] = "china"
+            item["default_endpoint_id"] = "china_workspace"
         catalog.append(item)
     return catalog
 
@@ -242,10 +251,17 @@ def _credential_from_payload(payload: dict) -> SqlCredential:
     endpoint_id = str(payload.get("endpoint_id") or "").strip()
     base_url = None
     if provider == "qwen":
-        endpoint_id = endpoint_id or "china"
-        base_url = _QWEN_ENDPOINTS.get(endpoint_id)
-        if base_url is None:
-            raise SqlAuthError("unsupported_endpoint")
+        endpoint_id = endpoint_id or "china_workspace"
+        if endpoint_id in _QWEN_WORKSPACE_REGIONS:
+            workspace_id = str(payload.get("workspace_id") or "").strip()
+            if not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", workspace_id):
+                raise SqlAuthError("unsupported_workspace")
+            region = _QWEN_WORKSPACE_REGIONS[endpoint_id]
+            base_url = f"https://{workspace_id}.{region}.maas.aliyuncs.com/compatible-mode/v1"
+        else:
+            base_url = _QWEN_ENDPOINTS.get(endpoint_id)
+            if base_url is None:
+                raise SqlAuthError("unsupported_endpoint")
     return SqlCredential(
         provider=provider,
         model=model,
@@ -284,6 +300,7 @@ def _sql_auth_error_response(error: SqlAuthError, provider: str = "provider"):
         "unsupported_provider": 400,
         "unsupported_model": 400,
         "unsupported_endpoint": 400,
+        "unsupported_workspace": 400,
         "credential_required": 400,
     }
     messages = {
@@ -292,6 +309,7 @@ def _sql_auth_error_response(error: SqlAuthError, provider: str = "provider"):
         "unsupported_provider": "The selected SQL provider is unsupported.",
         "unsupported_model": "The selected SQL model is unsupported.",
         "unsupported_endpoint": "The selected SQL provider region is unsupported.",
+        "unsupported_workspace": "A valid Alibaba Cloud Workspace ID is required for this Qwen endpoint.",
         "credential_required": "An API key is required.",
     }
     return jsonify({
@@ -1538,6 +1556,7 @@ def _spawn_evaluation_job(
                 stderr=subprocess.STDOUT,
                 env=_job_environment(job),
                 text=True,
+                start_new_session=True,
             )
         except (OSError, subprocess.SubprocessError) as exc:
             if log_handle is not None:
@@ -1726,6 +1745,27 @@ def _restore_evaluation_jobs_once() -> None:
                     _persist_job(job)
 
 
+def _evaluation_llm_preflight(dataset: str, method: str) -> None:
+    """Fail before spawn when the effective Board LLM (after SQURVE_LLM_* overrides) has no key."""
+    path = config_repo_path(dataset, method)
+    if not path.is_file():
+        raise ValueError(f"Unknown reproduce configuration: {method} / {dataset}")
+    try:
+        base = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError) as exc:
+        raise ValueError(f"Could not read reproduce configuration: {method} / {dataset}") from exc
+    if not isinstance(base, dict):
+        raise ValueError(f"Invalid reproduce configuration: {method} / {dataset}")
+    prepared = prepare_runtime_llm_config(base)
+    ready, message = api_key_ready(prepared)
+    if not ready:
+        provider = (prepared.get("llm") or {}).get("use") or "provider"
+        raise ValueError(
+            message
+            or f"{provider} is not ready. Configure the Demo LLM provider before starting a Board run."
+        )
+
+
 def _launch_evaluation(
         dataset: str,
         method: str,
@@ -1737,6 +1777,7 @@ def _launch_evaluation(
     config = next((item for item in _config_catalog() if item["dataset"] == dataset and item["method"] == method), None)
     if not config:
         raise ValueError(f"Unknown reproduce configuration: {method} / {dataset}")
+    _evaluation_llm_preflight(dataset, method)
 
     job_id = uuid.uuid4().hex[:10]
     job_dir = _run_dir / job_id
@@ -1817,6 +1858,8 @@ def start_comparison():
             _launch_evaluation(dataset, method, comparison_id, sample_limit, sample_mode, sample_seed)
             for dataset, method in normalized
         ]
+    except ValueError as exc:
+        return _json_error(str(exc))
     except RuntimeError:
         return _json_error("One or more evaluation processes could not be started.", 503)
     return jsonify({"comparison_id": comparison_id, "jobs": jobs}), 202
@@ -1899,21 +1942,66 @@ def evaluation_detail(job_id: str):
     return jsonify(_public_job(job))
 
 
+def _terminate_job_process(job: dict, process: subprocess.Popen | None) -> None:
+    """Stop an evaluation worker and its process group when possible."""
+    pid = None
+    if process is not None and process.poll() is None:
+        pid = process.pid
+        try:
+            process.terminate()
+        except OSError:
+            pass
+    elif job.get("pid") is not None:
+        try:
+            pid = int(job["pid"])
+        except (TypeError, ValueError):
+            pid = None
+        if pid is not None:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except OSError:
+                pass
+
+    if pid is not None:
+        try:
+            os.killpg(pid, signal.SIGTERM)
+        except OSError:
+            pass
+        deadline = time.time() + 2.0
+        while time.time() < deadline:
+            if not _pid_is_running(pid):
+                return
+            time.sleep(0.05)
+        try:
+            os.killpg(pid, signal.SIGKILL)
+        except OSError:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
+        if process is not None:
+            try:
+                process.kill()
+            except OSError:
+                pass
+
+
 @app.post("/api/evaluations/<job_id>/cancel")
 def cancel_evaluation(job_id: str):
     with _jobs_lock:
         job = _jobs.get(job_id)
-        process = _processes.get(job_id)
+        process = _processes.pop(job_id, None)
         if not job:
             return _json_error("Evaluation not found.", 404)
-        if job.get("status") not in {"running", "resuming"}:
+        if job.get("status") not in {"running", "resuming", "starting"}:
             return _json_error("Only a running or resuming evaluation can be cancelled.", 409)
         job["status"] = "cancelled"
         job["finished_at"] = time.time()
         _persist_job(job)
-        if process is not None:
-            process.terminate()
-        return jsonify(_public_job(dict(job)))
+        job_snapshot = dict(job)
+    _terminate_job_process(job_snapshot, process)
+    with _jobs_lock:
+        return jsonify(_public_job(dict(_jobs.get(job_id) or job_snapshot)))
 
 
 @app.post("/api/evaluations/<job_id>/profile")

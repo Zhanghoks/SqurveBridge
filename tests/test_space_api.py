@@ -44,6 +44,26 @@ class SpaceApiTests(unittest.TestCase):
         })
         self.assertEqual(china.base_url, self.api_server._QWEN_ENDPOINTS["china"])
         self.assertEqual(international.base_url, self.api_server._QWEN_ENDPOINTS["international"])
+        workspace = self.api_server._credential_from_payload({
+            "provider": "qwen",
+            "model": "qwen-plus",
+            "api_key": "test-key",
+            "endpoint_id": "china_workspace",
+            "workspace_id": "llm-valid-123",
+        })
+        self.assertEqual(
+            workspace.base_url,
+            "https://llm-valid-123.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        )
+        with self.assertRaises(self.api_server.SqlAuthError) as invalid_workspace:
+            self.api_server._credential_from_payload({
+                "provider": "qwen",
+                "model": "qwen-plus",
+                "api_key": "test-key",
+                "endpoint_id": "china_workspace",
+                "workspace_id": "../attacker",
+            })
+        self.assertEqual(invalid_workspace.exception.code, "unsupported_workspace")
         with self.assertRaises(self.api_server.SqlAuthError) as raised:
             self.api_server._credential_from_payload({
                 "provider": "qwen",
