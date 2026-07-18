@@ -7,7 +7,6 @@ import ipaddress
 import json
 import os
 import re
-import signal
 import sqlite3
 import subprocess
 import sys
@@ -43,10 +42,8 @@ from reproduce.lib.env_config import (
     PROVIDER_ENV_VARS,
     api_key_ready,
     load_dotenv,
-    prepare_runtime_llm_config,
     resolve_api_key,
 )
-from reproduce.lib.paths import config_repo_path
 from tools.profile_weakness import build_weakness_json
 from tools.evidence import EvidenceError, verify_bundle
 from demo.pi_api import register_pi_routes
@@ -1486,17 +1483,29 @@ def _artifact_comparison(
     return _comparison_payload(selected, methods)
 
 
+def _checkpoint_state_path(job: dict) -> Path:
+    run_id = f"{job['dataset']}-{job['method']}-{job['job_id']}"
+    return _project_root / "files" / "runs" / run_id / "checkpoints" / "state.json"
+
+
+def _job_has_checkpoint(job: dict) -> bool:
+    return _checkpoint_state_path(job).is_file()
+
+
+def _job_resumable(job: dict) -> bool:
+    """Mirror reproduce ``--resume``: failed/cancelled jobs with a checkpoint can continue."""
+    return job.get("status") in {"failed", "cancelled"} and _job_has_checkpoint(job)
+
+
 def _public_job(job: dict) -> dict:
-    return {key: value for key, value in job.items() if key not in {"scores_path"}}
+    public = {key: value for key, value in job.items() if key not in {"scores_path"}}
+    public["checkpoint_present"] = _job_has_checkpoint(job)
+    public["resumable"] = _job_resumable(job)
+    return public
 
 
 def _job_state_path(job_id: str) -> Path:
     return _run_dir / job_id / "job.json"
-
-
-def _checkpoint_state_path(job: dict) -> Path:
-    run_id = f"{job['dataset']}-{job['method']}-{job['job_id']}"
-    return _project_root / "files" / "runs" / run_id / "checkpoints" / "state.json"
 
 
 def _persist_job(job: dict) -> None:
@@ -1544,9 +1553,11 @@ def _spawn_evaluation_job(
         try:
             log_handle = log_path.open("a" if resume else "w", encoding="utf-8")
             if resume:
+                kind = "manual" if job.get("resume_mode") == "manual" else "autonomous"
                 log_handle.write(
-                    f"\n[demo] autonomous resume {job['resume_count']}/{_max_resume_attempts} "
-                    f"from {checkpoint_path.relative_to(_project_root)}\n"
+                    f"\n[demo] {kind} resume {job['resume_count']}/{job.get('max_resume_attempts', _max_resume_attempts)} "
+                    f"from {checkpoint_path.relative_to(_project_root)} "
+                    f"(reproduce/run.py --resume-from)\n"
                 )
                 log_handle.flush()
             process = subprocess.Popen(
@@ -1556,7 +1567,6 @@ def _spawn_evaluation_job(
                 stderr=subprocess.STDOUT,
                 env=_job_environment(job),
                 text=True,
-                start_new_session=True,
             )
         except (OSError, subprocess.SubprocessError) as exc:
             if log_handle is not None:
@@ -1745,27 +1755,6 @@ def _restore_evaluation_jobs_once() -> None:
                     _persist_job(job)
 
 
-def _evaluation_llm_preflight(dataset: str, method: str) -> None:
-    """Fail before spawn when the effective Board LLM (after SQURVE_LLM_* overrides) has no key."""
-    path = config_repo_path(dataset, method)
-    if not path.is_file():
-        raise ValueError(f"Unknown reproduce configuration: {method} / {dataset}")
-    try:
-        base = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, TypeError) as exc:
-        raise ValueError(f"Could not read reproduce configuration: {method} / {dataset}") from exc
-    if not isinstance(base, dict):
-        raise ValueError(f"Invalid reproduce configuration: {method} / {dataset}")
-    prepared = prepare_runtime_llm_config(base)
-    ready, message = api_key_ready(prepared)
-    if not ready:
-        provider = (prepared.get("llm") or {}).get("use") or "provider"
-        raise ValueError(
-            message
-            or f"{provider} is not ready. Configure the Demo LLM provider before starting a Board run."
-        )
-
-
 def _launch_evaluation(
         dataset: str,
         method: str,
@@ -1777,7 +1766,6 @@ def _launch_evaluation(
     config = next((item for item in _config_catalog() if item["dataset"] == dataset and item["method"] == method), None)
     if not config:
         raise ValueError(f"Unknown reproduce configuration: {method} / {dataset}")
-    _evaluation_llm_preflight(dataset, method)
 
     job_id = uuid.uuid4().hex[:10]
     job_dir = _run_dir / job_id
@@ -1858,8 +1846,6 @@ def start_comparison():
             _launch_evaluation(dataset, method, comparison_id, sample_limit, sample_mode, sample_seed)
             for dataset, method in normalized
         ]
-    except ValueError as exc:
-        return _json_error(str(exc))
     except RuntimeError:
         return _json_error("One or more evaluation processes could not be started.", 503)
     return jsonify({"comparison_id": comparison_id, "jobs": jobs}), 202
@@ -1942,66 +1928,60 @@ def evaluation_detail(job_id: str):
     return jsonify(_public_job(job))
 
 
-def _terminate_job_process(job: dict, process: subprocess.Popen | None) -> None:
-    """Stop an evaluation worker and its process group when possible."""
-    pid = None
-    if process is not None and process.poll() is None:
-        pid = process.pid
-        try:
-            process.terminate()
-        except OSError:
-            pass
-    elif job.get("pid") is not None:
-        try:
-            pid = int(job["pid"])
-        except (TypeError, ValueError):
-            pid = None
-        if pid is not None:
-            try:
-                os.kill(pid, signal.SIGTERM)
-            except OSError:
-                pass
-
-    if pid is not None:
-        try:
-            os.killpg(pid, signal.SIGTERM)
-        except OSError:
-            pass
-        deadline = time.time() + 2.0
-        while time.time() < deadline:
-            if not _pid_is_running(pid):
-                return
-            time.sleep(0.05)
-        try:
-            os.killpg(pid, signal.SIGKILL)
-        except OSError:
-            try:
-                os.kill(pid, signal.SIGKILL)
-            except OSError:
-                pass
-        if process is not None:
-            try:
-                process.kill()
-            except OSError:
-                pass
-
-
 @app.post("/api/evaluations/<job_id>/cancel")
 def cancel_evaluation(job_id: str):
     with _jobs_lock:
         job = _jobs.get(job_id)
-        process = _processes.pop(job_id, None)
+        process = _processes.get(job_id)
         if not job:
             return _json_error("Evaluation not found.", 404)
-        if job.get("status") not in {"running", "resuming", "starting"}:
+        if job.get("status") not in {"running", "resuming"}:
             return _json_error("Only a running or resuming evaluation can be cancelled.", 409)
         job["status"] = "cancelled"
         job["finished_at"] = time.time()
         _persist_job(job)
-        job_snapshot = dict(job)
-    _terminate_job_process(job_snapshot, process)
+        if process is not None:
+            process.terminate()
+        return jsonify(_public_job(dict(job)))
+
+
+@app.post("/api/evaluations/<job_id>/resume")
+def resume_evaluation(job_id: str):
+    """Manual resume aligned with ``python reproduce/run.py … --resume-from <checkpoint>``."""
     with _jobs_lock:
-        return jsonify(_public_job(dict(_jobs.get(job_id) or job_snapshot)))
+        job = _jobs.get(job_id)
+        if not job:
+            return _json_error("Evaluation not found.", 404)
+        if job.get("status") in {"running", "resuming", "starting"}:
+            return _json_error("Evaluation is already active.", 409)
+        if not _job_resumable(job):
+            return _json_error(
+                "Only a failed or cancelled evaluation with a checkpoint can be resumed.",
+                409,
+            )
+        dataset = str(job["dataset"])
+        method = str(job["method"])
+    try:
+        _evaluation_llm_preflight(dataset, method)
+    except ValueError as exc:
+        return _json_error(str(exc))
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if not job or not _job_resumable(job):
+            return _json_error(
+                "Only a failed or cancelled evaluation with a checkpoint can be resumed.",
+                409,
+            )
+        job["status"] = "resuming"
+        job["resume_mode"] = "manual"
+        job.pop("finished_at", None)
+        job.pop("recovery_error", None)
+        job.pop("launch_error", None)
+        _persist_job(job)
+    if not _spawn_evaluation_job(job_id, resume=True, expected_status="resuming"):
+        return _json_error("Evaluation resume could not be started.", 503)
+    with _jobs_lock:
+        return jsonify(_public_job(dict(_jobs[job_id]))), 202
 
 
 @app.post("/api/evaluations/<job_id>/profile")
