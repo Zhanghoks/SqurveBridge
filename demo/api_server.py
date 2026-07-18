@@ -31,6 +31,7 @@ from demo.gradio_demo import (
     ACTOR_BY_TYPE,
     WORKFLOW_SKELETONS,
     SqurveDemo,
+    _builtin_database_references,
     database_benchmark,
     database_schema_id,
     get_available_databases,
@@ -60,6 +61,8 @@ _pi_sessions = register_pi_routes(app, sock, _project_root)
 
 @app.before_request
 def enforce_deployment_policy():
+    if not app.testing and deployment_target() != "hf-space":
+        _restore_evaluation_jobs_once()
     if (
         request.url_rule is not None
         and request.path.startswith("/api/")
@@ -83,6 +86,10 @@ _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
 _processes: dict[str, subprocess.Popen] = {}
 _run_dir = _project_root / "tmp" / "demo-runs"
+_job_restore_lock = threading.Lock()
+_jobs_restored = False
+_max_resume_attempts = max(0, int(os.environ.get("SQURVE_EVAL_MAX_RESUMES", "2")))
+_resume_backoff_seconds = max(0.0, float(os.environ.get("SQURVE_EVAL_RESUME_BACKOFF", "2")))
 _provider_validation = {"verified": False, "error": None}
 _runtime_llm: dict[str, str | None] = {"provider": None, "model": None}
 _sql_credentials = SessionCredentialRegistry(max_sessions=128, idle_timeout=1800)
@@ -95,6 +102,10 @@ _provider_models = {
     "openai": ["gpt-4o-mini", "gpt-4.1-mini"],
     "claude": ["claude-3-5-sonnet-latest"],
     "gemini": ["gemini-2.0-flash"],
+}
+_QWEN_ENDPOINTS = {
+    "china": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "international": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
 }
 
 
@@ -156,6 +167,7 @@ def _session_demo(credential: SqlCredential) -> SqurveDemo:
         provider=credential.provider,
         model_name=credential.model,
         api_key=credential.api_key,
+        base_url=credential.base_url,
     )
 
 
@@ -200,14 +212,21 @@ def _same_origin_error():
 
 
 def _sql_provider_catalog() -> list[dict[str, object]]:
-    return [
-        {
+    catalog = []
+    for provider, models in _provider_models.items():
+        item = {
             "id": provider,
             "models": list(models),
             "default_model": models[0],
         }
-        for provider, models in _provider_models.items()
-    ]
+        if provider == "qwen":
+            item["endpoints"] = [
+                {"id": "china", "label": "China (Beijing)"},
+                {"id": "international", "label": "International (Singapore)"},
+            ]
+            item["default_endpoint_id"] = "china"
+        catalog.append(item)
+    return catalog
 
 
 def _credential_from_payload(payload: dict) -> SqlCredential:
@@ -220,7 +239,20 @@ def _credential_from_payload(payload: dict) -> SqlCredential:
         raise SqlAuthError("unsupported_model")
     if not isinstance(api_key, str) or not api_key.strip():
         raise SqlAuthError("credential_required")
-    return SqlCredential(provider=provider, model=model, api_key=api_key.strip())
+    endpoint_id = str(payload.get("endpoint_id") or "").strip()
+    base_url = None
+    if provider == "qwen":
+        endpoint_id = endpoint_id or "china"
+        base_url = _QWEN_ENDPOINTS.get(endpoint_id)
+        if base_url is None:
+            raise SqlAuthError("unsupported_endpoint")
+    return SqlCredential(
+        provider=provider,
+        model=model,
+        api_key=api_key.strip(),
+        endpoint_id=endpoint_id,
+        base_url=base_url,
+    )
 
 
 def _validate_sql_credential(credential: SqlCredential) -> None:
@@ -236,7 +268,10 @@ def _validate_sql_credential(credential: SqlCredential) -> None:
     except Exception as exc:
         message = str(exc).lower()
         status_code = getattr(exc, "status_code", None)
-        if status_code in {401, 403} or any(token in message for token in ("401", "403", "invalid api key", "incorrect api key")):
+        if status_code in {401, 403} or any(
+            token in message
+            for token in ("401", "403", "invalid_api_key", "invalid api key", "incorrect api key")
+        ):
             raise SqlAuthError("credential_rejected") from None
         raise SqlAuthError("provider_unreachable") from None
 
@@ -248,6 +283,7 @@ def _sql_auth_error_response(error: SqlAuthError, provider: str = "provider"):
         "origin_forbidden": 403,
         "unsupported_provider": 400,
         "unsupported_model": 400,
+        "unsupported_endpoint": 400,
         "credential_required": 400,
     }
     messages = {
@@ -255,6 +291,7 @@ def _sql_auth_error_response(error: SqlAuthError, provider: str = "provider"):
         "provider_unreachable": f"The {provider} provider could not be reached.",
         "unsupported_provider": "The selected SQL provider is unsupported.",
         "unsupported_model": "The selected SQL model is unsupported.",
+        "unsupported_endpoint": "The selected SQL provider region is unsupported.",
         "credential_required": "An API key is required.",
     }
     return jsonify({
@@ -264,33 +301,82 @@ def _sql_auth_error_response(error: SqlAuthError, provider: str = "provider"):
     }), statuses.get(error.code, 400)
 
 
+_DATABASE_RECORDS_LOCK = threading.Lock()
+_DATABASE_RECORDS_CACHE: tuple[tuple[tuple[str, str, str], ...], list[dict]] | None = None
+
+
+def _load_schema_document(schema_path: str, schema_cache: dict[str, object]) -> object | None:
+    if schema_path in schema_cache:
+        return schema_cache[schema_path]
+    try:
+        document = json.loads(Path(schema_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        document = None
+    schema_cache[schema_path] = document
+    return document
+
+
+def _tables_from_schema_document(document: object, db_path: str) -> list:
+    if document is None:
+        return []
+    schemas = document if isinstance(document, list) else [document]
+    item = next(
+        (
+            candidate
+            for candidate in schemas
+            if isinstance(candidate, dict) and candidate.get("db_id") == database_schema_id(db_path)
+        ),
+        schemas[0] if schemas and isinstance(schemas[0], dict) else None,
+    )
+    if not isinstance(item, dict):
+        return []
+    # Listing must stay cheap: never rewrite schemas or open SQLite here.
+    if len(item.get("column_names_original", [])) != len(item.get("column_types", [])):
+        return item.get("table_names_original") or item.get("table_names") or []
+    return item.get("table_names_original") or item.get("table_names") or []
+
+
 def _database_records() -> list[dict]:
+    global _DATABASE_RECORDS_CACHE
+    available = tuple(get_available_databases())
+    with _DATABASE_RECORDS_LOCK:
+        if _DATABASE_RECORDS_CACHE is not None and _DATABASE_RECORDS_CACHE[0] == available:
+            return _DATABASE_RECORDS_CACHE[1]
+
+    schema_cache: dict[str, object] = {}
+    # Avoid O(n^2) rebuilds of the builtin catalog via database_benchmark().
+    benchmark_by_id = {
+        reference_id: benchmark
+        for reference_id, benchmark, _db_path, _schema_path in _builtin_database_references()
+    }
     records = []
-    for db_id, db_path, schema_path in get_available_databases():
-        tables = []
+    for db_id, db_path, schema_path in available:
+        tables = _tables_from_schema_document(
+            _load_schema_document(schema_path, schema_cache),
+            db_path,
+        )
         try:
-            schema_file = Path(schema_path)
-            schema = json.loads(schema_file.read_text(encoding="utf-8"))
-            schemas = schema if isinstance(schema, list) else [schema]
-            item = next(
-                (candidate for candidate in schemas if candidate.get("db_id") == database_schema_id(db_path)),
-                schemas[0],
-            )
-            if len(item.get("column_names_original", [])) != len(item.get("column_types", [])):
-                item = sqlite_to_schema(db_path, db_id=database_schema_id(db_path))
-                schema_file.write_text(json.dumps([item], ensure_ascii=False, indent=2), encoding="utf-8")
-            tables = item.get("table_names_original") or item.get("table_names") or []
-        except (OSError, ValueError, TypeError):
-            pass
+            size_bytes = Path(db_path).stat().st_size
+        except OSError:
+            size_bytes = 0
         records.append({
             "id": db_id,
             "db_path": db_path,
             "schema_path": schema_path,
             "tables": tables,
-            "size_bytes": Path(db_path).stat().st_size if Path(db_path).exists() else 0,
-            "benchmark": database_benchmark(db_id),
+            "size_bytes": size_bytes,
+            "benchmark": benchmark_by_id.get(db_id) or database_benchmark(db_id),
         })
+
+    with _DATABASE_RECORDS_LOCK:
+        _DATABASE_RECORDS_CACHE = (available, records)
     return records
+
+
+def invalidate_database_records_cache() -> None:
+    global _DATABASE_RECORDS_CACHE
+    with _DATABASE_RECORDS_LOCK:
+        _DATABASE_RECORDS_CACHE = None
 
 
 def _find_database(db_id: str) -> dict | None:
@@ -597,6 +683,8 @@ def update_provider():
         status = _apply_provider_config(provider, model, api_key=api_key, persist=persist)
     except ValueError as exc:
         return _json_error(str(exc))
+    except RuntimeError:
+        return _json_error("Evaluation process could not be started.", 503)
     return jsonify({"status": "ok", "provider": status, "llm_providers": _llm_provider_catalog()})
 
 
@@ -648,6 +736,7 @@ def upload_database():
             storage.save(path)
             paths.append(path)
         result = process_uploaded_files(paths, get_uploaded_db_root())
+    invalidate_database_records_cache()
     return jsonify({"status": "success", "database": _find_database(result["db_id"])})
 
 
@@ -714,11 +803,21 @@ def query():
                 token in message.lower() for token in ("invalid_api_key", "incorrect api key", "401", "403")
             ) else "provider_unreachable"
             return _sql_auth_error_response(SqlAuthError(code), provider)
-        if "invalid_api_key" in message or "Incorrect API key" in message or "401" in message:
+        safe_message = _sanitize_error_message(
+            message,
+            fallback=f"The configured {provider} provider request failed.",
+        )
+        if any(token in message.lower() for token in ("invalid_api_key", "incorrect api key", "invalid api key", "401", "403")):
             _provider_validation.update(
                 verified=False,
                 error=f"The configured {provider} API key was rejected.",
             )
+            safe_message = f"The configured {provider} API key was rejected."
+        result = {
+            "status": "error",
+            "sql": "",
+            "message": safe_message,
+        }
     status = 200 if result.get("status") == "success" else 422
     return jsonify(result), status
 
@@ -907,12 +1006,31 @@ _FORBIDDEN_COMPARISON_KEY_MARKERS = {
 }
 _PRIVATE_VALUE_PATTERNS = (
     re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+"),
-    re.compile(r"(?i)\b(?:api[_-]?key|token|secret|authorization)\s*[:=]\s*\S+"),
-    re.compile(r"(?i)\b(?:sk|hf_|ghp_|github_pat_|xox[baprs]-)[A-Za-z0-9._-]{6,}"),
+    re.compile(r"(?i)\b(?:api[_-]?key|access_token|auth_token|secret_key|client_secret|password|token|secret|authorization)\s*[:=]\s*\S+"),
+    re.compile(r"(?i)\bapi[\s_-]*key\s*[:=]\s*\S+"),
+    re.compile(r"(?i)\b(?:sk[_-]?live[_-]?|sk[_-]?test[_-]?|sk|hf_|ghp_|github_pat_|xox[baprs]-|AIza)[A-Za-z0-9._-]{6,}"),
     re.compile(r"(?i)\b(?:https?|wss?)://[^\s]+"),
     re.compile(r"(?<![\w.])/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+"),
     re.compile(r"(?i)\b[A-Z]:\\(?:[^\\\s]+\\)*[^\\\s]+"),
 )
+_ERROR_SECRET_PATTERNS = (
+    re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+"),
+    re.compile(r"(?i)\b(?:api[_-]?key|access_token|auth_token|secret_key|client_secret|password|token|secret|authorization)\s*[:=]\s*\S+"),
+    re.compile(r"(?i)\bapi[\s_-]*key\s*[:=]\s*\S+"),
+    re.compile(r"(?i)\b(?:sk[_-]?live[_-]?|sk[_-]?test[_-]?|sk|hf_|ghp_|github_pat_|xox[baprs]-|AIza)[A-Za-z0-9._-]{6,}"),
+)
+
+
+def _sanitize_error_message(message: object, *, fallback: str = "The provider request failed.") -> str:
+    text = str(message or "")
+    lowered = text.lower()
+    if any(token in lowered for token in ("invalid_api_key", "incorrect api key", "invalid api key")):
+        return "The configured API key was rejected."
+    sanitized = text
+    for pattern in _PRIVATE_VALUE_PATTERNS:
+        sanitized = pattern.sub("[redacted]", sanitized)
+    sanitized = sanitized.strip()
+    return sanitized[:240] if sanitized else fallback
 _PUBLIC_IDENTIFIER = re.compile(r"^[A-Za-z0-9_.:@+-]{1,160}$")
 _PUBLIC_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}(?:[T ][0-9:.+-]+Z?)?$")
 _PUBLIC_ARTIFACT_REF = re.compile(r"^(?:session:)?[A-Za-z0-9_.:@+-]+(?:/[A-Za-z0-9_.@+-]+)*$")
@@ -1354,6 +1472,174 @@ def _public_job(job: dict) -> dict:
     return {key: value for key, value in job.items() if key not in {"scores_path"}}
 
 
+def _job_state_path(job_id: str) -> Path:
+    return _run_dir / job_id / "job.json"
+
+
+def _checkpoint_state_path(job: dict) -> Path:
+    run_id = f"{job['dataset']}-{job['method']}-{job['job_id']}"
+    return _project_root / "files" / "runs" / run_id / "checkpoints" / "state.json"
+
+
+def _persist_job(job: dict) -> None:
+    path = _job_state_path(job["job_id"])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(job, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.replace(path)
+
+
+def _job_environment(job: dict) -> dict[str, str]:
+    score_dir = _run_dir / job["job_id"] / "score-bundle"
+    child_env = os.environ.copy()
+    child_env["SQURVE_EVAL_OUTPUT_DIR"] = str(score_dir)
+    child_env["SQURVE_EVAL_RUN_ID"] = f"{job['dataset']}-{job['method']}-{job['job_id']}"
+    child_env["SQURVE_EVAL_SAMPLE_LIMIT"] = str(job["sample_limit"])
+    child_env["SQURVE_EVAL_SAMPLE_MODE"] = job["sample_mode"]
+    child_env["SQURVE_EVAL_SAMPLE_SEED"] = str(job["sample_seed"])
+    child_env["SQURVE_EVAL_SCOPE"] = "smoke"
+    return child_env
+
+
+def _spawn_evaluation_job(
+    job_id: str,
+    *,
+    resume: bool,
+    expected_status: str,
+) -> bool:
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if not job or job.get("status") != expected_status:
+            return False
+        job_dir = _run_dir / job_id
+        log_path = job_dir / "run.log"
+        scores_path = job_dir / "score-bundle" / "scores.json"
+        checkpoint_path = _checkpoint_state_path(job)
+        python = _project_root / ".venv" / "bin" / "python"
+        executable = str(python if python.exists() else Path(sys.executable))
+        command = [executable, "reproduce/run.py", job["dataset"], job["method"]]
+        if resume:
+            command.extend(["--resume-from", str(checkpoint_path)])
+            job["resume_count"] = int(job.get("resume_count", 0)) + 1
+            job["resumed_at"] = time.time()
+        log_handle = None
+        try:
+            log_handle = log_path.open("a" if resume else "w", encoding="utf-8")
+            if resume:
+                log_handle.write(
+                    f"\n[demo] autonomous resume {job['resume_count']}/{_max_resume_attempts} "
+                    f"from {checkpoint_path.relative_to(_project_root)}\n"
+                )
+                log_handle.flush()
+            process = subprocess.Popen(
+                command,
+                cwd=_project_root,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                env=_job_environment(job),
+                text=True,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            if log_handle is not None:
+                log_handle.close()
+            job.update({
+                "status": "failed",
+                "finished_at": time.time(),
+                "launch_error": f"Evaluation process could not be started: {type(exc).__name__}",
+            })
+            _persist_job(job)
+            return False
+        job.update({"status": "running", "pid": process.pid, "return_code": None})
+        job.pop("finished_at", None)
+        _processes[job_id] = process
+        _persist_job(job)
+    threading.Thread(
+        target=_monitor_job,
+        args=(job_id, process, log_handle, scores_path),
+        daemon=True,
+    ).start()
+    return True
+
+
+def _resume_job_after_backoff(job_id: str) -> None:
+    if _resume_backoff_seconds:
+        time.sleep(_resume_backoff_seconds)
+    _spawn_evaluation_job(job_id, resume=True, expected_status="resuming")
+
+
+def _pid_is_running(pid) -> bool:
+    try:
+        os.kill(int(pid), 0)
+    except (OSError, TypeError, ValueError):
+        return False
+    return True
+
+
+def _pid_matches_job(pid, job: dict) -> bool:
+    """Confirm a restored PID still belongs to this evaluation command."""
+    if not _pid_is_running(pid):
+        return False
+    try:
+        command_path = Path(f"/proc/{int(pid)}/cmdline")
+        if command_path.is_file():
+            command = command_path.read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")
+        else:
+            result = subprocess.run(
+                ["ps", "-o", "command=", "-p", str(int(pid))],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            command = result.stdout
+    except (OSError, subprocess.SubprocessError, TypeError, ValueError):
+        return False
+    expected = ("reproduce/run.py", str(job.get("dataset", "")), str(job.get("method", "")))
+    return all(token and token in command for token in expected)
+
+
+def _watch_restored_process(job_id: str, pid: int) -> None:
+    while True:
+        with _jobs_lock:
+            job = _jobs.get(job_id)
+            if not job or job.get("status") != "running" or job.get("pid") != pid:
+                return
+            job_snapshot = dict(job)
+        matches = _pid_matches_job(pid, job_snapshot)
+        if not matches:
+            break
+        time.sleep(1)
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if not job or job.get("status") != "running" or job.get("pid") != pid:
+            return
+        scores_path = _run_dir / job_id / "score-bundle" / "scores.json"
+        if scores_path.is_file():
+            job["status"] = "completed"
+            job["scores_path"] = str(scores_path)
+            job["result"] = _summarize_scores(scores_path)
+            job["run_id"] = job["result"].get("run_id")
+            job["finished_at"] = time.time()
+            _persist_job(job)
+            return
+        if (
+            _checkpoint_state_path(job).is_file()
+            and int(job.get("resume_count", 0)) < _max_resume_attempts
+        ):
+            job["status"] = "resuming"
+            job["next_resume_at"] = time.time() + _resume_backoff_seconds
+            _persist_job(job)
+            should_resume = True
+        else:
+            job["status"] = "failed"
+            job["finished_at"] = time.time()
+            job["recovery_error"] = "The restored evaluation exited without a score bundle."
+            _persist_job(job)
+            should_resume = False
+    if should_resume:
+        _resume_job_after_backoff(job_id)
+
+
 @app.get("/api/session")
 def session_state():
     with _jobs_lock:
@@ -1365,17 +1651,79 @@ def session_state():
 def _monitor_job(job_id: str, process: subprocess.Popen, log_handle, scores_path: Path):
     return_code = process.wait()
     log_handle.close()
+    should_resume = False
     with _jobs_lock:
         job = _jobs[job_id]
-        if job.get("status") != "cancelled":
+        checkpoint_path = _checkpoint_state_path(job)
+        can_resume = (
+            job.get("status") != "cancelled"
+            and return_code != 0
+            and checkpoint_path.is_file()
+            and int(job.get("resume_count", 0)) < _max_resume_attempts
+        )
+        if can_resume:
+            job["status"] = "resuming"
+            job["last_return_code"] = return_code
+            job["next_resume_at"] = time.time() + _resume_backoff_seconds
+            should_resume = True
+        elif job.get("status") != "cancelled":
             job["status"] = "completed" if return_code == 0 and scores_path.exists() else "failed"
         job["return_code"] = return_code
-        job["finished_at"] = time.time()
+        if not should_resume:
+            job["finished_at"] = time.time()
         if scores_path.exists():
             job["scores_path"] = str(scores_path)
             job["result"] = _summarize_scores(scores_path)
             job["run_id"] = job["result"].get("run_id")
         _processes.pop(job_id, None)
+        _persist_job(job)
+    if should_resume:
+        threading.Thread(target=_resume_job_after_backoff, args=(job_id,), daemon=True).start()
+
+
+def _restore_evaluation_jobs_once() -> None:
+    global _jobs_restored
+    if _jobs_restored:
+        return
+    with _job_restore_lock:
+        if _jobs_restored:
+            return
+        _jobs_restored = True
+        for path in sorted(_run_dir.glob("*/job.json")):
+            try:
+                job = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError, TypeError):
+                continue
+            if not isinstance(job, dict) or not job.get("job_id"):
+                continue
+            with _jobs_lock:
+                _jobs[job["job_id"]] = job
+            if (
+                job.get("status") in {"running", "resuming"}
+                and _pid_matches_job(job.get("pid"), job)
+            ):
+                job["status"] = "running"
+                threading.Thread(
+                    target=_watch_restored_process,
+                    args=(job["job_id"], int(job["pid"])),
+                    daemon=True,
+                ).start()
+            elif (
+                job.get("status") in {"running", "resuming"}
+                and _checkpoint_state_path(job).is_file()
+                and int(job.get("resume_count", 0)) < _max_resume_attempts
+            ):
+                with _jobs_lock:
+                    job["status"] = "resuming"
+                    job["next_resume_at"] = time.time()
+                    _persist_job(job)
+                threading.Thread(target=_resume_job_after_backoff, args=(job["job_id"],), daemon=True).start()
+            elif job.get("status") in {"running", "resuming"}:
+                with _jobs_lock:
+                    job["status"] = "failed"
+                    job["finished_at"] = time.time()
+                    job["recovery_error"] = "No resumable checkpoint was found after API restart."
+                    _persist_job(job)
 
 
 def _launch_evaluation(
@@ -1393,27 +1741,6 @@ def _launch_evaluation(
     job_id = uuid.uuid4().hex[:10]
     job_dir = _run_dir / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
-    log_path = job_dir / "run.log"
-    score_dir = job_dir / "score-bundle"
-    scores_path = score_dir / "scores.json"
-    python = _project_root / ".venv" / "bin" / "python"
-    executable = str(python if python.exists() else Path(sys.executable))
-    log_handle = log_path.open("w", encoding="utf-8")
-    child_env = os.environ.copy()
-    child_env["SQURVE_EVAL_OUTPUT_DIR"] = str(score_dir)
-    child_env["SQURVE_EVAL_RUN_ID"] = f"{dataset}-{method}-{job_id}"
-    child_env["SQURVE_EVAL_SAMPLE_LIMIT"] = str(sample_limit)
-    child_env["SQURVE_EVAL_SAMPLE_MODE"] = sample_mode
-    child_env["SQURVE_EVAL_SAMPLE_SEED"] = str(sample_seed)
-    child_env["SQURVE_EVAL_SCOPE"] = "smoke"
-    process = subprocess.Popen(
-        [executable, "reproduce/run.py", dataset, method],
-        cwd=_project_root,
-        stdout=log_handle,
-        stderr=subprocess.STDOUT,
-        env=child_env,
-        text=True,
-    )
     job = {
         "job_id": job_id,
         "dataset": dataset,
@@ -1423,17 +1750,21 @@ def _launch_evaluation(
         "sample_limit": sample_limit,
         "sample_mode": sample_mode,
         "sample_seed": sample_seed,
-        "status": "running",
-        "pid": process.pid,
-        "log_path": str(log_path.relative_to(_project_root)),
+        "status": "starting",
+        "pid": None,
+        "log_path": str((job_dir / "run.log").relative_to(_project_root)),
         "started_at": time.time(),
         "run_id": None,
+        "resume_count": 0,
+        "max_resume_attempts": _max_resume_attempts,
     }
     with _jobs_lock:
         _jobs[job_id] = job
-        _processes[job_id] = process
-    threading.Thread(target=_monitor_job, args=(job_id, process, log_handle, scores_path), daemon=True).start()
-    return _public_job(job)
+        _persist_job(job)
+    if not _spawn_evaluation_job(job_id, resume=False, expected_status="starting"):
+        raise RuntimeError("Evaluation launch was cancelled before the process started.")
+    with _jobs_lock:
+        return _public_job(dict(_jobs[job_id]))
 
 
 @app.post("/api/evaluations")
@@ -1481,10 +1812,13 @@ def start_comparison():
     if len(normalized) < 2:
         return _json_error("A comparison requires at least two distinct configurations.")
     comparison_id = uuid.uuid4().hex[:8]
-    jobs = [
-        _launch_evaluation(dataset, method, comparison_id, sample_limit, sample_mode, sample_seed)
-        for dataset, method in normalized
-    ]
+    try:
+        jobs = [
+            _launch_evaluation(dataset, method, comparison_id, sample_limit, sample_mode, sample_seed)
+            for dataset, method in normalized
+        ]
+    except RuntimeError:
+        return _json_error("One or more evaluation processes could not be started.", 503)
     return jsonify({"comparison_id": comparison_id, "jobs": jobs}), 202
 
 
@@ -1572,11 +1906,13 @@ def cancel_evaluation(job_id: str):
         process = _processes.get(job_id)
         if not job:
             return _json_error("Evaluation not found.", 404)
-        if job.get("status") != "running" or process is None:
-            return _json_error("Only a running evaluation can be cancelled.", 409)
+        if job.get("status") not in {"running", "resuming"}:
+            return _json_error("Only a running or resuming evaluation can be cancelled.", 409)
         job["status"] = "cancelled"
         job["finished_at"] = time.time()
-        process.terminate()
+        _persist_job(job)
+        if process is not None:
+            process.terminate()
         return jsonify(_public_job(dict(job)))
 
 

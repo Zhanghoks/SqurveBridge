@@ -3,6 +3,8 @@ set -euo pipefail
 
 export SQURVE_DEPLOYMENT_TARGET=hf-space
 
+python demo/runtime_check.py
+
 exec gunicorn \
   --bind 0.0.0.0:7860 \
   --workers 1 \

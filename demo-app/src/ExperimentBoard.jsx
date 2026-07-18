@@ -599,7 +599,7 @@ function FormalSql({ runs }) {
           <thead>
             <tr>
               <th>SQL feature</th>
-              {runs.map(run => <th key={run.run_id}>{run.method}<small>count · EX · SF1</small></th>)}
+              {runs.map(run => <th key={run.run_id || run.method}>{run.method}<small>count · EX · SF1</small></th>)}
             </tr>
           </thead>
           <tbody>
@@ -608,7 +608,7 @@ function FormalSql({ runs }) {
                 <th>{feature}</th>
                 {runs.map(run => {
                   const value = run.by_sql_feature?.[feature]
-                  return <td key={run.run_id}>{value?.count || 0} · {percent(value?.ex)} · {percent(value?.sf1)}</td>
+                  return <td key={run.run_id || run.method}>{value?.count || 0} · {percent(value?.ex)} · {percent(value?.sf1)}</td>
                 })}
               </tr>
             ))}
@@ -617,7 +617,7 @@ function FormalSql({ runs }) {
       </div>
       <div className="qvt-grid">
         {runs.map(run => (
-          <section key={run.run_id}>
+          <section key={run.run_id || run.method}>
             <h3>{run.method} QVT consistency</h3>
             {run.qvt?.eligible_groups ? (
               <dl>
@@ -653,7 +653,7 @@ function FormalRuntime({ runs }) {
           </thead>
           <tbody>
             {runs.map(run => (
-              <tr key={run.run_id}>
+              <tr key={run.run_id || run.method}>
                 <th>{run.method}</th>
                 <td>{compactNumber(run.token?.avg_per_sample)}</td>
                 <td>{compactNumber(run.token?.total_prompt_tokens)}</td>
@@ -668,7 +668,7 @@ function FormalRuntime({ runs }) {
       </div>
       <div className="runtime-grid">
         {runs.map(run => (
-          <section key={run.run_id}>
+          <section key={run.run_id || run.method}>
             <h3>{run.method} token and stage latency</h3>
             <div className="runtime-rows">
               {Object.entries(run.token?.by_step || {}).map(([name, value]) => (
@@ -686,14 +686,14 @@ function FormalRuntime({ runs }) {
           <thead>
             <tr>
               <th>Error root</th>
-              {runs.map(run => <th key={run.run_id}>{run.method}</th>)}
+              {runs.map(run => <th key={run.run_id || run.method}>{run.method}</th>)}
             </tr>
           </thead>
           <tbody>
             {errorNames.length ? errorNames.map(name => (
               <tr key={name}>
                 <th>{name.replaceAll('_', ' ')}</th>
-                {runs.map(run => <td key={run.run_id}>{run.errors?.[name]?.count || 0} · {percent(run.errors?.[name]?.pct)}</td>)}
+                {runs.map(run => <td key={run.run_id || run.method}>{run.errors?.[name]?.count || 0} · {percent(run.errors?.[name]?.pct)}</td>)}
               </tr>
             )) : (
               <tr><td colSpan={runs.length + 1}>No classified execution failures</td></tr>
@@ -870,6 +870,15 @@ export default function ExperimentBoard({
   Status,
   PageHeading,
   Empty,
+  viewOnly = false,
+  initialDataset,
+  initialMethods,
+  initialSplit,
+  initialSampleLimit,
+  initialSampleMode,
+  initialSampleSeed,
+  archiveRunId = '',
+  embedded = false,
 }) {
   const configs = capabilities?.reproduce_configs || []
   const benchmarks = useMemo(() => {
@@ -888,18 +897,38 @@ export default function ExperimentBoard({
     }))
   }, [capabilities, configs])
 
-  const [dataset, setDataset] = useState('spider')
-  const [split, setSplit] = useState('dev')
-  const [methods, setMethods] = useState(['c3sql'])
-  const [sampleLimit, setSampleLimit] = useState(100)
-  const [sampleMode, setSampleMode] = useState('random')
-  const [sampleSeed, setSampleSeed] = useState(42)
+  const [dataset, setDataset] = useState(initialDataset || 'spider')
+  const [split, setSplit] = useState(initialSplit || 'dev')
+  const [methods, setMethods] = useState(initialMethods?.length ? initialMethods : ['c3sql'])
+  const [sampleLimit, setSampleLimit] = useState(initialSampleLimit ?? 100)
+  const [sampleMode, setSampleMode] = useState(initialSampleMode || 'random')
+  const [sampleSeed, setSampleSeed] = useState(initialSampleSeed ?? 42)
   const [payload, setPayload] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [running, setRunning] = useState(false)
   const [comparisonId, setComparisonId] = useState('')
   const [section, setSection] = useState('compare')
+
+  useEffect(() => {
+    if (initialDataset) setDataset(initialDataset)
+  }, [initialDataset])
+
+  useEffect(() => {
+    if (initialMethods?.length) setMethods(initialMethods)
+  }, [(initialMethods || []).join('|')])
+
+  useEffect(() => {
+    if (initialSampleLimit != null) setSampleLimit(initialSampleLimit)
+  }, [initialSampleLimit])
+
+  useEffect(() => {
+    if (initialSampleMode) setSampleMode(initialSampleMode)
+  }, [initialSampleMode])
+
+  useEffect(() => {
+    if (initialSampleSeed != null) setSampleSeed(initialSampleSeed)
+  }, [initialSampleSeed])
 
   const datasetMethods = useMemo(
     () => [...new Set(configs.filter(item => item.dataset === dataset).map(item => item.method))].sort(),
@@ -929,10 +958,46 @@ export default function ExperimentBoard({
   }, [dataset, datasetMethods.join('|')])
 
   const load = async () => {
-    if (methods.length < 1) return
+    if (methods.length < 1 && !archiveRunId) return
     setBusy(true)
     setError('')
     try {
+      if (archiveRunId) {
+        const detail = await api(`/api/archive/${encodeURIComponent(archiveRunId)}`)
+        const scoresFile = detail?.files?.find(item => item.name === 'scores.json')
+        const hosted = capabilities?.deployment?.target === 'hf-space'
+        let scores = detail?.scores || (hosted ? {
+          method: detail?.method,
+          dataset: detail?.dataset,
+          split: detail?.split,
+          sample_count: detail?.sample_count,
+          aggregate: detail?.metrics || {},
+        } : null)
+        if (!hosted && !scores && scoresFile) {
+          const file = await api(`/api/archive/${encodeURIComponent(archiveRunId)}/files/${scoresFile.path}`)
+          scores = file?.json || null
+        }
+        if (scores) {
+          setPayload({
+            runs: [{
+              ...scores,
+              run_id: detail.run_id || archiveRunId,
+              method: detail.method || scores.method,
+              dataset: detail.dataset || scores.dataset,
+              split: detail.split || scores.split,
+              sample_count: detail.sample_count ?? scores.sample_count,
+              aggregate: scores.aggregate || detail.metrics,
+              evidence_origin: 'historical-archive',
+              source: detail.source,
+            }],
+            sample_alignment: { aligned: false },
+          })
+        } else {
+          setPayload({ runs: [], sample_alignment: { aligned: false } })
+          setError('This archive run does not include a scores.json bundle.')
+        }
+        return
+      }
       const params = new URLSearchParams({
         dataset,
         split,
@@ -953,7 +1018,7 @@ export default function ExperimentBoard({
     }
   }
 
-  useEffect(() => { load() }, [dataset, split, methods.join(','), sampleMode, sampleLimit, sampleSeed, comparisonId])
+  useEffect(() => { load() }, [dataset, split, methods.join(','), sampleMode, sampleLimit, sampleSeed, comparisonId, archiveRunId])
 
   const toggleMethod = method => {
     setMethods(current => {
@@ -997,18 +1062,18 @@ export default function ExperimentBoard({
   ]
 
   return (
-    <div className="workspace board-workspace">
-      <PageHeading
+    <div className={`workspace board-workspace${embedded ? ' board-workspace-embedded' : ''}`}>
+      {!embedded && <PageHeading
         eyebrow="Experiment board"
         title="Method comparison"
         status={<Status tone={alignment?.aligned ? 'success' : runs.length ? 'warning' : 'neutral'}>{alignment?.aligned ? `${alignment.sample_count} samples aligned` : runs.length ? `${runs.length} methods loaded` : 'awaiting artifacts'}</Status>}
-      />
+      />}
 
-      <section className="tool-panel board-controls">
+      {!archiveRunId && <section className="tool-panel board-controls">
         <div className="panel-title">
           <div>
-            <span>Comparison setup</span>
-            <small>One dataset · multiple methods · shared sample protocol</small>
+            <span>{viewOnly ? 'Visualization focus' : 'Comparison setup'}</span>
+            <small>{viewOnly ? 'Browse evaluation and generated-data charts' : 'One dataset · multiple methods · shared sample protocol'}</small>
           </div>
           <Status tone={busy ? 'running' : 'neutral'}>{busy ? 'loading' : context}</Status>
         </div>
@@ -1066,19 +1131,27 @@ export default function ExperimentBoard({
 
           <div className="board-actions">
             <button className="button secondary compact" disabled={busy} onClick={load}>{busy ? 'Refreshing…' : 'Refresh artifacts'}</button>
-            <HostedEvaluationControls enabled={liveEvaluation}>
+            {!viewOnly && <HostedEvaluationControls enabled={liveEvaluation}>
               <button className="button primary compact" disabled={running || runnablePairs.length < 2} onClick={runComparison}>
                 {running ? 'Starting evaluation…' : `Run ${runnablePairs.length} methods on ${dataset}`}
               </button>
-            </HostedEvaluationControls>
+            </HostedEvaluationControls>}
           </div>
         </div>
         {error && <p className="error-banner">{error}</p>}
-      </section>
+      </section>}
+
+      {archiveRunId && error && <p className="error-banner">{error}</p>}
+      {archiveRunId && <div className="archive-focus-banner"><Status tone="success">Archive run · {archiveRunId}</Status></div>}
 
       {!runs.length ? (
         <section className="tool-panel board-empty">
-          <Empty title="No aligned score bundle for this selection" detail="Pick methods with matching artifacts, or run a fresh multi-method evaluation." />
+          <Empty
+            title={viewOnly ? 'No evaluation charts yet' : 'No aligned score bundle for this selection'}
+            detail={viewOnly
+              ? 'Run evaluations on Board, or open a score bundle from Archive.'
+              : 'Pick methods with matching artifacts, or run a fresh multi-method evaluation.'}
+          />
         </section>
       ) : (
         <div className="board-body">

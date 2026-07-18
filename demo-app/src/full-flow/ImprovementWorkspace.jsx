@@ -31,7 +31,7 @@ function Provenance({ run, t }) {
   </aside>
 }
 
-export default function ImprovementWorkspace({ evidence, t }) {
+export default function ImprovementWorkspace({ evidence, t, compact = false }) {
   const selectedRun = evidence?.selectedRun
   const weakness = selectedRun?.weakness ?? selectedRun?.weakness_profile
   const evolution = selectedRun?.evolution ?? selectedRun?.evolution_record
@@ -45,11 +45,12 @@ export default function ImprovementWorkspace({ evidence, t }) {
     }))
     .filter(record => isRecorded(record.value))
 
-  return <section id="improve" className="flow-module flow-glass improvement-workspace">
-    <header className="flow-module-header">
+  const Shell = compact ? 'div' : 'section'
+  return <Shell id={compact ? undefined : 'improve'} className={compact ? 'board-section improvement-workspace' : 'flow-module flow-glass improvement-workspace'}>
+    <header className={compact ? 'board-section-header' : 'flow-module-header'}>
       <div>
-        <span>{t('process.improve')}</span>
-        <h2>{t('improve.title')}</h2>
+        {!compact && <span>{t('process.improve')}</span>}
+        {compact ? <h3>{t('board.evolveSection')}</h3> : <h2>{t('improve.title')}</h2>}
       </div>
     </header>
     {evidence?.loading
@@ -64,5 +65,5 @@ export default function ImprovementWorkspace({ evidence, t }) {
               <RecordedValue value={record.value} />
             </li>)}
           </ol></>}
-  </section>
+  </Shell>
 }

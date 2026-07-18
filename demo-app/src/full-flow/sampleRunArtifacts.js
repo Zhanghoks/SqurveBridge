@@ -7,6 +7,7 @@ export const resolveInspectArtifacts = runState => {
   const state = runState || {}
   return {
     ...state,
+    question: state.question || state.context?.question || null,
     source: hasLiveRunEvidence(state) ? 'live' : 'empty',
     metrics: state.metrics || (state.result
       ? {

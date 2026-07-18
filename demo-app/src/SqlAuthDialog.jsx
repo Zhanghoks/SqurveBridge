@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { officialModelsFor } from './llmCatalog.js'
 
 const jsonOptions = (method, body) => ({
   method,
@@ -12,6 +13,7 @@ export default function SqlAuthDialog({ open, api, status, onStatusChange, onClo
   const [search, setSearch] = useState('')
   const [provider, setProvider] = useState(initialProvider?.id || '')
   const [model, setModel] = useState(status?.model || initialProvider?.default_model || '')
+  const [endpointId, setEndpointId] = useState(status?.endpoint_id || initialProvider?.default_endpoint_id || '')
   const [apiKey, setApiKey] = useState('')
   const [revealed, setRevealed] = useState(false)
   const [currentStatus, setCurrentStatus] = useState(status || { configured: false, providers })
@@ -27,6 +29,9 @@ export default function SqlAuthDialog({ open, api, status, onStatusChange, onClo
     setModel(status?.provider === selected.id && status?.model
       ? status.model
       : selected.default_model)
+    setEndpointId(status?.provider === selected.id && status?.endpoint_id
+      ? status.endpoint_id
+      : selected.default_endpoint_id || '')
   }, [status, providers.map(item => `${item.id}:${item.models.join(',')}`).join('|')])
 
   const selectedProvider = providers.find(item => item.id === provider)
@@ -45,6 +50,7 @@ export default function SqlAuthDialog({ open, api, status, onStatusChange, onClo
   const selectProvider = item => {
     setProvider(item.id)
     setModel(item.default_model)
+    setEndpointId(item.default_endpoint_id || '')
     setMessage('')
     setError('')
   }
@@ -60,6 +66,7 @@ export default function SqlAuthDialog({ open, api, status, onStatusChange, onClo
           provider,
           model,
           api_key: apiKey.trim(),
+          endpoint_id: endpointId,
         }),
       )
       if (method === 'test') {
@@ -126,7 +133,8 @@ export default function SqlAuthDialog({ open, api, status, onStatusChange, onClo
             <span>{currentStatus?.configured ? 'Connected' : 'Not connected'}</span>
             {currentStatus?.configured && <strong>{currentStatus.provider} / {currentStatus.model}</strong>}
           </div>
-          <label className="field model-id-field"><span>Model</span><input aria-label="Model" value={model} onChange={event => setModel(event.target.value)} list="sql-model-suggestions" placeholder="Enter a model ID" autoComplete="off" spellCheck="false" /><datalist id="sql-model-suggestions">{(selectedProvider?.models || []).map(item => <option key={item} value={item} />)}</datalist><small>Choose a suggestion or enter any model ID supported by this provider.</small></label>
+          <label className="field model-id-field"><span>Model</span><input aria-label="Model" value={model} onChange={event => setModel(event.target.value)} list="sql-model-suggestions" placeholder="Enter a model ID" autoComplete="off" spellCheck="false" /><datalist id="sql-model-suggestions">{officialModelsFor(provider).map(item => <option key={item} value={item} />)}</datalist><small>Choose a suggestion or enter any model ID supported by this provider.</small></label>
+          {selectedProvider?.endpoints?.length > 0 && <label className="field"><span>API region</span><select aria-label="API region" value={endpointId} onChange={event => setEndpointId(event.target.value)}>{selectedProvider.endpoints.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select><small>Choose the region where this API key was created.</small></label>}
           <label className="field api-key-field"><span>API key</span><div><input type={revealed ? 'text' : 'password'} autoComplete="new-password" spellCheck="false" value={apiKey} onChange={event => setApiKey(event.target.value)} placeholder={`Paste ${provider || 'provider'} API key`} /><button type="button" aria-label={revealed ? 'Hide API key' : 'Show API key'} onClick={() => setRevealed(value => !value)}>{revealed ? 'Hide' : 'Show'}</button></div></label>
           <div className="auth-dialog-actions">
             <button className="button secondary" type="button" disabled={Boolean(busy) || !provider || !model || !apiKey.trim()} onClick={() => submit('test')}>{busy === 'test' ? 'Testing…' : 'Test connection'}</button>

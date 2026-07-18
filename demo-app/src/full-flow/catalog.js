@@ -1,4 +1,4 @@
-/** Public intro catalog for Configure workspace. Only recorded repo facts. */
+/** Public intro catalog for Studio workspace. Only recorded repo facts. */
 
 export const METHOD_CATALOG = [
   {

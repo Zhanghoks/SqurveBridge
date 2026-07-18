@@ -10,7 +10,7 @@ import { installTestDom } from './testDom.js'
 
 const closeDom = installTestDom()
 globalThis.React = React
-const { cleanup, render, screen, waitFor } = await import('@testing-library/react')
+const { cleanup, render, screen, waitFor, within } = await import('@testing-library/react')
 const userEvent = (await import('@testing-library/user-event')).default
 registerLoader('./cssTestLoader.mjs', import.meta.url)
 const unregister = register()
@@ -67,12 +67,18 @@ test('hosted App exposes session SQL configuration instead of local env configur
     '/api/archive': { runs: [] },
   }
   const requested = []
+  responses['/api/agent'] = { available: true, profile: 'hosted-readonly', skills: [] }
   globalThis.fetch = async path => {
     requested.push(path)
+    const key = String(path).split('?')[0]
     return {
       ok: true,
       statusText: 'OK',
-      json: async () => path.startsWith('/api/comparisons/latest/results') ? responses['/api/comparisons/latest/results'] : responses[path],
+      json: async () => (
+        path.startsWith('/api/comparisons/latest/results')
+          ? responses['/api/comparisons/latest/results']
+          : responses[key] || responses[path] || {}
+      ),
     }
   }
   let appElement
@@ -87,21 +93,22 @@ test('hosted App exposes session SQL configuration instead of local env configur
   assert.deepEqual(
     [...document.querySelectorAll('.flow-module h2')].map(heading => heading.textContent),
     [
-      'Configuration Studio',
+      'Studio',
       'Workflow Composition',
-      'Run Workspace',
-      'Result Inspection',
-      'Weakness Diagnosis',
-      'Bounded Improvement',
+      'Experiment Board',
+      'Evaluation Visualization',
+      'Experiment Archive',
     ],
   )
   assert.match(document.body.textContent, /64 canonical configurations/i)
   assert.match(document.body.textContent, /Method × Database/i)
-  assert.equal(screen.queryByText('Experiment Board'), null)
-  assert.equal(screen.queryByText('Archive'), null)
+  const tabs = screen.getByRole('navigation', { name: 'Workflow stages' })
+  assert.ok(within(tabs).getByRole('button', { name: 'Run' }))
+  assert.ok(within(tabs).getByRole('button', { name: 'Visualize' }))
+  assert.ok(within(tabs).getByRole('button', { name: 'Archive' }))
   await waitFor(() => {
-    assert.ok(requested.some(path => path.startsWith('/api/comparisons/latest/results?')))
-    assert.ok(requested.includes('/api/archive'))
+    assert.ok(requested.some(path => String(path).startsWith('/api/comparisons/latest/results')))
+    assert.ok(requested.some(path => String(path).startsWith('/api/archive')))
   })
   await userEvent.setup().click(configure)
   assert.ok(screen.getByRole('dialog', { name: 'Configure SQL API' }))
@@ -123,7 +130,7 @@ test('local App renders the same full-flow surface as the hosted deployment', as
       llm_providers: [{
         id: 'qwen',
         configured: true,
-        models: ['qwen-plus'],
+        models: ['qwen-turbo', 'qwen-plus', 'qwen-max', 'deepseek-v4-flash'],
         default_model: 'qwen-plus',
       }],
       actors: {},
@@ -154,12 +161,15 @@ test('local App renders the same full-flow surface as the hosted deployment', as
 
   render(React.createElement(HostedApp))
 
-  assert.ok(await screen.findByRole('heading', { name: 'Configuration Studio' }))
+  assert.equal((await screen.findByRole('heading', { level: 2, name: 'Studio' })).textContent, 'Studio')
   await userEvent.setup().click(screen.getByRole('button', { name: 'Configure LLM' }))
   assert.ok(screen.getByRole('dialog', { name: 'Configure LLM' }))
   assert.ok(document.querySelector('.flow-provider-dialog'))
+  assert.ok(screen.getByRole('list', { name: 'Suggested models' }))
+  assert.ok(screen.getByRole('button', { name: 'qwen-plus' }))
+  assert.equal(screen.getByRole('button', { name: 'qwen-plus' }).getAttribute('aria-pressed'), 'true')
   assert.doesNotMatch(document.body.textContent, /Hugging Face Live Demo/i)
-  assert.equal(screen.queryByText('Experiment Board'), null)
+  assert.ok(within(screen.getByRole('navigation', { name: 'Workflow stages' })).getByRole('button', { name: 'Run' }))
   assert.ok(document.querySelector('.flow-demo'))
 })
 

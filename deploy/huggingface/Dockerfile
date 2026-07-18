@@ -35,6 +35,7 @@ RUN GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 https://github.com/Zhanghoks/Squrv
     && rm -rf /tmp/squrvebridge-assets
 RUN python -m pip install --upgrade pip \
     && python -m pip install -r deploy/huggingface/requirements.txt \
+    && python demo/runtime_check.py \
     && chmod +x deploy/huggingface/entrypoint.sh \
     && mkdir -p /app/tmp /app/artifacts \
     && chown -R node:node /app

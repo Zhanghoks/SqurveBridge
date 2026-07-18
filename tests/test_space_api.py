@@ -29,6 +29,42 @@ class SpaceApiTests(unittest.TestCase):
         self.assertTrue(response.json["deployment"]["features"]["agent_chat"])
         self.assertTrue(response.json["deployment"]["features"]["session_sql_auth"])
 
+    def test_qwen_sql_credentials_use_only_allowlisted_regions(self):
+        china = self.api_server._credential_from_payload({
+            "provider": "qwen",
+            "model": "qwen-plus",
+            "api_key": "test-key",
+            "endpoint_id": "china",
+        })
+        international = self.api_server._credential_from_payload({
+            "provider": "qwen",
+            "model": "qwen-plus",
+            "api_key": "test-key",
+            "endpoint_id": "international",
+        })
+        self.assertEqual(china.base_url, self.api_server._QWEN_ENDPOINTS["china"])
+        self.assertEqual(international.base_url, self.api_server._QWEN_ENDPOINTS["international"])
+        with self.assertRaises(self.api_server.SqlAuthError) as raised:
+            self.api_server._credential_from_payload({
+                "provider": "qwen",
+                "model": "qwen-plus",
+                "api_key": "test-key",
+                "endpoint_id": "https://attacker.invalid",
+            })
+        self.assertEqual(raised.exception.code, "unsupported_endpoint")
+
+    def test_hosted_requests_never_restore_local_evaluation_jobs(self):
+        self.api_server.app.config.update(TESTING=False)
+        try:
+            with patch.dict(os.environ, {"SQURVE_DEPLOYMENT_TARGET": "hf-space"}, clear=False), patch.object(
+                self.api_server, "_restore_evaluation_jobs_once"
+            ) as restore:
+                response = self.client.get("/api/capabilities")
+            self.assertEqual(response.status_code, 200)
+            restore.assert_not_called()
+        finally:
+            self.api_server.app.config.update(TESTING=True)
+
     def test_database_catalog_exposes_public_reference_benchmarks_without_paths(self):
         records = [
             ("college_2", "/tmp/college_2.sqlite", "/tmp/spider.json"),
@@ -38,6 +74,8 @@ class SpaceApiTests(unittest.TestCase):
         ]
         with patch.object(self.api_server, "get_available_databases", return_value=records), patch.object(
             self.api_server, "database_benchmark", side_effect=["spider", "bird", "bull-en", "ehrsql-2024"]
+        ), patch.object(
+            self.api_server, "_builtin_database_references", return_value=[]
         ), patch("demo.api_server.Path.is_file", return_value=True), patch(
             "demo.api_server.Path.stat", return_value=Mock(st_size=2048)
         ), patch("demo.api_server.Path.read_text", return_value="[]"), patch(
@@ -319,6 +357,61 @@ class SpaceApiTests(unittest.TestCase):
         self.assertEqual(generated.json["run_config"]["llm"], {"provider": "qwen", "model": "qwen-plus"})
         self.assertEqual(captured[-1].api_key, "session-sql-secret")
         self.assertNotIn("session-sql-secret", generated.get_data(as_text=True))
+
+    def test_local_query_errors_do_not_echo_provider_secrets(self):
+        database = {"id": "demo", "db_path": "/tmp/demo.sqlite", "schema_path": "/tmp/schema.json"}
+        fake_secret = "sk-" + "proj-leaked-secret-value"
+        fake_demo = Mock()
+        fake_demo.generate_sql.return_value = {
+            "status": "error",
+            "sql": "",
+            "message": f"Incorrect API key provided: {fake_secret}",
+        }
+        provider_config = {
+            "id": "openai",
+            "default_model": "gpt-4.1-mini",
+            "models": ["gpt-4.1-mini"],
+            "configured": True,
+        }
+
+        with patch.dict(os.environ, {"SQURVE_DEPLOYMENT_TARGET": "local"}, clear=False), patch.object(
+            self.api_server, "_find_database", return_value=database
+        ), patch.object(self.api_server, "_llm_provider_catalog", return_value=[provider_config]), patch.object(
+            self.api_server, "_provider_status", return_value={"provider": "openai"}
+        ), patch.object(self.api_server, "_get_demo", return_value=fake_demo):
+            response = self.client.post(
+                "/api/query",
+                json={
+                    "question": "Count rows",
+                    "db_id": "demo",
+                    "provider": "openai",
+                    "model": "gpt-4.1-mini",
+                },
+            )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json["status"], "error")
+        self.assertNotIn(fake_secret, response.get_data(as_text=True))
+        self.assertIn("rejected", response.json["message"].lower())
+
+    def test_sanitize_error_message_covers_common_secret_shapes(self):
+        sanitized = self.api_server._sanitize_error_message(
+            "API key: api-secret; Bearer bearer-secret; password=pw-secret; "
+            "client_secret=oauth-secret; AIzaSyLeakTestTokenValue"
+        )
+        self.assertNotIn("api-secret", sanitized)
+        self.assertNotIn("bearer-secret", sanitized)
+        self.assertNotIn("pw-secret", sanitized)
+        self.assertNotIn("oauth-secret", sanitized)
+        self.assertNotIn("AIzaSyLeakTestTokenValue", sanitized)
+
+    def test_sanitize_error_message_removes_private_urls_and_paths(self):
+        private_path = "/" + "Users/person/project/config.json"
+        sanitized = self.api_server._sanitize_error_message(
+            f"Request failed at https://private.example/v1 from {private_path}"
+        )
+        self.assertNotIn("private.example", sanitized)
+        self.assertNotIn(private_path, sanitized)
 
     def test_squrve_demo_direct_key_bypasses_environment_resolution(self):
         from demo import gradio_demo

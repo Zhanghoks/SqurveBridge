@@ -67,7 +67,7 @@ function Provenance({ run, t }) {
   </aside>
 }
 
-export default function DiagnosisWorkspace({ evidence, t }) {
+export default function DiagnosisWorkspace({ evidence, t, compact = false }) {
   const selectedRun = evidence?.selectedRun
   const groups = DIAGNOSTIC_FIELDS
     .map(([field, label]) => ({ field, label, value: selectedRun?.[field] }))
@@ -75,11 +75,12 @@ export default function DiagnosisWorkspace({ evidence, t }) {
   const samples = Array.isArray(selectedRun?.samples) ? selectedRun.samples : []
   const hasEvidence = groups.length > 0 || samples.length > 0
 
-  return <section id="diagnose" className="flow-module flow-glass diagnosis-workspace">
-    <header className="flow-module-header">
+  const Shell = compact ? 'div' : 'section'
+  return <Shell id={compact ? undefined : 'diagnose'} className={compact ? 'board-section diagnosis-workspace' : 'flow-module flow-glass diagnosis-workspace'}>
+    <header className={compact ? 'board-section-header' : 'flow-module-header'}>
       <div>
-        <span>{t('process.diagnose')}</span>
-        <h2>{t('diagnose.title')}</h2>
+        {!compact && <span>{t('process.diagnose')}</span>}
+        {compact ? <h3>{t('board.diagnoseSection')}</h3> : <h2>{t('diagnose.title')}</h2>}
       </div>
     </header>
     {evidence?.loading
@@ -96,5 +97,5 @@ export default function DiagnosisWorkspace({ evidence, t }) {
       />)}
       {samples.length > 0 && <SanitizedSamples samples={samples} title={t('diagnose.samples')} />}
     </div></>}
-  </section>
+  </Shell>
 }

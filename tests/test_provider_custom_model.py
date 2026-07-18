@@ -48,6 +48,30 @@ class ProviderCustomModelTests(unittest.TestCase):
                 self.assertIn("SQURVE_LLM_PROVIDER=qwen", body)
                 self.assertIn("SQURVE_LLM_MODEL=qwen3-custom-latest", body)
 
+    def test_llm_provider_catalog_keeps_official_models_only(self):
+        from demo import api_server
+
+        with mock.patch.object(
+            api_server,
+            "_provider_status",
+            return_value={
+                "provider": "qwen",
+                "model": "qwen3-custom-latest",
+                "configured": True,
+                "ready": True,
+                "verified": True,
+            },
+        ), mock.patch.object(api_server, "deployment_target", return_value="local"), mock.patch.object(
+            api_server,
+            "resolve_api_key",
+            return_value="sk-test",
+        ), mock.patch.object(api_server, "load_dotenv"):
+            catalog = {item["id"]: item for item in api_server._llm_provider_catalog()}
+            qwen = catalog["qwen"]
+            self.assertEqual(qwen["models"], list(api_server._provider_models["qwen"]))
+            self.assertNotIn("qwen3-custom-latest", qwen["models"])
+            self.assertEqual(qwen["default_model"], api_server._provider_models["qwen"][0])
+
 
 if __name__ == "__main__":
     unittest.main()

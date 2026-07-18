@@ -73,7 +73,18 @@ export default function Archive({
   Status,
   PageHeading,
   Empty,
+  onOpenInVisualize,
+  embedded = false,
+  allowFileContent = true,
+  t,
 }) {
+  const label = (key, fallback) => {
+    if (typeof t === 'function') {
+      const value = t(key)
+      if (value != null && value !== '' && value !== key) return value
+    }
+    return fallback
+  }
   const [query, setQuery] = useState('')
   const [dataset, setDataset] = useState('')
   const [method, setMethod] = useState('')
@@ -95,11 +106,16 @@ export default function Archive({
       if (method) params.set('method', method)
       if (source) params.set('source', source)
       const data = await api(`/api/archive?${params}`)
-      setCatalog(data)
-      if (selectedId && !data.runs.some(run => run.run_id === selectedId)) {
-        setSelectedId(data.runs[0]?.run_id || '')
-      } else if (!selectedId && data.runs[0]) {
-        setSelectedId(data.runs[0].run_id)
+      const next = {
+        runs: Array.isArray(data?.runs) ? data.runs : [],
+        filters: data?.filters || { datasets: [], methods: [], sources: [] },
+        total: Number.isFinite(data?.total) ? data.total : (Array.isArray(data?.runs) ? data.runs.length : 0),
+      }
+      setCatalog(next)
+      if (selectedId && !next.runs.some(run => run.run_id === selectedId)) {
+        setSelectedId(next.runs[0]?.run_id || '')
+      } else if (!selectedId && next.runs[0]) {
+        setSelectedId(next.runs[0].run_id)
       }
     } catch (err) {
       setError(err.message)
@@ -129,7 +145,7 @@ export default function Archive({
         const preferred = data.files?.find(item => item.name === 'scores.json')
           || data.files?.find(item => item.kind === 'markdown')
           || data.files?.[0]
-        if (preferred) {
+        if (allowFileContent && preferred) {
           const file = await api(`/api/archive/${encodeURIComponent(selectedId)}/files/${preferred.path}`)
           if (active) setFilePayload(file)
         }
@@ -139,10 +155,10 @@ export default function Archive({
     }
     load()
     return () => { active = false }
-  }, [selectedId])
+  }, [selectedId, allowFileContent])
 
   const openFile = async path => {
-    if (!selectedId || !path) return
+    if (!allowFileContent || !selectedId || !path) return
     setError('')
     try {
       const file = await api(`/api/archive/${encodeURIComponent(selectedId)}/files/${path}`)
@@ -164,12 +180,12 @@ export default function Archive({
   }, [detail])
 
   return (
-    <div className="workspace archive-workspace">
-      <PageHeading
+    <div className={`workspace archive-workspace${embedded ? ' archive-workspace-embedded' : ''}`}>
+      {!embedded && <PageHeading
         eyebrow="Experiment archive"
         title="Artifacts library"
         status={<Status tone={catalog.total ? 'success' : 'neutral'}>{catalog.total} runs indexed</Status>}
-      />
+      />}
 
       <section className="tool-panel archive-filters">
         <div className="panel-title">
@@ -218,7 +234,7 @@ export default function Archive({
             </div>
           </div>
           <div className="archive-run-list">
-            {catalog.runs.length ? catalog.runs.map(run => (
+            {catalog.runs?.length ? catalog.runs.map(run => (
               <button
                 key={run.run_id}
                 className={selectedId === run.run_id ? 'active' : ''}
@@ -256,7 +272,16 @@ export default function Archive({
                     <span>{detail.method} on {detail.dataset}</span>
                     <small>{detail.run_id}</small>
                   </div>
-                  <Status tone="success">{detail.source}</Status>
+                  <div className="archive-summary-actions">
+                    {onOpenInVisualize && <button
+                      type="button"
+                      className="button compact primary"
+                      onClick={() => onOpenInVisualize(detail.run_id)}
+                    >
+                      {label('archive.openInVisualize', 'Open in Visualize')}
+                    </button>}
+                    <Status tone="success">{detail.source}</Status>
+                  </div>
                 </div>
                 <div className="archive-metric-strip">
                   {['ex', 'em', 'sf1', 'ves', 'rves'].map(metric => (
@@ -297,6 +322,7 @@ export default function Archive({
                         <button
                           key={file.path}
                           className={filePayload?.path === file.path ? 'active' : ''}
+                          disabled={!allowFileContent}
                           onClick={() => openFile(file.path)}
                         >
                           <span>{file.name}</span>
@@ -307,7 +333,9 @@ export default function Archive({
                   ) : null)}
                 </section>
                 <div className="tool-panel archive-viewer-shell">
-                  <FileViewer file={filePayload} onClose={() => setFilePayload(null)} />
+                {allowFileContent
+                  ? <FileViewer file={filePayload} onClose={() => setFilePayload(null)} />
+                  : <div className="archive-viewer empty-viewer"><strong>Sanitized summary only</strong><span>Raw archive files stay unavailable in the public hosted demo.</span></div>}
                 </div>
               </div>
             </>

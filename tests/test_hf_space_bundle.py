@@ -76,6 +76,7 @@ class HuggingFaceBundleContractTests(unittest.TestCase):
         self.assertIn("git lfs pull --include=\"benchmarks/packages/*.zip\"", dockerfile)
         self.assertIn("tools/extract_space_assets.py", dockerfile)
         self.assertIn("node --version", dockerfile)
+        self.assertIn("python demo/runtime_check.py", dockerfile)
         self.assertNotIn("SQURVE_LLM_PROVIDER=", dockerfile)
         self.assertNotIn("SQURVE_LLM_MODEL=", dockerfile)
         self.assertIn("npm ci --ignore-scripts", build_script)
@@ -175,6 +176,7 @@ class HuggingFaceBundleTests(unittest.TestCase):
         expected_paths = (
             "core/engine.py",
             "demo/space_server.py",
+            "demo/runtime_check.py",
             "demo-app/src/main.jsx",
             "demo-app/src/SqlAuthDialog.jsx",
             "demo-app/src/PiAuthDialog.jsx",
@@ -303,6 +305,7 @@ class HuggingFaceBundleTests(unittest.TestCase):
         sentinel = "release-boundary-sentinel-secret"
         dockerfile = (self.output / "Dockerfile").read_text(encoding="utf-8")
         entrypoint = (self.output / "deploy/huggingface/entrypoint.sh").read_text(encoding="utf-8")
+        self.assertIn("python demo/runtime_check.py", entrypoint)
         self.assertNotIn("SQURVE_LLM_PROVIDER=", dockerfile)
         self.assertNotIn("SQURVE_LLM_MODEL=", dockerfile)
         self.assertNotIn("SQURVE_LLM_PROVIDER is required", entrypoint)

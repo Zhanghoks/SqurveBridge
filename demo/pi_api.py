@@ -76,7 +76,7 @@ def register_pi_routes(
             "profile": current.profile,
             "provider": current.provider,
             "model": current.model,
-            "skills": [] if current.profile == "hosted-readonly" else sorted(discover_pi_skills(root) or PI_SKILLS),
+            "skills": sorted(discover_pi_skills(root) or PI_SKILLS),
             "tools": list(current.tools),
         })
 

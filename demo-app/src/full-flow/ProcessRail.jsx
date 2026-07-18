@@ -1,8 +1,16 @@
-export const PROCESS_STEPS = ['configure', 'compose', 'run', 'inspect', 'diagnose', 'improve']
+export const PROCESS_STEPS = ['configure', 'compose', 'board', 'visualize', 'archive']
+
+const LEGACY_STEP_MAP = {
+  run: 'board',
+  diagnose: 'board',
+  improve: 'board',
+  inspect: 'visualize',
+}
 
 export function resolveProcessStep(hashOrId, fallback = PROCESS_STEPS[0]) {
   const value = String(hashOrId || '').replace(/^#/, '')
-  return PROCESS_STEPS.includes(value) ? value : fallback
+  const mapped = LEGACY_STEP_MAP[value] || value
+  return PROCESS_STEPS.includes(mapped) ? mapped : fallback
 }
 
 export default function ProcessRail({ activeStep, onNavigate, t }) {

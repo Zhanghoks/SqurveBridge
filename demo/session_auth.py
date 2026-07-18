@@ -16,6 +16,8 @@ class SqlCredential:
     provider: str
     model: str
     api_key: str = field(repr=False)
+    endpoint_id: str = ""
+    base_url: str | None = field(default=None, repr=False)
     validated_at: float = 0.0
 
 
@@ -71,12 +73,15 @@ class SessionCredentialRegistry:
         credential = self.get(session_id)
         if credential is None:
             return {"configured": False}
-        return {
+        status = {
             "configured": True,
             "provider": credential.provider,
             "model": credential.model,
             "validated_at": credential.validated_at,
         }
+        if credential.endpoint_id:
+            status["endpoint_id"] = credential.endpoint_id
+        return status
 
     def delete(self, session_id: str) -> bool:
         with self._lock:

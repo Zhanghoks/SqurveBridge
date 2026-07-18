@@ -8,13 +8,15 @@ import SqlAuthDialog from './SqlAuthDialog.jsx'
 import { deploymentTarget, featureEnabled } from './runtimeMode.js'
 import { detectLocale, translate } from './i18n/index.js'
 import { normalizePublicGitHubUrl } from './full-flow/model.js'
+import { sanitizeRunError } from './full-flow/RunWorkspace.jsx'
+import { officialModelsFor } from './llmCatalog.js'
 
 const AgentHarness = lazy(() => import('./AgentHarness.jsx'))
 
 const api = async (path, options = {}) => {
   const response = await fetch(path, options)
   const data = await response.json().catch(() => ({ message: response.statusText }))
-  if (!response.ok) throw new Error(data.message || 'Request failed')
+  if (!response.ok) throw new Error(sanitizeRunError({ message: data.message || 'Request failed' }))
   return data
 }
 
@@ -91,6 +93,7 @@ function ProviderConfig({
   const [error, setError] = useState('')
   const panelRef = useRef(null)
   const selected = providers.find(item => item.id === provider)
+  const catalogModels = officialModelsFor(provider)
 
   useEffect(() => {
     const current = health?.provider?.provider
@@ -150,7 +153,34 @@ function ProviderConfig({
 
   const fields = <>
     <label className="field"><span>Provider</span><select aria-label="Provider" value={provider} onChange={event => selectProvider(event.target.value)}>{providers.map(item => <option key={item.id} value={item.id}>{item.id}{item.configured ? ' · configured' : ' · needs key'}</option>)}</select></label>
-    <label className="field model-id-field"><span>Model</span><input aria-label="Model" value={model} onChange={event => setModel(event.target.value)} list="local-llm-model-suggestions" placeholder="Enter a model ID" autoComplete="off" spellCheck="false" /><datalist id="local-llm-model-suggestions">{(selected?.models || []).map(item => <option key={item} value={item} />)}</datalist><small>Choose a suggestion or enter any model ID supported by this provider.</small></label>
+    <div className="field model-id-field">
+      <span>Model</span>
+      {catalogModels.length > 0 && (
+        <ul className="model-suggestion-list" aria-label="Suggested models">
+          {catalogModels.map(item => (
+            <li key={item}>
+              <button
+                type="button"
+                className={model === item ? 'active' : ''}
+                aria-pressed={model === item}
+                onClick={() => setModel(item)}
+              >
+                {item}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <input
+        aria-label="Model"
+        value={model}
+        onChange={event => setModel(event.target.value)}
+        placeholder="Enter a model ID"
+        autoComplete="off"
+        spellCheck="false"
+      />
+      <small>Pick a catalog model above, or type any model ID this provider supports.</small>
+    </div>
     <label className="field"><span>API key{selected?.env_var ? ` · ${selected.env_var}` : ''}</span><input type="password" aria-label={selected?.env_var ? `API key · ${selected.env_var}` : 'API key'} autoComplete="off" spellCheck="false" value={apiKey} onChange={event => setApiKey(event.target.value)} placeholder={selected?.configured ? 'Leave blank to keep current key' : 'Paste API key'} /></label>
     <label className="persist-toggle"><input type="checkbox" checked={persist} onChange={event => setPersist(event.target.checked)} /><span>Write to repo-root .env</span></label>
   </>
@@ -609,7 +639,33 @@ function App() {
   ))
   const hosted = deploymentTarget(capabilities) === 'hf-space'
   const sessionSqlAuth = hosted && featureEnabled(capabilities, 'session_sql_auth')
-  const refresh = async () => { setBusy(true); setBootError(false); try { const [healthData, capabilityData, databaseData] = await Promise.all([api('/api/health'), api('/api/capabilities'), api('/api/databases')]); const hostedData = deploymentTarget(capabilityData) === 'hf-space' && featureEnabled(capabilityData, 'session_sql_auth') ? await api('/api/sql-auth') : null; setHealth(healthData); setCapabilities(capabilityData); setDatabases(databaseData.databases); setSqlAuth(hostedData) } catch (error) { setBootError(true); setHealth({ status: 'error', provider: { configured: false, ready: false, message: error.message } }) } finally { setBusy(false) } }
+  const refresh = async () => {
+    setBusy(true)
+    setBootError(false)
+    try {
+      // Boot on health + capabilities only. /api/databases can scan hundreds of
+      // bundled SQLite files and must not block the first paint.
+      const [healthData, capabilityData] = await Promise.all([
+        api('/api/health'),
+        api('/api/capabilities'),
+      ])
+      const hostedData = deploymentTarget(capabilityData) === 'hf-space'
+        && featureEnabled(capabilityData, 'session_sql_auth')
+        ? await api('/api/sql-auth')
+        : null
+      setHealth(healthData)
+      setCapabilities(capabilityData)
+      setSqlAuth(hostedData)
+      api('/api/databases')
+        .then(databaseData => setDatabases(databaseData.databases || []))
+        .catch(() => setDatabases([]))
+    } catch (error) {
+      setBootError(true)
+      setHealth({ status: 'error', provider: { configured: false, ready: false, message: error.message } })
+    } finally {
+      setBusy(false)
+    }
+  }
   useEffect(() => { refresh() }, [])
   if (!capabilities) return <main className="deployment-gate" role={bootError ? 'alert' : 'status'}>
     {translate(bootLocale, bootError ? 'boot.error' : 'boot.loading')}

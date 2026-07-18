@@ -61,16 +61,55 @@ wait_http() {
   die "${label} did not become ready: ${url}"
 }
 
+# Launch outside the parent shell process group so IDE/tool cleanup
+# cannot SIGTERM the demo when the starter command exits.
+# Usage: daemonize <pid_file> <log_file> <cwd> <command...>
+daemonize() {
+  local pid_file="$1"
+  local log_file="$2"
+  local workdir="$3"
+  shift 3
+  "${PYTHON}" - "${pid_file}" "${log_file}" "${workdir}" "$@" <<'PY'
+import subprocess
+import sys
+from pathlib import Path
+
+pid_file = Path(sys.argv[1])
+log_file = Path(sys.argv[2])
+workdir = sys.argv[3]
+command = sys.argv[4:]
+log_file.parent.mkdir(parents=True, exist_ok=True)
+with log_file.open("ab", buffering=0) as log:
+    proc = subprocess.Popen(
+        command,
+        cwd=workdir,
+        stdin=subprocess.DEVNULL,
+        stdout=log,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+        close_fds=True,
+    )
+pid_file.write_text(f"{proc.pid}\n", encoding="utf-8")
+print(proc.pid)
+PY
+}
+
 cd "${ROOT}"
 
-if [[ -f "${RUNTIME_DIR}/api.pid" ]] || [[ -f "${RUNTIME_DIR}/web.pid" ]]; then
+if [[ -f "${RUNTIME_DIR}/api.pid" ]] || [[ -f "${RUNTIME_DIR}/web.pid" ]] || [[ -f "${RUNTIME_DIR}/demo.env" ]]; then
   api_pid="$(cat "${RUNTIME_DIR}/api.pid" 2>/dev/null || true)"
   web_pid="$(cat "${RUNTIME_DIR}/web.pid" 2>/dev/null || true)"
-  if pid_alive "${api_pid}" || pid_alive "${web_pid}" || port_in_use "${API_PORT}" || port_in_use "${WEB_PORT}"; then
+  if { pid_alive "${api_pid}" || port_in_use "${API_PORT}"; } && { pid_alive "${web_pid}" || port_in_use "${WEB_PORT}"; }; then
     trap - EXIT
-    die "Demo already appears running. Use: demo/stop.sh"
+    log "Demo already running."
+    log "  Workspace: http://${WEB_HOST}:${WEB_PORT}"
+    log "  API:       http://${API_HOST}:${API_PORT}"
+    log "Stop with:   demo/stop.sh"
+    exit 0
   fi
-  rm -f "${RUNTIME_DIR}/api.pid" "${RUNTIME_DIR}/web.pid"
+  # Stale pid files / half-dead previous attempt — reclaim ports and restart.
+  log "Cleaning stale demo runtime before restart…"
+  "${ROOT}/demo/stop.sh" >/dev/null 2>&1 || true
 fi
 
 if port_in_use "${API_PORT}"; then
@@ -85,6 +124,8 @@ fi
 PYTHON="$(resolve_python)"
 command -v npm >/dev/null 2>&1 || die "npm not found. Install Node.js first."
 command -v curl >/dev/null 2>&1 || die "curl not found."
+"${PYTHON}" "${ROOT}/demo/runtime_check.py" || die \
+  "Python runtime check failed. Install: uv pip install --python ${PYTHON} -r requirements.txt -r demo/requirements.txt"
 
 node_major="$(node -p 'process.versions.node.split(".")[0]')"
 [[ "${node_major}" -ge 22 ]] || die "Embedded Pi requires Node.js 22.19 or newer."
@@ -100,18 +141,20 @@ if [[ ! -d "${ROOT}/demo-app/node_modules" ]]; then
 fi
 
 log "Starting API on http://${API_HOST}:${API_PORT}"
-nohup "${PYTHON}" "${ROOT}/demo/api_server.py" --host "${API_HOST}" --port "${API_PORT}" \
-  >"${RUNTIME_DIR}/api.log" 2>&1 &
-api_pid=$!
-echo "${api_pid}" >"${RUNTIME_DIR}/api.pid"
+: >"${RUNTIME_DIR}/api.log"
+api_pid="$(daemonize "${RUNTIME_DIR}/api.pid" "${RUNTIME_DIR}/api.log" "${ROOT}" \
+  "${PYTHON}" "${ROOT}/demo/api_server.py" --host "${API_HOST}" --port "${API_PORT}")"
 
 log "Starting frontend on http://${WEB_HOST}:${WEB_PORT}"
-cd "${ROOT}/demo-app"
-nohup npm run dev -- --host "${WEB_HOST}" --port "${WEB_PORT}" \
-  >"${RUNTIME_DIR}/web.log" 2>&1 &
-web_pid=$!
-echo "${web_pid}" >"${RUNTIME_DIR}/web.pid"
-cd "${ROOT}"
+: >"${RUNTIME_DIR}/web.log"
+# Prefer launching Vite directly so the recorded PID is the listener, not npm.
+if [[ -x "${ROOT}/demo-app/node_modules/.bin/vite" ]]; then
+  web_pid="$(daemonize "${RUNTIME_DIR}/web.pid" "${RUNTIME_DIR}/web.log" "${ROOT}/demo-app" \
+    "${ROOT}/demo-app/node_modules/.bin/vite" --host "${WEB_HOST}" --port "${WEB_PORT}")"
+else
+  web_pid="$(daemonize "${RUNTIME_DIR}/web.pid" "${RUNTIME_DIR}/web.log" "${ROOT}/demo-app" \
+    npm run dev -- --host "${WEB_HOST}" --port "${WEB_PORT}")"
+fi
 
 wait_http "http://${API_HOST}:${API_PORT}/api/health" "API"
 wait_http "http://${WEB_HOST}:${WEB_PORT}/" "Frontend" 60

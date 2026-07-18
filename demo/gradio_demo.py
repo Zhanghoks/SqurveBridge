@@ -202,6 +202,7 @@ class SqurveDemo:
             provider: Optional[str] = None,
             model_name: Optional[str] = None,
             api_key: Optional[str] = None,
+            base_url: Optional[str] = None,
     ):
         config_path = config_path or get_router_config_path()
         if not Path(config_path).is_absolute():
@@ -213,6 +214,8 @@ class SqurveDemo:
             config.setdefault("llm", {})["use"] = provider
         if model_name:
             config.setdefault("llm", {})["model_name"] = model_name
+        if base_url:
+            config.setdefault("llm", {})["base_url"] = base_url
         if provider and api_key:
             config.setdefault("api_key", {})[provider] = api_key
         else:
@@ -383,7 +386,7 @@ class SqurveDemo:
             }
 
         except Exception as e:
-            logger.exception(f"Error generating SQL: {e}")
+            logger.exception("Error generating SQL")
             return {"sql": "", "status": "error", "message": str(e)}
 
 

@@ -96,7 +96,7 @@ test('renders Pi OAuth events, select prompts, and cancellation', async () => {
   await user.click(screen.getByRole('radio', { name: 'Team A' }))
   await user.click(screen.getByRole('button', { name: 'Continue' }))
   assert.equal(commands.at(-1).value, 'team-a')
-  await user.click(screen.getByRole('button', { name: 'Cancel login' }))
+  await user.click(screen.getByRole('button', { name: 'Cancel' }))
   assert.deepEqual(commands.at(-1), { type: 'auth_cancel' })
 })
 
@@ -118,7 +118,7 @@ test('selects an authenticated Pi model and logs out', async () => {
 
   await user.click(screen.getByRole('button', { name: /Claude Sonnet/ }))
   assert.deepEqual(commands.at(-1), { type: 'model_select', provider: 'anthropic', model: 'claude-sonnet' })
-  await user.click(screen.getByRole('button', { name: 'Logout' }))
+  await user.click(screen.getByRole('button', { name: 'Disconnect' }))
   assert.deepEqual(commands.at(-1), { type: 'logout', provider: 'anthropic' })
   await user.click(screen.getAllByRole('button', { name: 'Close' }).at(-1))
   assert.equal(closed, true)
@@ -140,9 +140,66 @@ test('submits a custom model id for an authenticated provider', async () => {
   }))
 
   await user.type(screen.getByLabelText('Custom model ID'), 'claude-custom-latest')
-  await user.click(screen.getByRole('button', { name: 'Use custom model' }))
+  await user.click(screen.getByRole('button', { name: 'Use model' }))
 
   assert.deepEqual(commands.at(-1), {
     type: 'model_select', provider: 'anthropic', model: 'claude-custom-latest',
   })
+})
+
+test('closes with Escape and cancels an active authentication prompt', async () => {
+  const PiAuthDialog = await loadDialog()
+  const commands = []
+  let closed = false
+  const user = userEvent.setup()
+  render(React.createElement(PiAuthDialog, {
+    open: true,
+    state: {
+      ...baseState,
+      status: 'prompting',
+      prompt: { request_id: 'auth-escape', kind: 'secret', message: 'Enter API key', placeholder: 'API key' },
+    },
+    send: command => commands.push(command),
+    onClose: () => { closed = true },
+  }))
+
+  await user.keyboard('{Escape}')
+
+  assert.deepEqual(commands.at(-1), { type: 'auth_cancel' })
+  assert.equal(closed, true)
+})
+
+test('Escape uses the latest send and onClose callbacks after rerender', async () => {
+  const PiAuthDialog = await loadDialog()
+  const staleCommands = []
+  const freshCommands = []
+  let closedBy = ''
+  const user = userEvent.setup()
+  const view = render(React.createElement(PiAuthDialog, {
+    open: true,
+    state: {
+      ...baseState,
+      status: 'prompting',
+      prompt: { request_id: 'auth-escape-stale', kind: 'secret', message: 'Enter API key', placeholder: 'API key' },
+    },
+    send: command => staleCommands.push(command),
+    onClose: () => { closedBy = 'stale' },
+  }))
+
+  view.rerender(React.createElement(PiAuthDialog, {
+    open: true,
+    state: {
+      ...baseState,
+      status: 'prompting',
+      prompt: { request_id: 'auth-escape-fresh', kind: 'secret', message: 'Enter API key', placeholder: 'API key' },
+    },
+    send: command => freshCommands.push(command),
+    onClose: () => { closedBy = 'fresh' },
+  }))
+
+  await user.keyboard('{Escape}')
+
+  assert.deepEqual(staleCommands, [])
+  assert.deepEqual(freshCommands.at(-1), { type: 'auth_cancel' })
+  assert.equal(closedBy, 'fresh')
 })

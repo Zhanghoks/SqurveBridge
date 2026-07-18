@@ -9,10 +9,8 @@ export default function FlashcardDialog({
   open,
   kind,
   entry,
-  selected,
   t,
   onClose,
-  onToggleSelect,
 }) {
   const closeRef = useRef(null)
 
@@ -29,9 +27,6 @@ export default function FlashcardDialog({
   if (!open || !entry) return null
 
   const prefix = kind === 'method' ? `catalog.method.${entry.slug}` : `catalog.database.${entry.slug}`
-  const selectLabel = kind === 'method'
-    ? t('configure.selectMethod', { name: entry.name })
-    : t('configure.selectDatabase', { name: entry.name })
 
   return (
     <div
@@ -151,15 +146,7 @@ export default function FlashcardDialog({
         </dl>
 
         <footer className="flashcard-actions">
-          <button
-            type="button"
-            className={selected ? 'selected' : ''}
-            aria-pressed={selected}
-            aria-label={selectLabel}
-            onClick={() => onToggleSelect(entry.name)}
-          >
-            {selected ? t('catalog.selected') : t('catalog.select')}
-          </button>
+          <p className="flashcard-compose-hint">{t('configure.composeHint')}</p>
           <button type="button" onClick={onClose}>
             {t('catalog.done')}
           </button>

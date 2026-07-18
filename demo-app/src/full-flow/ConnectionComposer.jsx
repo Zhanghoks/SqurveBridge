@@ -9,7 +9,7 @@ import {
   hasConnection,
 } from './model.js'
 
-const pointY = index => 42 + index * 48
+const pointY = index => 36 + index * 52
 
 function ConnectionSwitcher({
   connections,
@@ -85,7 +85,7 @@ function ConnectionSwitcher({
                 onClick={() => onFocusConnection(connection.method, connection.database)}
               >
                 <strong>{connection.method}</strong>
-                <span aria-hidden="true">→</span>
+                <span aria-hidden="true"> → </span>
                 <strong>{connection.database}</strong>
                 {!ready && <em>{t('compose.browsable')}</em>}
               </button>
@@ -198,7 +198,7 @@ export default function ConnectionComposer({
           </ol>
           <div className="flow-connection-canvas">
             <svg
-              viewBox="0 0 1000 420"
+              viewBox="0 0 1000 440"
               preserveAspectRatio="none"
               role="group"
               aria-labelledby="flow-matrix-title flow-matrix-description"
@@ -288,10 +288,6 @@ export default function ConnectionComposer({
           onFocusConnection={onFocusConnection}
           onRemoveConnection={onToggleConnection}
         />
-        <div className="compose-workflow-focus">
-          <span>{t('compose.activeConnection')}</span>
-          <strong>{focusedMethod} → {focusedDatabase}</strong>
-        </div>
         <ActorWorkflow focusedConfig={focusedConfig} t={t} />
         <IntegrationProvenance focusedConfig={focusedConfig} t={t} />
       </aside>

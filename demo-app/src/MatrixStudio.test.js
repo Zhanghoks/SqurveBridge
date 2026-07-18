@@ -12,7 +12,7 @@ Object.defineProperty(globalThis, 'localStorage', {
   configurable: true,
   value: window.localStorage,
 })
-const { cleanup, render, screen } = await import('@testing-library/react')
+const { cleanup, render, screen, within } = await import('@testing-library/react')
 const userEvent = (await import('@testing-library/user-event')).default
 registerLoader('./cssTestLoader.mjs', import.meta.url)
 const unregister = register()
@@ -35,11 +35,17 @@ const baseCapabilities = {
 function renderDemo(locale = 'en-US', capabilities = baseCapabilities, overrides = {}) {
   localStorage.setItem('squrve-demo-locale', locale)
   window.history.replaceState(null, '', '#configure')
+  const api = overrides.api || (async path => {
+    if (String(path).startsWith('/api/agent')) {
+      return { available: true, profile: 'hosted-readonly', skills: [] }
+    }
+    return { runs: [] }
+  })
   return render(React.createElement(FullFlowDemo, {
     capabilities,
     databases: [],
     sqlAuth: { configured: false },
-    api: async () => ({ runs: [] }),
+    api,
     postJson: async () => ({}),
     onConfigureSql: () => {},
     ...overrides,
@@ -47,7 +53,8 @@ function renderDemo(locale = 'en-US', capabilities = baseCapabilities, overrides
 }
 
 async function goToStep(user, name) {
-  await user.click(screen.getByRole('button', { name: `Go to ${name}` }))
+  const tabs = screen.getByRole('navigation', { name: 'Workflow stages' })
+  await user.click(within(tabs).getByRole('button', { name }))
 }
 
 test.afterEach(() => {
@@ -61,48 +68,94 @@ test.after(() => {
   closeDom()
 })
 
-test('renders six bilingual modules in process order', () => {
+test('renders five bilingual modules in process order', () => {
   renderDemo('en-US')
-  assert.ok(document.querySelector('.flow-demo'))
-  assert.ok(document.querySelector('.flow-process-rail'))
-  assert.ok(document.querySelector('.flow-demo-body'))
-  assert.equal(document.querySelectorAll('.flow-module').length, 6)
-  assert.ok(document.querySelector('.flow-glass'))
+  assert.ok(document.querySelector('.flow-demo.agent-shell'))
+  assert.equal(document.querySelector('.agent-icon-rail'), null)
+  assert.ok(document.querySelector('.agent-chat-column'))
+  assert.ok(document.querySelector('.agent-dashboard-pane'))
+  assert.equal(document.querySelectorAll('.flow-module').length, 5)
   assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'configure')
   assert.deepEqual(
     [...document.querySelectorAll('.flow-module')].map(section => section.id),
-    ['configure', 'compose', 'run', 'inspect', 'diagnose', 'improve'],
+    ['configure', 'compose', 'board', 'visualize', 'archive'],
   )
-  assert.equal(screen.getByRole('heading', { level: 2 }).textContent, 'Configuration Studio')
-  assert.equal(screen.getAllByRole('button', { name: /^Go to / }).length, 6)
+  assert.equal(document.querySelector('#configure h2')?.textContent, 'Studio')
+  const tabs = screen.getByRole('navigation', { name: 'Workflow stages' })
+  assert.equal(within(tabs).getAllByRole('button').length, 5)
+  assert.ok(document.querySelector('.agent-chat-body'))
+  assert.ok(screen.getByTestId('pi-backend-badge'))
+  assert.match(screen.getByTestId('pi-backend-badge').textContent, /Pi/)
 })
 
-test('switches process pages from the left rail', async () => {
+test('collapses either pane without hiding both and persists the shell layout', async () => {
+  renderDemo('en-US')
+  const user = userEvent.setup()
+  const shell = screen.getByTestId('agent-shell')
+
+  await user.click(screen.getByRole('button', { name: 'Collapse SqurveBridge Agent' }))
+  assert.ok(shell.classList.contains('agent-collapsed'))
+  assert.equal(JSON.parse(localStorage.getItem('squrve-demo-shell-layout')).agentCollapsed, true)
+
+  await user.click(screen.getByRole('button', { name: 'Expand SqurveBridge Agent' }))
+  assert.equal(shell.classList.contains('agent-collapsed'), false)
+  await user.click(screen.getByRole('button', { name: 'Collapse dashboard' }))
+  assert.ok(shell.classList.contains('dashboard-collapsed'))
+  assert.equal(shell.classList.contains('agent-collapsed'), false)
+})
+
+test('switches process pages from the stage tabs', async () => {
   renderDemo()
   const user = userEvent.setup()
 
   await goToStep(user, 'Compose')
   assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'compose')
-  assert.ok(screen.getByRole('heading', { name: 'Workflow Composition' }))
+  assert.equal(document.querySelector('#compose h2')?.textContent, 'Workflow Composition')
   assert.equal(window.location.hash, '#compose')
 
-  await user.click(screen.getByRole('button', { name: 'Next' }))
-  assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'run')
-  assert.ok(screen.getByRole('heading', { name: 'Run Workspace' }))
+  await goToStep(user, 'Run')
+  assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'board')
+  assert.equal(document.querySelector('#board h2')?.textContent, 'Experiment Board')
 
-  await goToStep(user, 'Improve')
-  assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'improve')
+  await goToStep(user, 'Archive')
+  assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'archive')
+  const tabs = screen.getByRole('navigation', { name: 'Workflow stages' })
   assert.equal(
-    screen.getByRole('button', { name: 'Go to Improve' }).getAttribute('aria-current'),
+    within(tabs).getByRole('button', { name: 'Archive' }).getAttribute('aria-current'),
     'page',
   )
+})
+
+test('maps legacy process hashes onto the five-step flow', () => {
+  localStorage.setItem('squrve-demo-locale', 'en-US')
+  window.history.replaceState(null, '', '#run')
+  render(React.createElement(FullFlowDemo, {
+    capabilities: baseCapabilities,
+    databases: [],
+    sqlAuth: { configured: false },
+    api: async () => ({ runs: [] }),
+    postJson: async () => ({}),
+    onConfigureSql: () => {},
+  }))
+  assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'board')
+  cleanup()
+  localStorage.clear()
+  window.history.replaceState(null, '', '#inspect')
+  render(React.createElement(FullFlowDemo, {
+    capabilities: baseCapabilities,
+    databases: [],
+    sqlAuth: { configured: false },
+    api: async () => ({ runs: [] }),
+    postJson: async () => ({}),
+    onConfigureSql: () => {},
+  }))
+  assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'visualize')
 })
 
 test('keeps functional controls and technical metadata readable', () => {
   assert.match(fullFlowCss, /--flow-type-control:\s*12px/)
   assert.match(fullFlowCss, /--flow-type-meta:\s*11px/)
   for (const selector of [
-    '.catalog-card-select',
     '.flashcard-tile-open',
     '.flashcard-face section p',
     '.flow-graph-nodes button',
@@ -122,48 +175,47 @@ test('keeps functional controls and technical metadata readable', () => {
 test('switches to Chinese and persists the locale', async () => {
   renderDemo('en-US')
   await userEvent.setup().click(screen.getByRole('button', { name: '切换到中文' }))
-  assert.ok(screen.getByRole('heading', { name: '配置工作台' }))
+  assert.equal(document.querySelector('#configure h2')?.textContent, '工作室')
   assert.equal(localStorage.getItem('squrve-demo-locale'), 'zh-CN')
   assert.equal(document.documentElement.lang, 'zh-CN')
 })
 
-test('supports additive method and database selection without clearing the last item', async () => {
+test('supports additive method and database selection on Compose without clearing the last item', async () => {
   renderDemo()
   const user = userEvent.setup()
 
-  assert.equal(screen.getAllByRole('button', { name: /^Select method / }).length, 8)
-  assert.equal(screen.getAllByRole('button', { name: /^Select database / }).length, 8)
   assert.ok(document.querySelector('[data-testid="catalog-workspaces"]'))
   assert.equal(document.querySelectorAll('.catalog-workspace').length, 2)
-  await user.click(screen.getByRole('button', { name: 'Select method DINSQL' }))
-  await user.click(screen.getByRole('button', { name: 'Select database BIRD' }))
+  assert.equal(screen.getAllByRole('button', { name: /^Open flashcard for method / }).length, 8)
+  assert.equal(screen.getAllByRole('button', { name: /^Open flashcard for database / }).length, 8)
 
-  assert.equal(screen.getByRole('button', { name: 'Select method C3SQL' }).getAttribute('aria-pressed'), 'true')
-  assert.equal(screen.getByRole('button', { name: 'Select method DINSQL' }).getAttribute('aria-pressed'), 'true')
-  assert.equal(screen.getByRole('button', { name: 'Select database Spider' }).getAttribute('aria-pressed'), 'true')
-  assert.equal(screen.getByRole('button', { name: 'Select database BIRD' }).getAttribute('aria-pressed'), 'true')
   await goToStep(user, 'Compose')
+  await user.click(screen.getByRole('button', { name: 'Toggle graph method DINSQL' }))
+  await user.click(screen.getByRole('button', { name: 'Toggle graph database BIRD' }))
+
+  assert.equal(screen.getByRole('button', { name: 'Toggle graph method C3SQL' }).getAttribute('aria-pressed'), 'true')
+  assert.equal(screen.getByRole('button', { name: 'Toggle graph method DINSQL' }).getAttribute('aria-pressed'), 'true')
+  assert.equal(screen.getByRole('button', { name: 'Toggle graph database Spider' }).getAttribute('aria-pressed'), 'true')
+  assert.equal(screen.getByRole('button', { name: 'Toggle graph database BIRD' }).getAttribute('aria-pressed'), 'true')
   assert.equal(screen.getAllByRole('button', { name: /^Focus connection / }).length, 4)
 
-  await goToStep(user, 'Configure')
-  await user.click(screen.getByRole('button', { name: 'Select method C3SQL' }))
-  await user.click(screen.getByRole('button', { name: 'Select method DINSQL' }))
-  assert.equal(screen.getByRole('button', { name: 'Select method DINSQL' }).getAttribute('aria-pressed'), 'true')
+  await user.click(screen.getByRole('button', { name: 'Toggle graph method C3SQL' }))
+  await user.click(screen.getByRole('button', { name: 'Toggle graph method DINSQL' }))
+  assert.equal(screen.getByRole('button', { name: 'Toggle graph method DINSQL' }).getAttribute('aria-pressed'), 'true')
 })
 
-test('shows an honest read-only Pi surface on hosted Configure', async () => {
+test('keeps Studio focused on explaining methods and databases', async () => {
   renderDemo()
   const user = userEvent.setup()
 
-  assert.ok(screen.getByTestId('configure-agent-panel'))
-  assert.match(screen.getByTestId('configure-agent-panel').textContent, /Inspect the published SqurveBridge bundle/)
-  assert.match(screen.getByTestId('configure-agent-panel').textContent, /cannot fetch or integrate external repositories/)
-  assert.match(document.querySelector('#configure').textContent, /published configurations bundled with SqurveBridge/)
-  assert.doesNotMatch(screen.getByTestId('configure-agent-panel').textContent, /candidate-reader/)
-  assert.ok(screen.getByRole('button', { name: 'Open Pi Agent chat' }))
-  assert.match(screen.getByTestId('focused-configuration').textContent, /Compose/)
+  assert.equal(screen.queryByTestId('configure-agent-panel'), null)
+  assert.match(document.querySelector('#configure').textContent, /Studio|工作室/)
+  assert.match(screen.getByTestId('studio-guide').textContent, /Explain methods|讲解方法/)
+  assert.ok(document.querySelector('.agent-chat-column'))
+  assert.match(screen.getByRole('heading', { level: 2, name: 'SqurveBridge Agent' }).textContent, /SqurveBridge Agent/)
   assert.equal(document.querySelector('#configure .flow-connection-graph'), null)
   assert.equal(document.querySelector('#configure [data-testid="actor-workflow"]'), null)
+  assert.equal(screen.queryByRole('button', { name: /^Select method / }), null)
 
   await goToStep(user, 'Compose')
   assert.ok(document.querySelector('#compose .flow-connection-graph'))
@@ -171,20 +223,20 @@ test('shows an honest read-only Pi surface on hosted Configure', async () => {
   assert.match(document.querySelector('#compose').textContent, /Method × Database/)
 })
 
-test('keeps external integration intake on the trusted local Configure surface', () => {
+test('keeps the local Configure surface free of a duplicate agent intake panel', () => {
   renderDemo('en-US', baseCapabilities, { credentialMode: 'local' })
 
-  assert.match(screen.getByTestId('configure-agent-panel').textContent, /Integrate external methods/)
-  assert.match(screen.getByTestId('configure-agent-panel').textContent, /candidate-reader/)
-  assert.ok(screen.getByLabelText('Candidate GitHub repository'))
+  assert.equal(screen.queryByTestId('configure-agent-panel'), null)
+  assert.equal(screen.queryByLabelText('Candidate GitHub repository'), null)
+  assert.ok(document.querySelector('.agent-chat-column'))
 })
 
 test('opens method and database flashcards with what, origin, and intro', async () => {
   renderDemo()
   const user = userEvent.setup()
 
-  assert.match(document.querySelector('#configure').textContent, /Three-layer recall/)
-  assert.match(document.querySelector('#configure').textContent, /Classic cross-domain/)
+  assert.ok(document.querySelector('#configure.configuration-studio-compact'))
+  assert.match(document.querySelector('#configure').textContent, /Three-layer recall|Question enrichment/)
   await user.click(screen.getByRole('button', { name: 'Open flashcard for method E-SQL' }))
   const dialog = screen.getByTestId('flashcard-dialog')
   assert.match(dialog.textContent, /What it is/)
@@ -193,6 +245,7 @@ test('opens method and database flashcards with what, origin, and intro', async 
   assert.match(dialog.textContent, /CSG-QE-SR/)
   assert.match(dialog.textContent, /arXiv:2409\.16751/)
   assert.ok(screen.getByRole('link', { name: 'arXiv:2409.16751' }))
+  assert.equal(screen.queryByRole('button', { name: /Select method|Select for run/ }), null)
   await user.click(screen.getByRole('button', { name: 'Done' }))
   await user.click(screen.getByRole('button', { name: 'Open flashcard for database BIRD' }))
   assert.ok(screen.getByRole('link', { name: 'https://bird-bench.github.io/' }))
@@ -221,9 +274,6 @@ test('supports arbitrary graph connections without cartesian expansion', async (
     screen.getByRole('button', { name: 'Toggle connection DINSQL to BIRD' }).getAttribute('aria-pressed'),
     'true',
   )
-  await goToStep(user, 'Configure')
-  assert.match(screen.getByTestId('focused-configuration').textContent, /DINSQL → BIRD/)
-  await goToStep(user, 'Compose')
   assert.match(screen.getByTestId('compose-workflow-panel').textContent, /DINSQL → BIRD/)
 })
 
@@ -269,13 +319,14 @@ test('moves method focus to a remaining selected method when removing the focuse
   })
   const user = userEvent.setup()
 
-  await user.click(screen.getByRole('button', { name: 'Select method DINSQL' }))
-  assert.match(screen.getByTestId('focused-configuration').textContent, /dinsql\.json/)
-  await user.click(screen.getByRole('button', { name: 'Select method DINSQL' }))
+  await goToStep(user, 'Compose')
+  await user.click(screen.getByRole('button', { name: 'Toggle graph method DINSQL' }))
+  assert.match(screen.getByTestId('compose-workflow-panel').textContent, /DINSQL → Spider/)
+  await user.click(screen.getByRole('button', { name: 'Toggle graph method DINSQL' }))
 
-  assert.equal(screen.getByRole('button', { name: 'Select method C3SQL' }).getAttribute('aria-pressed'), 'true')
-  assert.equal(screen.getByRole('button', { name: 'Select method DINSQL' }).getAttribute('aria-pressed'), 'false')
-  assert.match(screen.getByTestId('focused-configuration').textContent, /c3sql\.json/)
+  assert.equal(screen.getByRole('button', { name: 'Toggle graph method C3SQL' }).getAttribute('aria-pressed'), 'true')
+  assert.equal(screen.getByRole('button', { name: 'Toggle graph method DINSQL' }).getAttribute('aria-pressed'), 'false')
+  assert.match(screen.getByTestId('compose-workflow-panel').textContent, /C3SQL → Spider/)
 })
 
 test('moves database focus to a remaining selected database when removing the focused database', async () => {
@@ -292,48 +343,46 @@ test('moves database focus to a remaining selected database when removing the fo
   })
   const user = userEvent.setup()
 
-  await user.click(screen.getByRole('button', { name: 'Select database BIRD' }))
-  assert.match(screen.getByTestId('focused-configuration').textContent, /bird\/c3sql\.json/)
-  await user.click(screen.getByRole('button', { name: 'Select database BIRD' }))
+  await goToStep(user, 'Compose')
+  await user.click(screen.getByRole('button', { name: 'Toggle graph database BIRD' }))
+  assert.match(screen.getByTestId('compose-workflow-panel').textContent, /C3SQL → BIRD/)
+  await user.click(screen.getByRole('button', { name: 'Toggle graph database BIRD' }))
 
-  assert.equal(screen.getByRole('button', { name: 'Select database Spider' }).getAttribute('aria-pressed'), 'true')
-  assert.equal(screen.getByRole('button', { name: 'Select database BIRD' }).getAttribute('aria-pressed'), 'false')
-  assert.match(screen.getByTestId('focused-configuration').textContent, /spider\/c3sql\.json/)
+  assert.equal(screen.getByRole('button', { name: 'Toggle graph database Spider' }).getAttribute('aria-pressed'), 'true')
+  assert.equal(screen.getByRole('button', { name: 'Toggle graph database BIRD' }).getAttribute('aria-pressed'), 'false')
+  assert.match(screen.getByTestId('compose-workflow-panel').textContent, /C3SQL → Spider/)
 })
 
-test('renders real run controls while preserving persisted-evidence boundaries', async () => {
+test('renders real board controls for config runs', async () => {
   renderDemo('en-US')
   const user = userEvent.setup()
 
   await goToStep(user, 'Run')
-  assert.match(document.querySelector('#run').textContent, /Configuration preview/)
-  assert.doesNotMatch(document.querySelector('#run').textContent, /configuration is unavailable/)
-  assert.equal(screen.getByRole('button', { name: 'Run workflow' }).disabled, true)
-  await goToStep(user, 'Inspect')
-  assert.match(document.querySelector('#inspect').textContent, /Run a workflow to inspect its artifacts/)
-  assert.equal(screen.queryByTestId('inspect-sample-banner'), null)
-  await goToStep(user, 'Diagnose')
-  await screen.findByText(/Diagnosis requires a persisted score bundle/)
-  assert.match(document.querySelector('#diagnose').textContent, /persisted score bundle/)
-  await goToStep(user, 'Improve')
-  assert.match(document.querySelector('#improve').textContent, /persisted improvement or weakness-evolution record/)
+  assert.match(document.querySelector('#board').textContent, /Parameter console/)
+  assert.match(document.querySelector('#board').textContent, /reproduce\/run\.py|Config/)
+  assert.equal(screen.getByRole('button', { name: 'Run config' }).disabled, true)
+  assert.equal(document.querySelector('#board .diagnosis-workspace'), null)
+  assert.equal(document.querySelector('#board .improvement-workspace'), null)
+  await goToStep(user, 'Visualize')
+  assert.match(document.querySelector('#visualize').textContent, /Evaluation Visualization|No evaluation charts yet|No aligned score/)
+  await goToStep(user, 'Archive')
+  assert.match(document.querySelector('#archive').textContent, /Experiment Archive|No archived runs/)
 })
 
-test('translates the process navigation, run controls, and evidence boundaries', async () => {
+test('translates the process navigation and board controls', async () => {
   renderDemo('en-US')
-  assert.ok(screen.getByRole('navigation', { name: 'Text-to-SQL workflow' }))
+  assert.ok(screen.getByRole('navigation', { name: 'Workflow stages' }))
 
   const user = userEvent.setup()
   await user.click(screen.getByRole('button', { name: '切换到中文' }))
 
-  assert.ok(screen.getByRole('navigation', { name: 'Text-to-SQL 工作流' }))
-  await user.click(screen.getByRole('button', { name: '前往运行' }))
-  assert.match(document.querySelector('#run').textContent, /配置预览/)
-  assert.ok(screen.getByRole('button', { name: '从运行工作台配置 SQL API' }))
-  await user.click(screen.getByRole('button', { name: '前往诊断' }))
-  assert.match(document.querySelector('#diagnose').textContent, /持久化评分包/)
-  await user.click(screen.getByRole('button', { name: '前往改进' }))
-  assert.match(document.querySelector('#improve').textContent, /持久化改进记录或弱点演化记录/)
+  const tabs = screen.getByRole('navigation', { name: '工作流阶段' })
+  assert.ok(tabs)
+  await user.click(within(tabs).getByRole('button', { name: '运行' }))
+  assert.match(document.querySelector('#board').textContent, /参数工作台/)
+  assert.match(document.querySelector('#board').textContent, /运行 Config|reproduce\/run\.py|本地 Demo/)
+  assert.equal(document.querySelector('#board .diagnosis-workspace'), null)
+  assert.equal(document.querySelector('#board .improvement-workspace'), null)
 })
 
 test('renders only configuration-backed workflow and provenance', async () => {
@@ -342,9 +391,6 @@ test('renders only configuration-backed workflow and provenance', async () => {
 
   await goToStep(user, 'Compose')
   assert.ok(screen.getByRole('group', { name: /^Method to database configuration matrix/ }))
-  await goToStep(user, 'Configure')
-  assert.match(screen.getByTestId('focused-configuration').textContent, /reproduce\/configs\/spider\/c3sql\.json/)
-  await goToStep(user, 'Compose')
   assert.match(screen.getByTestId('actor-workflow').textContent, /C3SQLGenerator/)
   assert.match(screen.getByTestId('actor-workflow').textContent, /GenerateTask/)
 
@@ -357,22 +403,81 @@ test('renders only configuration-backed workflow and provenance', async () => {
 test('does not invent stages for an unavailable connection', async () => {
   renderDemo()
   const user = userEvent.setup()
-  await user.click(screen.getByRole('button', { name: 'Select database BIRD' }))
   await goToStep(user, 'Compose')
+  await user.click(screen.getByRole('button', { name: 'Toggle connection C3SQL to BIRD' }))
   await user.click(screen.getByRole('button', { name: 'Focus connection C3SQL to BIRD' }))
 
-  await goToStep(user, 'Configure')
-  assert.match(screen.getByTestId('focused-configuration').textContent, /Unavailable/)
-  await goToStep(user, 'Compose')
   assert.match(screen.getByTestId('actor-workflow').textContent, /No verified workflow/)
   assert.doesNotMatch(screen.getByTestId('actor-workflow').textContent, /Generator/)
   await goToStep(user, 'Run')
-  assert.match(document.querySelector('#run').textContent, /configuration is unavailable/)
-  assert.equal(screen.getByRole('button', { name: 'Run workflow' }).disabled, true)
+  assert.match(document.querySelector('#board').textContent, /configuration is unavailable/)
+  assert.equal(screen.getByRole('button', { name: 'Run config' }).disabled, true)
 })
 
-test('keeps completed evidence labelled with its immutable run connection after focus changes', async () => {
+test('opens a hosted archive summary in Visualize without requesting raw files', async () => {
+  const calls = []
+  const api = async path => {
+    calls.push(String(path))
+    if (String(path).startsWith('/api/archive?') || path === '/api/archive') {
+      return {
+        runs: [{
+          run_id: 'run-archive-1',
+          method: 'c3sql',
+          dataset: 'spider',
+          split: 'dev',
+          source: 'evidence',
+          metrics: { ex: 0.5 },
+          file_count: 1,
+        }],
+        filters: { datasets: ['spider'], methods: ['c3sql'], sources: ['evidence'] },
+        total: 1,
+      }
+    }
+    if (path === '/api/archive/run-archive-1') {
+      return {
+        run_id: 'run-archive-1',
+        method: 'c3sql',
+        dataset: 'spider',
+        split: 'dev',
+        source: 'evidence',
+        metrics: { ex: 0.5 },
+        files: [{ name: 'scores.json', path: 'scores.json', size_bytes: 12, kind: 'json' }],
+      }
+    }
+    if (String(path).includes('/api/archive/run-archive-1/files/')) {
+      return {
+        name: 'scores.json',
+        path: 'scores.json',
+        kind: 'json',
+        json: {
+          method: 'c3sql',
+          dataset: 'spider',
+          metrics: { ex: 0.5, em: 0.4 },
+        },
+      }
+    }
+    return { runs: [] }
+  }
+  renderDemo('en-US', {
+    ...baseCapabilities,
+    deployment: { target: 'hf-space', features: { live_evaluation: false } },
+  }, { api })
+  const user = userEvent.setup()
+
+  await goToStep(user, 'Archive')
+  await screen.findByText('run-archive-1')
+  await screen.findByRole('button', { name: 'Open in Visualize' })
+  await user.click(screen.getByRole('button', { name: 'Open in Visualize' }))
+
+  assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'visualize')
+  assert.equal(window.location.hash, '#visualize')
+  await screen.findByText(/Archive run · run-archive-1/)
+  assert.equal(calls.some(path => path.includes('/files/')), false)
+})
+
+test('keeps config-run jobs labelled with their immutable connection after focus changes', async () => {
   const capabilities = {
+    deployment: { features: { live_evaluation: true } },
     reproduce_configs: [
       baseCapabilities.reproduce_configs[0],
       {
@@ -383,31 +488,43 @@ test('keeps completed evidence labelled with its immutable run connection after 
       },
     ],
   }
-  const postJson = async path => path === '/api/query'
-    ? { sql: 'SELECT sku FROM demo_inventory', trace: [{ actor_name: 'C3SQLGenerator' }] }
-    : { columns: ['sku'], rows: [['SKU-001']], row_count: 1, elapsed_ms: 4 }
+  const postJson = async (path, body) => {
+    if (path === '/api/evaluations') {
+      return {
+        job_id: 'job-1',
+        method: body.method,
+        dataset: body.dataset,
+        status: 'completed',
+      }
+    }
+    return {}
+  }
   renderDemo('en-US', capabilities, {
     databases: [{ id: 'Spider' }, { id: 'BIRD' }],
     sqlAuth: { configured: true, provider: 'openai', model: 'gpt-4.1-mini' },
     postJson,
+    api: async path => {
+      if (String(path).startsWith('/api/archive')) {
+        return { runs: [], filters: { datasets: [], methods: [], sources: [] }, total: 0 }
+      }
+      return { job_id: 'job-1', method: 'c3sql', dataset: 'spider', status: 'completed', log: 'ok' }
+    },
   })
   const user = userEvent.setup()
 
   await goToStep(user, 'Run')
-  await user.type(screen.getByLabelText('Question'), 'List demo inventory SKUs')
-  await user.click(screen.getByRole('button', { name: 'Run workflow' }))
-  assert.equal((await screen.findAllByText('SELECT sku FROM demo_inventory')).length, 2)
+  await user.click(screen.getByRole('button', { name: 'Run config' }))
+  await screen.findByText((content, element) => {
+    return element?.tagName === 'STRONG' && /c3sql\s*\/\s*spider/i.test(content)
+  })
 
-  await goToStep(user, 'Configure')
-  await user.click(screen.getByRole('button', { name: 'Select database BIRD' }))
   await goToStep(user, 'Compose')
+  await user.click(screen.getByRole('button', { name: 'Toggle connection C3SQL to BIRD' }))
   await user.click(screen.getByRole('button', { name: 'Focus connection C3SQL to BIRD' }))
+  assert.match(screen.getByTestId('compose-workflow-panel').textContent, /C3SQL → BIRD/)
 
-  await goToStep(user, 'Configure')
-  assert.match(screen.getByTestId('focused-configuration').textContent, /bird\/c3sql\.json/)
-  await goToStep(user, 'Inspect')
-  const context = screen.getByTestId('run-context').textContent
-  assert.match(context, /Spider/)
-  assert.match(context, /spider\/c3sql\.json/)
-  assert.doesNotMatch(context, /bird\/c3sql\.json/)
+  await goToStep(user, 'Run')
+  const monitor = screen.getByTestId('run-batch-monitor').textContent
+  assert.match(monitor, /c3sql\s*\/\s*spider/i)
+  assert.doesNotMatch(monitor, /c3sql\s*\/\s*bird/i)
 })

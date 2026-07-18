@@ -395,7 +395,6 @@ export async function runBridge(argv = process.argv.slice(2)) {
   if (config.profile !== 'hosted-readonly') {
     if (config.provider && config.model) model = modelRegistry.find(config.provider, config.model)
     if (!model) model = modelRegistry.getAvailable()[0]
-    if (!model) throw new Error(`Pi model is unavailable: ${config.provider || '<auto>'}/${config.model || '<auto>'}`)
   }
 
   const hostedTools = config.profile === 'hosted-readonly' ? createHostedTools(sdk, config) : null

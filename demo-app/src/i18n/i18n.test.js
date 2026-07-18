@@ -14,7 +14,7 @@ test('detects Chinese only for zh browser locales and honors stored locale', () 
 test('translates parameters and falls back to English', () => {
   assert.equal(translate('zh-CN', 'header.configCount', { count: 64 }), '64 个规范配置')
   assert.equal(translate('zh-CN', 'missing.key'), 'missing.key')
-  assert.equal(translate('invalid', 'process.configure'), 'Configure')
+  assert.equal(translate('invalid', 'process.configure'), 'Studio')
 })
 
 test('keeps staging and accessibility keys shared across both dictionaries', () => {

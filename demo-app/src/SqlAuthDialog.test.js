@@ -18,7 +18,16 @@ async function loadDialog() {
 }
 
 const providers = [
-  { id: 'qwen', models: ['qwen-plus', 'qwen-max'], default_model: 'qwen-plus' },
+  {
+    id: 'qwen',
+    models: ['qwen-plus', 'qwen-max'],
+    default_model: 'qwen-plus',
+    default_endpoint_id: 'china',
+    endpoints: [
+      { id: 'china', label: 'China (Beijing)' },
+      { id: 'international', label: 'International (Singapore)' },
+    ],
+  },
   { id: 'deepseek', models: ['deepseek-chat'], default_model: 'deepseek-chat' },
 ]
 
@@ -139,4 +148,29 @@ test('accepts a custom SQL model id while keeping catalog suggestions', async ()
   await user.click(screen.getByRole('button', { name: 'Test connection' }))
 
   assert.equal(JSON.parse(calls.at(-1).options.body).model, 'qwen-custom-latest')
+})
+
+test('sends only an allowlisted Qwen API region identifier', async () => {
+  const SqlAuthDialog = await loadDialog()
+  const calls = []
+  const api = async (path, options = {}) => {
+    calls.push({ path, options })
+    return { status: 'ok', validated: true, provider: 'qwen', model: 'qwen-plus' }
+  }
+  const user = userEvent.setup()
+  render(React.createElement(SqlAuthDialog, {
+    open: true,
+    api,
+    status: { configured: false, providers },
+    onStatusChange: () => {},
+    onClose: () => {},
+  }))
+
+  await user.selectOptions(screen.getByLabelText('API region'), 'international')
+  await user.type(screen.getByLabelText('API key'), 'regional-test-key')
+  await user.click(screen.getByRole('button', { name: 'Test connection' }))
+
+  const payload = JSON.parse(calls.at(-1).options.body)
+  assert.equal(payload.endpoint_id, 'international')
+  assert.equal(Object.hasOwn(payload, 'base_url'), false)
 })

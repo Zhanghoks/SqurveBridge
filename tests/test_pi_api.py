@@ -109,7 +109,7 @@ class PiApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["backend"], "pi")
         self.assertEqual(response.json["profile"], "hosted-readonly")
-        self.assertEqual(response.json["skills"], [])
+        self.assertEqual(response.json["skills"], sorted(self.api_module().PI_SKILLS))
 
     def test_catalog_discovers_all_skills_from_the_project(self):
         module = self.api_module()
