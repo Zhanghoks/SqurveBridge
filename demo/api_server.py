@@ -96,7 +96,7 @@ _sql_credentials = SessionCredentialRegistry(max_sessions=128, idle_timeout=1800
 _session_cookie_name = "squrve_session"
 _sample_limits = {3, 10, 20, 50, 100, 200}
 _provider_models = {
-    "qwen": ["qwen-turbo", "qwen-plus", "qwen-max", "deepseek-v4-flash"],
+    "qwen": ["qwen-plus", "qwen-max", "qwen-turbo", "deepseek-v4-flash"],
     "deepseek": ["deepseek-chat", "deepseek-reasoner"],
     "zhipu": ["glm-4-plus", "glm-4-flash"],
     "openai": ["gpt-4o-mini", "gpt-4.1-mini"],
@@ -286,6 +286,12 @@ def _validate_sql_credential(credential: SqlCredential) -> None:
             for token in ("401", "403", "invalid_api_key", "invalid api key", "incorrect api key")
         ):
             raise SqlAuthError("credential_rejected") from None
+        if status_code == 429 or "rate limit" in message or "rate_limit" in message:
+            raise SqlAuthError("provider_rate_limited") from None
+        if status_code in {400, 404, 422}:
+            raise SqlAuthError("model_rejected") from None
+        if "timeout" in type(exc).__name__.lower() or "timed out" in message:
+            raise SqlAuthError("provider_timeout") from None
         raise SqlAuthError("provider_unreachable") from None
 
 
@@ -293,6 +299,9 @@ def _sql_auth_error_response(error: SqlAuthError, provider: str = "provider"):
     statuses = {
         "credential_rejected": 401,
         "provider_unreachable": 503,
+        "provider_timeout": 504,
+        "provider_rate_limited": 429,
+        "model_rejected": 400,
         "origin_forbidden": 403,
         "unsupported_provider": 400,
         "unsupported_model": 400,
@@ -303,6 +312,9 @@ def _sql_auth_error_response(error: SqlAuthError, provider: str = "provider"):
     messages = {
         "credential_rejected": f"The {provider} credential was rejected.",
         "provider_unreachable": f"The {provider} provider could not be reached.",
+        "provider_timeout": f"The {provider} endpoint timed out. Check the selected region and Workspace ID.",
+        "provider_rate_limited": f"The {provider} account is currently rate limited.",
+        "model_rejected": f"The selected {provider} model is unavailable for this region or workspace.",
         "unsupported_provider": "The selected SQL provider is unsupported.",
         "unsupported_model": "The selected SQL model is unsupported.",
         "unsupported_endpoint": "The selected SQL provider region is unsupported.",

@@ -341,6 +341,32 @@ class SpaceApiTests(unittest.TestCase):
         self.assertEqual(response.json["code"], "credential_rejected")
         self.assertNotIn("rejected-secret", response.get_data(as_text=True))
 
+    def test_sql_auth_classifies_model_rate_limit_and_timeout_failures(self):
+        credential = self.api_server._credential_from_payload({
+            "provider": "qwen",
+            "model": "qwen-plus",
+            "api_key": "classification-secret",
+            "endpoint_id": "china_workspace",
+            "workspace_id": "llm-valid-123",
+        })
+
+        class ProviderError(Exception):
+            def __init__(self, message, status_code=None):
+                super().__init__(message)
+                self.status_code = status_code
+
+        cases = [
+            (ProviderError("model not found", 404), "model_rejected"),
+            (ProviderError("rate limit reached", 429), "provider_rate_limited"),
+            (TimeoutError("request timed out"), "provider_timeout"),
+        ]
+        for exception, expected in cases:
+            with self.subTest(expected=expected), patch.object(
+                self.api_server, "_session_demo", side_effect=exception
+            ), self.assertRaises(self.api_server.SqlAuthError) as raised:
+                self.api_server._validate_sql_credential(credential)
+            self.assertEqual(raised.exception.code, expected)
+
     def test_hosted_query_requires_and_uses_only_the_session_credential(self):
         database = {"id": "demo", "db_path": "/tmp/demo.sqlite", "schema_path": "/tmp/schema.json"}
         fake_demo = Mock()
