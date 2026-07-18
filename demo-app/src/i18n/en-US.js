@@ -5,7 +5,7 @@ export default {
   'local.notice': 'Local development · .env model credentials · full debugging runtime',
   'boot.loading': 'Loading demo…',
   'boot.error': 'The demo could not load its deployment configuration. Please retry.',
-  'header.configureApi': 'Configure SQL API',
+  'header.configureApi': 'Configure LLM',
   'header.configureLocalApi': 'Configure LLM',
   'process.configure': 'Studio',
   'process.compose': 'Compose',

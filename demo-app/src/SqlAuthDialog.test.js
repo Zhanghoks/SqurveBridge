@@ -56,20 +56,16 @@ test('tests and saves a masked SQL credential without retaining it', async () =>
     onClose: () => {},
   }))
 
-  await user.type(screen.getByLabelText('Search providers'), 'deep')
-  assert.equal(screen.queryByRole('button', { name: /qwen/i }), null)
-  await user.click(screen.getByRole('button', { name: /deepseek/i }))
+  await user.selectOptions(screen.getByLabelText('Provider'), 'deepseek')
   const keyInput = screen.getByLabelText('API key')
   assert.equal(keyInput.type, 'password')
   await user.type(keyInput, 'sql-secret')
-  await user.click(screen.getByRole('button', { name: 'Show API key' }))
-  assert.equal(keyInput.type, 'text')
 
   await user.click(screen.getByRole('button', { name: 'Test connection' }))
   assert.equal(calls.at(-1).path, '/api/sql-auth/test')
   assert.equal(keyInput.value, 'sql-secret')
 
-  await user.click(screen.getByRole('button', { name: 'Use for this session' }))
+  await user.click(screen.getByRole('button', { name: 'Save' }))
   assert.equal(calls.at(-1).path, '/api/sql-auth')
   assert.equal(calls.at(-1).options.method, 'PUT')
   assert.equal(keyInput.value, '')
@@ -141,7 +137,8 @@ test('accepts a custom SQL model id while keeping catalog suggestions', async ()
 
   const modelInput = screen.getByLabelText('Model')
   assert.equal(modelInput.tagName, 'INPUT')
-  assert.equal(modelInput.getAttribute('list'), 'sql-model-suggestions')
+  assert.ok(screen.getByRole('list', { name: 'Suggested models' }))
+  assert.ok(screen.getByRole('button', { name: 'qwen-plus' }))
   await user.clear(modelInput)
   await user.type(modelInput, 'qwen-custom-latest')
   await user.type(screen.getByLabelText('API key'), 'custom-model-secret')

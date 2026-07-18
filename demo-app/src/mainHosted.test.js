@@ -87,8 +87,7 @@ test('hosted App exposes session SQL configuration instead of local env configur
   HostedApp = appElement.type
   render(React.createElement(appElement.type))
 
-  const configure = await screen.findByRole('button', { name: 'Configure SQL API' })
-  assert.equal(screen.queryByRole('button', { name: 'Configure LLM' }), null)
+  const configure = await screen.findByRole('button', { name: 'Configure LLM' })
   assert.equal(screen.queryByRole('dialog', { name: 'Connect a model' }), null)
   assert.match(document.body.textContent, /Bring your own SQL model credential/i)
   assert.deepEqual(
@@ -112,7 +111,12 @@ test('hosted App exposes session SQL configuration instead of local env configur
     assert.ok(requested.some(path => String(path).startsWith('/api/archive')))
   })
   await userEvent.setup().click(configure)
-  assert.ok(screen.getByRole('dialog', { name: 'Configure SQL API' }))
+  const dialog = screen.getByRole('dialog', { name: 'Configure LLM' })
+  assert.ok(within(dialog).getByRole('combobox', { name: 'Provider' }))
+  assert.ok(within(dialog).getByRole('list', { name: 'Suggested models' }))
+  assert.match(dialog.textContent, /current browser session/i)
+  assert.equal(within(dialog).queryByText(/Search providers/i), null)
+  assert.equal(within(dialog).queryByText(/Write to repo-root \.env/i), null)
 })
 
 test('local App renders the same full-flow surface as the hosted deployment', async () => {

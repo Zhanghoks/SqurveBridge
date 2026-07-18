@@ -5,7 +5,7 @@ export default {
   'local.notice': '本地开发模式 · 使用 .env 模型凭据 · 完整调试运行环境',
   'boot.loading': '正在加载演示…',
   'boot.error': '无法加载演示部署配置，请重试。',
-  'header.configureApi': '配置 SQL API',
+  'header.configureApi': '配置 LLM',
   'header.configureLocalApi': '配置 LLM',
   'process.configure': '工作室',
   'process.compose': '编排',
