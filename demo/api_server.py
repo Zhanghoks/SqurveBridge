@@ -1483,29 +1483,17 @@ def _artifact_comparison(
     return _comparison_payload(selected, methods)
 
 
-def _checkpoint_state_path(job: dict) -> Path:
-    run_id = f"{job['dataset']}-{job['method']}-{job['job_id']}"
-    return _project_root / "files" / "runs" / run_id / "checkpoints" / "state.json"
-
-
-def _job_has_checkpoint(job: dict) -> bool:
-    return _checkpoint_state_path(job).is_file()
-
-
-def _job_resumable(job: dict) -> bool:
-    """Mirror reproduce ``--resume``: failed/cancelled jobs with a checkpoint can continue."""
-    return job.get("status") in {"failed", "cancelled"} and _job_has_checkpoint(job)
-
-
 def _public_job(job: dict) -> dict:
-    public = {key: value for key, value in job.items() if key not in {"scores_path"}}
-    public["checkpoint_present"] = _job_has_checkpoint(job)
-    public["resumable"] = _job_resumable(job)
-    return public
+    return {key: value for key, value in job.items() if key not in {"scores_path"}}
 
 
 def _job_state_path(job_id: str) -> Path:
     return _run_dir / job_id / "job.json"
+
+
+def _checkpoint_state_path(job: dict) -> Path:
+    run_id = f"{job['dataset']}-{job['method']}-{job['job_id']}"
+    return _project_root / "files" / "runs" / run_id / "checkpoints" / "state.json"
 
 
 def _persist_job(job: dict) -> None:
@@ -1553,11 +1541,9 @@ def _spawn_evaluation_job(
         try:
             log_handle = log_path.open("a" if resume else "w", encoding="utf-8")
             if resume:
-                kind = "manual" if job.get("resume_mode") == "manual" else "autonomous"
                 log_handle.write(
-                    f"\n[demo] {kind} resume {job['resume_count']}/{job.get('max_resume_attempts', _max_resume_attempts)} "
-                    f"from {checkpoint_path.relative_to(_project_root)} "
-                    f"(reproduce/run.py --resume-from)\n"
+                    f"\n[demo] autonomous resume {job['resume_count']}/{_max_resume_attempts} "
+                    f"from {checkpoint_path.relative_to(_project_root)}\n"
                 )
                 log_handle.flush()
             process = subprocess.Popen(
@@ -1943,45 +1929,6 @@ def cancel_evaluation(job_id: str):
         if process is not None:
             process.terminate()
         return jsonify(_public_job(dict(job)))
-
-
-@app.post("/api/evaluations/<job_id>/resume")
-def resume_evaluation(job_id: str):
-    """Manual resume aligned with ``python reproduce/run.py … --resume-from <checkpoint>``."""
-    with _jobs_lock:
-        job = _jobs.get(job_id)
-        if not job:
-            return _json_error("Evaluation not found.", 404)
-        if job.get("status") in {"running", "resuming", "starting"}:
-            return _json_error("Evaluation is already active.", 409)
-        if not _job_resumable(job):
-            return _json_error(
-                "Only a failed or cancelled evaluation with a checkpoint can be resumed.",
-                409,
-            )
-        dataset = str(job["dataset"])
-        method = str(job["method"])
-    try:
-        _evaluation_llm_preflight(dataset, method)
-    except ValueError as exc:
-        return _json_error(str(exc))
-    with _jobs_lock:
-        job = _jobs.get(job_id)
-        if not job or not _job_resumable(job):
-            return _json_error(
-                "Only a failed or cancelled evaluation with a checkpoint can be resumed.",
-                409,
-            )
-        job["status"] = "resuming"
-        job["resume_mode"] = "manual"
-        job.pop("finished_at", None)
-        job.pop("recovery_error", None)
-        job.pop("launch_error", None)
-        _persist_job(job)
-    if not _spawn_evaluation_job(job_id, resume=True, expected_status="resuming"):
-        return _json_error("Evaluation resume could not be started.", 503)
-    with _jobs_lock:
-        return jsonify(_public_job(dict(_jobs[job_id]))), 202
 
 
 @app.post("/api/evaluations/<job_id>/profile")
