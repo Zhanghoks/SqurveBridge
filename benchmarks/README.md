@@ -14,9 +14,9 @@ The Live Demo exposes every installed database as a read-only target:
 | BULL-EN | All installed SQLite databases | `benchmarks/bull-en/` | Local reference asset |
 | EHRSQL-2024 | All installed SQLite databases | `benchmarks/ehrsql-2024/` | Local reference asset |
 
-`tools/build_hf_space.py --require-benchmarks` copies every installed SQLite
-database for those four benchmarks and their selected schema JSON files. It does
-not copy `dataset.json` or any other question/SQL payload. Before publishing a
-new source or replacing an asset, record the upstream source, immutable revision
-or checksum, and license/data-use terms, then run the repository privacy and
-security scans.
+The packaged benchmark archives contain the complete evaluation payloads,
+including questions and reference SQL where supplied upstream. The Space Docker
+build unpacks the same archives so hosted evaluation uses the exact packaged
+payload. Before publishing a new source or replacing an asset, record the
+upstream source, immutable revision or checksum, and license/data-use terms,
+then run the repository privacy and security scans.

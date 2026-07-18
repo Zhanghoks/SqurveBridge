@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract only the SQLite and schema files needed by the public Space."""
+"""Extract the complete versioned benchmark archives needed by the Space."""
 
 from __future__ import annotations
 
@@ -9,14 +9,6 @@ from pathlib import Path, PurePosixPath
 
 
 ARCHIVES = ("spider.zip", "bird.zip", "bull-en.zip", "ehrsql-2024.zip")
-SCHEMA_MEMBERS = {
-    "spider/dev/schema.json",
-    "bird/dev/schema.json",
-    "bull-en/dev/schema.json",
-    "ehrsql-2024/valid/schema.json",
-}
-
-
 def _safe_member(name: str) -> PurePosixPath:
     path = PurePosixPath(name)
     if not name or path.is_absolute() or ".." in path.parts or "\\" in name:
@@ -33,7 +25,7 @@ def extract_space_assets(archive_root: Path, output_root: Path) -> int:
         with zipfile.ZipFile(archive_path) as archive:
             for info in archive.infolist():
                 member = _safe_member(info.filename)
-                if member.suffix != ".sqlite" and member.as_posix() not in SCHEMA_MEMBERS:
+                if info.is_dir():
                     continue
                 target = output_root.joinpath(*member.parts)
                 target.parent.mkdir(parents=True, exist_ok=True)

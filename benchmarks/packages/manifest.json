@@ -30,45 +30,63 @@
       ]
     },
     "bull-en": {
-      "version": "BULL-EN Live Demo database snapshot",
+      "version": "BULL-EN complete benchmark snapshot",
       "archive": "benchmarks/packages/bull-en.zip",
       "top_level": "bull-en",
       "source": "https://bull-text-to-sql-benchmark.github.io/",
-      "license_notice": "BULL data remains subject to the terms published by its authors. This archive contains only SQLite databases and schema metadata for interactive research demonstration.",
-      "sha256": "c67f58985f516665eb3ffce07d6b2d97c8fe6eb8fa7735ab0153507ba40250db",
-      "archive_size": 10299312,
-      "uncompressed_size": 50750877,
-      "member_count": 4,
+      "license_notice": "BULL data remains subject to the terms published by its authors. This archive contains the complete benchmark payload for research evaluation.",
+      "sha256": "39f530962df4575a37714a7c171fdcd7da5646a65c5efd974a392ae7934e8831",
+      "archive_size": 10668709,
+      "uncompressed_size": 53181136,
+      "member_count": 9,
       "allowed_suffixes": [
         ".json",
         ".sqlite"
       ],
-      "dataset_counts": {},
+      "dataset_counts": {
+        "dev": 1000,
+        "test": 1000,
+        "train": 3966
+      },
       "sqlite_count": 3,
       "required_files": [
+        "bull-en/dev/dataset.json",
         "bull-en/dev/schema.json",
+        "bull-en/test/dataset.json",
+        "bull-en/test/schema.json",
+        "bull-en/train/dataset.json",
+        "bull-en/train/schema.json",
         "bull-en/database/ccks_fund.sqlite",
         "bull-en/database/ccks_macro.sqlite",
         "bull-en/database/ccks_stock.sqlite"
       ]
     },
     "ehrsql-2024": {
-      "version": "EHRSQL-2024 MIMIC-IV Demo database snapshot",
+      "version": "EHRSQL-2024 complete MIMIC-IV Demo snapshot",
       "archive": "benchmarks/packages/ehrsql-2024.zip",
       "top_level": "ehrsql-2024",
       "source": "https://github.com/glee4810/ehrsql-2024",
       "license_notice": "EHRSQL is CC-BY-4.0 and the bundled MIMIC-IV Demo database is subject to ODbL v1.0; preserve upstream attribution and data-use terms.",
-      "sha256": "e7fa71dd8aee21f6a1612114aa1e6736eeb47b8f6ef2b012234ffa861bef158d",
-      "archive_size": 11069146,
-      "uncompressed_size": 37038248,
-      "member_count": 2,
+      "sha256": "c49ad8b8dccfb3a7e682994a3cce9a1d6069582542b05e7218f7623d95e2580d",
+      "archive_size": 11543855,
+      "uncompressed_size": 42690492,
+      "member_count": 7,
       "allowed_suffixes": [
         ".json",
         ".sqlite"
       ],
-      "dataset_counts": {},
+      "dataset_counts": {
+        "train": 5124,
+        "test": 1167,
+        "valid": 1163
+      },
       "sqlite_count": 1,
       "required_files": [
+        "ehrsql-2024/train/dataset.json",
+        "ehrsql-2024/train/schema.json",
+        "ehrsql-2024/test/dataset.json",
+        "ehrsql-2024/test/schema.json",
+        "ehrsql-2024/valid/dataset.json",
         "ehrsql-2024/valid/schema.json",
         "ehrsql-2024/database/mimic_iv/mimic_iv.sqlite"
       ]

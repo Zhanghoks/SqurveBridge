@@ -4,8 +4,8 @@ SqurveBridge versions its normalized benchmark snapshots as Git LFS archives:
 
 - `spider.zip`
 - `bird.zip`
-- `bull-en.zip` (SQLite and schema only)
-- `ehrsql-2024.zip` (SQLite and schema only)
+- `bull-en.zip`
+- `ehrsql-2024.zip`
 
 The archives are redistribution packages for research reproducibility, not new licenses. Review each benchmark's upstream terms and cite the original dataset. Provenance, sizes, checksums, expected sample counts, and layout requirements are recorded in `manifest.json`.
 

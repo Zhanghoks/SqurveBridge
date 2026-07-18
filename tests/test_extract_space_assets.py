@@ -9,7 +9,7 @@ from tools.extract_space_assets import ARCHIVES, extract_space_assets
 
 
 class SpaceAssetExtractionTests(unittest.TestCase):
-    def test_extracts_only_sqlite_and_selected_schema(self) -> None:
+    def test_extracts_complete_benchmark_payloads(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             archives = root / "archives"
@@ -23,6 +23,6 @@ class SpaceAssetExtractionTests(unittest.TestCase):
                     archive.writestr(f"{benchmark}/{schema_split}/schema.json", "[]")
                     archive.writestr(f"{benchmark}/{schema_split}/dataset.json", "[{\"sql\": \"SELECT 1\"}]")
 
-            self.assertEqual(extract_space_assets(archives, output), 8)
-            self.assertFalse(any(output.rglob("dataset.json")))
+            self.assertEqual(extract_space_assets(archives, output), 12)
+            self.assertEqual(len(list(output.rglob("dataset.json"))), 4)
             self.assertEqual(len(list(output.rglob("*.sqlite"))), 4)
