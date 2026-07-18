@@ -449,7 +449,6 @@ export default function FullFlowDemo({
                   postJson={postJson}
                   Status={FlowStatus}
                   shell
-                  autoOpenAuth
                   t={t}
                   queuedCommand={harnessTask}
                   onQueuedCommandSent={() => setHarnessTask(null)}
