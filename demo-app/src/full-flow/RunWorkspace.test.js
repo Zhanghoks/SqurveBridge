@@ -12,7 +12,7 @@ const userEvent = (await import('@testing-library/user-event')).default
 registerLoader('../cssTestLoader.mjs', import.meta.url)
 const unregister = register()
 
-const { default: RunWorkspace, sanitizeRunError } = await import('./RunWorkspace.jsx')
+const { default: RunWorkspace, sanitizeRunError, summarizeRunProgress } = await import('./RunWorkspace.jsx')
 const { default: ResultWorkspace } = await import('./ResultWorkspace.jsx')
 
 const translations = {
@@ -33,6 +33,15 @@ const translations = {
   'run.batchLog': 'Selected job log',
   'run.batchLogEmpty': 'Waiting for job output…',
   'run.action': 'Run config',
+  'run.stop': 'Stop run',
+  'run.resume': 'Resume run',
+  'run.resumeMeta': 'Resume {count}/{max}',
+  'run.resumeCount': 'Resumed {count}×',
+  'run.checkpointReady': 'Resumable',
+  'run.resumeHint': 'Checkpoint ready · resume {count}/{max} · same as {command}',
+  'run.sampleUnit': 'samples',
+  'run.samplesStarted': '{count} samples started',
+  'run.waiting': 'Waiting to run',
   'run.unavailable': 'This configuration is unavailable.',
   'run.databaseUnavailable': 'The focused database is not available in the live runtime.',
   'configure.sampleLimit': 'Sample limit',
@@ -60,6 +69,7 @@ const translations = {
   'inspect.contextActors': 'Actors',
   'status.ready': 'Ready',
   'status.running': 'Running',
+  'status.cancelled': 'Cancelled',
   'status.completed': 'Completed',
   'status.failed': 'Failed',
   'status.unavailable': 'Unavailable',
@@ -174,6 +184,150 @@ test('launches comparisons for multiple Compose connections', async () => {
     { dataset: 'spider', method: 'dinsql' },
     { dataset: 'spider', method: 'c3sql' },
   ])
+})
+
+test('summarizeRunProgress prefers finished samples and server progress', () => {
+  const fromLog = summarizeRunProgress([
+    '开始处理样本 dev_0',
+    '样本 dev_0 @ c3sql_reduce1',
+    '样本 dev_0 @ c3sql_generate1',
+    '样本 dev_0 处理完成 (1.0s)',
+    '开始处理样本 dev_1',
+    '样本 dev_1 @ c3sql_generate1',
+  ].join('\n'), { sample_limit: 20, status: 'running' })
+  assert.equal(fromLog.completed, 1)
+  assert.equal(fromLog.started, 2)
+  assert.equal(fromLog.percent, 5)
+  assert.equal(fromLog.currentStage, 'c3sql_generate1')
+
+  const fromServer = summarizeRunProgress('truncated tail only', {
+    sample_limit: 20,
+    status: 'completed',
+    progress: {
+      current_stage: '评估完成',
+      started: 20,
+      completed: 20,
+      total: 20,
+      percent: 100,
+    },
+  })
+  assert.equal(fromServer.percent, 100)
+  assert.equal(fromServer.completed, 20)
+  assert.equal(fromServer.currentStage, '评估完成')
+})
+
+test('resumes a cancelled board job through the reproduce resume endpoint', async () => {
+  const calls = []
+  let resumed = false
+  const cancelledJob = {
+    job_id: 'job-resume',
+    method: 'dinsql',
+    dataset: 'spider',
+    status: 'cancelled',
+    checkpoint_present: true,
+    resumable: true,
+    resume_count: 0,
+    max_resume_attempts: 2,
+    progress: { current_stage: 'c3sql_generate1', started: 8, completed: 8, total: 20, percent: 40 },
+  }
+  renderRun({
+    api: async path => {
+      if (path === '/api/session') {
+        return { jobs: [cancelledJob] }
+      }
+      if (path === '/api/evaluations/job-resume') {
+        if (!resumed) {
+          return { ...cancelledJob, log: 'checkpoint ready' }
+        }
+        return {
+          ...cancelledJob,
+          status: 'running',
+          resumable: false,
+          resume_count: 1,
+          log: '[demo] manual resume 1/2',
+          progress: { current_stage: 'c3sql_generate1', started: 8, completed: 8, total: 20, percent: 40 },
+        }
+      }
+      return {}
+    },
+    postJson: async (path, body) => {
+      calls.push([path, body])
+      resumed = true
+      return {
+        job_id: 'job-resume',
+        method: 'dinsql',
+        dataset: 'spider',
+        status: 'running',
+        checkpoint_present: true,
+        resumable: false,
+        resume_count: 1,
+        max_resume_attempts: 2,
+        resume_mode: 'manual',
+      }
+    },
+  })
+
+  const resume = await screen.findByTestId('run-resume-action')
+  await waitFor(() => assert.equal(resume.disabled, false))
+  assert.match(screen.getByTestId('run-config-command').textContent, /--resume/)
+  await userEvent.setup().click(resume)
+
+  assert.deepEqual(calls, [['/api/evaluations/job-resume/resume', {}]])
+  await waitFor(() => assert.match(screen.getByTestId('run-batch-monitor').textContent, /running/i))
+})
+
+test('stops active board jobs through the cancel endpoint', async () => {
+  const calls = []
+  let cancelled = false
+  renderRun({
+    api: async path => {
+      if (path === '/api/session') {
+        return {
+          jobs: [{
+            job_id: 'job-stop',
+            method: 'dinsql',
+            dataset: 'spider',
+            status: 'running',
+            progress: { current_stage: 'c3sql_parse1', started: 4, completed: 2, total: 20, percent: 10 },
+          }],
+        }
+      }
+      if (path === '/api/evaluations/job-stop') {
+        return {
+          job_id: 'job-stop',
+          method: 'dinsql',
+          dataset: 'spider',
+          status: cancelled ? 'cancelled' : 'running',
+          log: cancelled ? 'cancelled by user' : 'running…',
+          progress: {
+            current_stage: cancelled ? '评估完成' : 'c3sql_parse1',
+            started: cancelled ? 4 : 4,
+            completed: cancelled ? 4 : 2,
+            total: 20,
+            percent: cancelled ? 20 : 10,
+          },
+        }
+      }
+      return {}
+    },
+    postJson: async (path, body) => {
+      calls.push([path, body])
+      cancelled = true
+      return {
+        job_id: 'job-stop',
+        method: 'dinsql',
+        dataset: 'spider',
+        status: 'cancelled',
+      }
+    },
+  })
+
+  const stop = await screen.findByTestId('run-stop-action')
+  await waitFor(() => assert.equal(stop.disabled, false))
+  await userEvent.setup().click(stop)
+
+  assert.deepEqual(calls, [['/api/evaluations/job-stop/cancel', {}]])
+  await waitFor(() => assert.match(screen.getByTestId('run-batch-monitor').textContent, /cancelled/i))
 })
 
 test('restores supervised jobs from the backend session after a page reload', async () => {

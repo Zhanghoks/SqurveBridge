@@ -112,6 +112,95 @@ class EvaluationResumeTests(unittest.TestCase):
         self.assertFalse(spawned)
         popen.assert_not_called()
 
+    def test_cancel_terminates_process_group_and_marks_cancelled(self):
+        process = Mock()
+        process.poll.return_value = None
+        process.pid = 4242
+        api_server._processes[self.job["job_id"]] = process
+        api_server._jobs[self.job["job_id"]]["status"] = "running"
+        api_server._jobs[self.job["job_id"]]["pid"] = 4242
+        client = api_server.app.test_client()
+
+        with patch.object(api_server, "_terminate_job_process") as terminate:
+            response = client.post(f"/api/evaluations/{self.job['job_id']}/cancel")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["status"], "cancelled")
+        self.assertEqual(api_server._jobs[self.job["job_id"]]["status"], "cancelled")
+        self.assertNotIn(self.job["job_id"], api_server._processes)
+        terminate.assert_called_once()
+
+    def test_manual_resume_spawns_reproduce_resume_from_checkpoint(self):
+        self._write_checkpoint()
+        job_dir = self.run_dir / self.job["job_id"]
+        job_dir.mkdir(parents=True, exist_ok=True)
+        api_server._jobs[self.job["job_id"]]["status"] = "cancelled"
+        api_server._jobs[self.job["job_id"]]["log_path"] = str(
+            (job_dir / "run.log").relative_to(self.root)
+        )
+        api_server._processes.pop(self.job["job_id"], None)
+        client = api_server.app.test_client()
+        process = Mock()
+        process.pid = 9090
+
+        with patch.object(api_server, "_evaluation_llm_preflight"), patch.object(
+            api_server.subprocess, "Popen", return_value=process
+        ) as popen, patch.object(api_server.threading, "Thread") as thread_cls:
+            thread_cls.return_value = Mock()
+            response = client.post(f"/api/evaluations/{self.job['job_id']}/resume")
+
+        self.assertEqual(response.status_code, 202)
+        payload = response.get_json()
+        self.assertEqual(payload["status"], "running")
+        self.assertTrue(payload["checkpoint_present"])
+        self.assertEqual(payload["resume_mode"], "manual")
+        self.assertEqual(payload["resume_count"], 1)
+        command = popen.call_args.args[0]
+        self.assertIn("reproduce/run.py", command)
+        self.assertIn("--resume-from", command)
+        self.assertTrue(any(str(part).endswith("state.json") for part in command))
+
+    def test_manual_resume_without_checkpoint_is_rejected(self):
+        api_server._jobs[self.job["job_id"]]["status"] = "failed"
+        api_server._processes.pop(self.job["job_id"], None)
+        client = api_server.app.test_client()
+        response = client.post(f"/api/evaluations/{self.job['job_id']}/resume")
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("checkpoint", response.get_json()["message"].lower())
+
+    def test_public_job_exposes_resumable_flag(self):
+        self._write_checkpoint()
+        api_server._jobs[self.job["job_id"]]["status"] = "failed"
+        public = api_server._public_job(api_server._jobs[self.job["job_id"]])
+        self.assertTrue(public["checkpoint_present"])
+        self.assertTrue(public["resumable"])
+
+    def test_run_progress_counts_finished_samples_not_stage_entries(self):
+        log = "\n".join([
+            "开始处理样本 dev_0",
+            "样本 dev_0 @ c3sql_reduce1",
+            "样本 dev_0 @ c3sql_parse1",
+            "样本 dev_0 @ c3sql_generate1",
+            "样本 dev_0 处理完成 (12.0s)",
+            "开始处理样本 dev_1",
+            "样本 dev_1 @ c3sql_generate1",
+            "样本 20 条  |  pass@1",
+        ])
+        # Without the report header line used by the summarizer, only finished samples count.
+        progress = api_server._summarize_run_progress(log, {"sample_limit": 20, "status": "running"})
+        self.assertEqual(progress["completed"], 1)
+        self.assertEqual(progress["started"], 2)
+        self.assertEqual(progress["percent"], 5)
+
+        finished_log = log + "\n========================================================================\n  评估结果  spider-c3sql\n  样本 20 条  |  pass@1  |  generate_num=1\n"
+        done = api_server._summarize_run_progress(
+            finished_log,
+            {"sample_limit": 20, "status": "completed"},
+        )
+        self.assertEqual(done["percent"], 100)
+        self.assertEqual(done["completed"], 20)
+        self.assertEqual(done["current_stage"], "评估完成")
+
     def test_restored_pid_must_match_the_evaluation_command(self):
         running = Mock(returncode=0, stdout="python unrelated_service.py")
         with patch.object(api_server, "_pid_is_running", return_value=True), patch.object(

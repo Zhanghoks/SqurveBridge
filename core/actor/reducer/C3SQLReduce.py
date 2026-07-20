@@ -28,11 +28,12 @@ from loguru import logger
 
 from core.actor.reducer.BaseReduce import BaseReducer
 from core.data_manage import Dataset, single_central_process
+from core.llm.completion_limits import chat_extra_body_for_llm, max_chat_completion_n
 from core.utils import load_dataset, parse_schema_from_df, save_dataset
 
 
 # ── original C3SQL table-recall instruction (verbatim) ─────────────────
-# OpenAI-compatible APIs (e.g. Qwen) cap chat.completions `n` at 4.
+# Default chunk size when the provider allows multi-sample `n` (e.g. Qwen).
 MAX_BATCH_N = 4
 
 TABLE_RECALL_INSTRUCTION = """Given the database schema and question, perform the following actions:
@@ -309,21 +310,23 @@ retry loop on API failure, table_sc() sorted-tuple voting.
     def _generate_reply_batch(self, prompt: str, n: int) -> Optional[List[str]]:
         """Generate n responses via OpenAI-compatible batch API.
 
-        Uses raw client with n=sc_num when supported; splits into chunks of
-        MAX_BATCH_N for providers that cap n (e.g. Qwen: [1, 4]).
+        Uses raw client with n=sc_num when supported; splits into provider-safe
+        chunks (DeepSeek: n=1, Qwen: n<=4).
         Falls back to sequential llm.complete() if raw client unavailable.
         """
         llm = self.get_llm()
         client = getattr(llm, "client", None)
         model = getattr(llm, "model_name", "gpt-3.5-turbo")
+        max_n = max(1, min(MAX_BATCH_N, max_chat_completion_n(llm, default=MAX_BATCH_N)))
+        extra_body = chat_extra_body_for_llm(llm)
 
         if client is not None:
             try:
                 results: List[str] = []
                 remaining = n
                 while remaining > 0:
-                    batch_n = min(remaining, MAX_BATCH_N)
-                    response = client.chat.completions.create(
+                    batch_n = min(remaining, max_n)
+                    create_kwargs = dict(
                         model=model,
                         messages=[{"role": "user", "content": prompt}],
                         temperature=(
@@ -334,8 +337,10 @@ retry loop on API failure, table_sc() sorted-tuple voting.
                         n=batch_n,
                         max_tokens=getattr(llm, "max_tokens", 8000),
                         timeout=getattr(llm, "time_out", 300.0),
-                        extra_body={"enable_thinking": False},
                     )
+                    if extra_body:
+                        create_kwargs["extra_body"] = extra_body
+                    response = client.chat.completions.create(**create_kwargs)
                     results.extend(
                         choice.message.content for choice in response.choices
                     )

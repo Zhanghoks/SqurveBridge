@@ -2549,13 +2549,18 @@
 }
 
 .flow-demo .run-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 14px;
 }
 
 .flow-demo .run-primary-action,
+.flow-demo .run-resume-action,
+.flow-demo .run-stop-action,
 .flow-demo .run-interactive-params > button {
   min-height: 42px;
-  margin: 0 8px 0 0;
+  margin: 0;
   border: 1px solid rgb(218 119 86 / 56%);
   border-radius: 10px;
   padding: 0 16px;
@@ -2566,12 +2571,47 @@
   cursor: pointer;
 }
 
+.flow-demo .run-resume-action {
+  border-color: rgb(70 100 90 / 50%);
+  color: #24352f;
+  background: rgb(242 250 246);
+}
+
+.flow-demo .run-stop-action {
+  border-color: rgb(120 70 60 / 55%);
+  color: #5c2f28;
+  background: rgb(255 245 242);
+}
+
 .flow-demo .run-primary-action:disabled,
+.flow-demo .run-resume-action:disabled,
+.flow-demo .run-stop-action:disabled,
 .flow-demo .run-interactive-params > button:disabled {
   border-color: var(--flow-border);
   color: var(--flow-muted);
   background: rgb(40 80 130 / 10%);
   cursor: not-allowed;
+}
+
+.flow-demo .run-batch-jobs button small,
+.flow-demo .run-batch-jobs button em {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-weight: 560;
+  color: var(--flow-muted);
+}
+
+.flow-demo .run-batch-jobs button em {
+  color: #3d6b57;
+}
+
+.flow-demo .run-resume-note {
+  margin: 8px 0 0;
+  color: var(--flow-muted);
+  font-size: var(--flow-type-control);
+  line-height: 1.5;
+  word-break: break-word;
 }
 
 .flow-demo .run-interactive-params > p,

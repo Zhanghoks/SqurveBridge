@@ -24,7 +24,7 @@ from reproduce.eval.utils import (
     _load_dataset_from_engine,
     evaluate_custom_with_details,
 )
-from reproduce.lib.env_config import resolve_config_api_keys
+from reproduce.lib.env_config import prepare_runtime_llm_config
 from reproduce.metrics.diagnostics import evaluate_execution_detail
 from reproduce.metrics.assembly import build_scores
 from reproduce.metrics.evolution import build_meta_evo_input
@@ -95,7 +95,7 @@ def _load_token_data_from_source(source_scores: str | Path | None) -> dict[str, 
 
 
 def _config_with_existing_task(base_config: dict, task_json: str) -> dict:
-    config = resolve_config_api_keys(base_config)
+    config = prepare_runtime_llm_config(base_config)
     task_path = str(Path(task_json).resolve())
     config.setdefault("dataset", {})["data_source"] = task_path
     for task in config.get("task", {}).get("task_meta", []):

@@ -31,17 +31,41 @@ export const INITIAL_RUN_STATE = {
 }
 
 export function summarizeRunProgress(log, job) {
+  // Prefer server progress computed from the full run.log (UI log is a truncated tail).
+  const server = job?.progress
+  if (server && typeof server.percent === 'number') {
+    return {
+      currentStage: server.current_stage || '准备中',
+      started: Number(server.started) || 0,
+      completed: Number(server.completed) || 0,
+      total: Number(server.total) || 1,
+      percent: Math.min(100, Math.max(0, Number(server.percent) || 0)),
+    }
+  }
+
   const text = String(log || '')
   const target = Number(job?.sample_limit) || 0
-  const started = [...text.matchAll(/开始处理样本\s+([^\s]+)/g)].map(match => match[1])
-  const completed = [...text.matchAll(/样本\s+([^\s]+)\s+@\s+([^\s]+)/g)].map(match => `${match[1]}@${match[2]}`)
-  const stages = [...text.matchAll(/样本\s+([^\s]+)\s+@\s+([^\s]+)/g)].map(match => match[2])
-  const currentStage = stages.at(-1) || '准备中'
-  const uniqueSamples = new Set(started)
-  const doneSamples = new Set(completed.map(item => item.split('@')[0]))
-  const total = target || uniqueSamples.size || 1
-  const percent = Math.min(100, Math.round((doneSamples.size / total) * 100))
-  return { currentStage, started: uniqueSamples.size, completed: doneSamples.size, total, percent }
+  const started = new Set([...text.matchAll(/开始处理样本\s+(\S+)/g)].map(match => match[1]))
+  const finished = new Set([...text.matchAll(/样本\s+(\S+)\s+处理完成/g)].map(match => match[1]))
+  const stageHits = [...text.matchAll(/样本\s+(\S+)\s+@\s+(\S+)/g)]
+  for (const match of stageHits) started.add(match[1])
+  let currentStage = stageHits.at(-1)?.[2] || '准备中'
+  const reportMatch = text.match(/评估结果[^\n]*\n\s*样本\s+(\d+)\s*条/)
+  const reportTotal = reportMatch ? Number(reportMatch[1]) : 0
+  if (reportTotal) currentStage = '评估完成'
+
+  const total = target || reportTotal || Math.max(started.size, finished.size, 1)
+  let completed = finished.size
+  if (job?.status === 'completed' || reportTotal) {
+    completed = Math.max(completed, reportTotal || total)
+    if (job?.status === 'completed') currentStage = '评估完成'
+  }
+  completed = Math.min(completed, total)
+  const startedCount = Math.max(started.size, completed)
+  const percent = job?.status === 'completed'
+    ? 100
+    : Math.min(100, Math.round((completed / total) * 100))
+  return { currentStage, started: startedCount, completed, total, percent }
 }
 
 const sensitivePatterns = [
@@ -73,16 +97,39 @@ const actorNames = config => (config?.stages || [])
 const jobTone = status => {
   if (status === 'completed') return 'completed'
   if (status === 'failed' || status === 'cancelled') return 'failed'
-  if (status === 'running') return 'current'
+  if (status === 'running' || status === 'resuming' || status === 'starting') return 'current'
   return 'pending'
 }
 
+const isActiveJob = job => ['running', 'resuming', 'starting'].includes(job?.status)
+
+export const isResumableJob = job => Boolean(
+  job?.resumable
+  || (['failed', 'cancelled'].includes(job?.status) && job?.checkpoint_present),
+)
+
 const phaseFromJobs = jobs => {
   if (!jobs.length) return 'ready'
-  if (jobs.some(job => job.status === 'running' || job.status === 'resuming')) return 'evaluating'
+  if (jobs.some(isActiveJob)) return 'evaluating'
   if (jobs.some(job => job.status === 'failed' || job.status === 'cancelled')) return 'failed'
   if (jobs.every(job => job.status === 'completed')) return 'completed'
   return 'ready'
+}
+
+const reproduceCommand = (dataset, method, { resume = false } = {}) => (
+  resume
+    ? `python reproduce/run.py ${dataset} ${method} --resume`
+    : `python reproduce/run.py ${dataset} ${method}`
+)
+
+const jobResumeLabel = (job, t) => {
+  const count = Number(job?.resume_count) || 0
+  const max = Number(job?.max_resume_attempts)
+  if (!count && !job?.checkpoint_present && !job?.resumable) return ''
+  if (Number.isFinite(max) && max >= 0) {
+    return t('run.resumeMeta', { count, max })
+  }
+  return t('run.resumeCount', { count })
 }
 
 function describeTarget(connection, configs, databases) {
@@ -139,11 +186,20 @@ export default function RunWorkspace({
     .slice(0, MAX_BATCH_TARGETS)
   const primaryConfig = primaryTarget?.config || null
   const actors = useMemo(() => actorNames(primaryConfig), [primaryConfig])
-  const commandPreview = runTargets.length === 1
-    ? `python reproduce/run.py ${runTargets[0].config.dataset} ${runTargets[0].config.method}`
-    : runTargets.length > 1
-      ? `python reproduce/run.py <dataset> <method> × ${runTargets.length}`
-      : 'python reproduce/run.py <dataset> <method>'
+  const selectedJob = jobs.find(job => job.job_id === selectedJobId) || null
+  const resumableJobs = jobs.filter(isResumableJob)
+  const commandPreview = (() => {
+    if (selectedJob && isResumableJob(selectedJob)) {
+      return reproduceCommand(selectedJob.dataset, selectedJob.method, { resume: true })
+    }
+    if (runTargets.length === 1) {
+      return reproduceCommand(runTargets[0].config.dataset, runTargets[0].config.method)
+    }
+    if (runTargets.length > 1) {
+      return `python reproduce/run.py <dataset> <method> × ${runTargets.length}`
+    }
+    return 'python reproduce/run.py <dataset> <method>'
+  })()
 
   const publishRunState = (phase, additions = {}) => {
     const context = primaryTarget
@@ -166,11 +222,14 @@ export default function RunWorkspace({
     })
   }
 
+  const activeJobs = jobs.filter(isActiveJob)
   const runnable = Boolean(
     liveEvaluation
     && runTargets.length >= 1
-    && !busy,
+    && !busy
+    && !activeJobs.length,
   )
+  const canResume = Boolean(liveEvaluation && resumableJobs.length && !busy && !activeJobs.length)
 
   const refreshJobs = async current => {
     if (!api || !current.length) return current
@@ -197,7 +256,7 @@ export default function RunWorkspace({
   }, [api])
 
   useEffect(() => {
-    if (!jobs.some(job => job.status === 'running' || job.status === 'resuming') || !api) return undefined
+    if (!jobs.some(isActiveJob) || !api) return undefined
     let active = true
     const timer = setInterval(() => {
       refreshJobs(jobs).then(next => {
@@ -219,12 +278,31 @@ export default function RunWorkspace({
     }
     let active = true
     api(`/api/evaluations/${selectedJobId}`).then(detail => {
-      if (active) setLog(detail.log || '')
+      if (!active) return
+      setLog(detail.log || '')
+      setJobs(current => current.map(job => (
+        job.job_id === selectedJobId
+          ? {
+            ...job,
+            status: detail.status ?? job.status,
+            progress: detail.progress ?? job.progress,
+            log: detail.log ?? job.log,
+            checkpoint_present: detail.checkpoint_present ?? job.checkpoint_present,
+            resumable: detail.resumable ?? job.resumable,
+            resume_count: detail.resume_count ?? job.resume_count,
+          }
+          : job
+      )))
     }).catch(err => {
       if (active) setLog(sanitizeRunError(err))
     })
     return () => { active = false }
-  }, [api, selectedJobId, jobs])
+  }, [api, selectedJobId])
+
+  useEffect(() => {
+    const selected = jobs.find(job => job.job_id === selectedJobId)
+    if (selected?.log) setLog(selected.log)
+  }, [jobs, selectedJobId])
 
   const runConfigs = async () => {
     if (!runnable) return
@@ -269,8 +347,55 @@ export default function RunWorkspace({
     }
   }
 
+  const stopRuns = async () => {
+    if (!postJson || !activeJobs.length) return
+    setBusy(true)
+    setError('')
+    try {
+      await Promise.all(activeJobs.map(job => postJson(`/api/evaluations/${job.job_id}/cancel`, {})))
+      const next = await refreshJobs(jobs)
+      setJobs(next)
+      publishRunState(phaseFromJobs(next))
+    } catch (err) {
+      const message = sanitizeRunError(err)
+      setError(message)
+      publishRunState('failed', { error: message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const resumeRuns = async () => {
+    if (!postJson || !resumableJobs.length) return
+    const targets = selectedJob && isResumableJob(selectedJob)
+      ? [selectedJob]
+      : resumableJobs
+    setBusy(true)
+    setError('')
+    publishRunState('evaluating')
+    try {
+      const resumed = await Promise.all(
+        targets.map(job => postJson(`/api/evaluations/${job.job_id}/resume`, {})),
+      )
+      const byId = new Map(resumed.map(job => [job.job_id, job]))
+      const next = jobs.map(job => byId.get(job.job_id) || job)
+      setJobs(next)
+      setSelectedJobId(resumed[0]?.job_id || selectedJobId)
+      publishRunState(phaseFromJobs(next))
+    } catch (err) {
+      const message = sanitizeRunError(err)
+      setError(message)
+      publishRunState('failed', { error: message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const statusLabel = () => {
-    if (busy || jobs.some(job => job.status === 'running' || job.status === 'resuming')) return t('status.running')
+    if (busy || jobs.some(isActiveJob)) return t('status.running')
+    if (jobs.some(job => job.status === 'cancelled') && !jobs.some(job => job.status === 'failed')) {
+      return t('status.cancelled')
+    }
     if (jobs.some(job => job.status === 'failed')) return t('status.failed')
     if (jobs.length && jobs.every(job => job.status === 'completed')) return t('status.completed')
     return t('status.ready')
@@ -368,6 +493,24 @@ export default function RunWorkspace({
           >
             {t('run.action')}
           </button>
+          <button
+            type="button"
+            className="run-resume-action"
+            data-testid="run-resume-action"
+            disabled={!canResume}
+            onClick={resumeRuns}
+          >
+            {t('run.resume')}
+          </button>
+          <button
+            type="button"
+            className="run-stop-action"
+            data-testid="run-stop-action"
+            disabled={!liveEvaluation || !activeJobs.length || busy}
+            onClick={stopRuns}
+          >
+            {t('run.stop')}
+          </button>
         </div>
       </section>
     </div>
@@ -387,6 +530,8 @@ export default function RunWorkspace({
                 >
                   <strong>{job.method} / {job.dataset}</strong>
                   <span>{job.status}</span>
+                  {jobResumeLabel(job, t) && <small>{jobResumeLabel(job, t)}</small>}
+                  {isResumableJob(job) && <em>{t('run.checkpointReady')}</em>}
                 </button>
               </li>
             ))}
@@ -395,12 +540,24 @@ export default function RunWorkspace({
       <div className="run-progress-card">
         <div className="run-progress-heading">
           <div><strong>{progress.percent}%</strong><span>{progress.currentStage}</span></div>
-          <small>{progress.completed} / {progress.total} 个样本</small>
+          <small>{progress.completed} / {progress.total} {t('run.sampleUnit')}</small>
         </div>
         <div className="run-progress-track" role="progressbar" aria-valuenow={progress.percent} aria-valuemin="0" aria-valuemax="100">
           <span style={{ width: `${progress.percent}%` }} />
         </div>
-        <div className="run-progress-meta"><span>已启动 {progress.started} 个样本</span><span>{jobs.find(job => job.job_id === selectedJobId)?.status || '等待运行'}</span></div>
+        <div className="run-progress-meta">
+          <span>{t('run.samplesStarted', { count: progress.started })}</span>
+          <span>{selectedJob?.status || t('run.waiting')}</span>
+        </div>
+        {selectedJob && (selectedJob.checkpoint_present || selectedJob.resume_count > 0) && (
+          <p className="run-resume-note" data-testid="run-resume-note">
+            {t('run.resumeHint', {
+              count: Number(selectedJob.resume_count) || 0,
+              max: Number(selectedJob.max_resume_attempts) || 0,
+              command: reproduceCommand(selectedJob.dataset, selectedJob.method, { resume: true }),
+            })}
+          </p>
+        )}
         <details className="run-log-details">
           <summary>查看调试日志</summary>
           <pre className="run-batch-log" aria-label={t('run.batchLog')}>{log || t('run.batchLogEmpty')}</pre>

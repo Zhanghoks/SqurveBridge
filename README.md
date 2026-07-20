@@ -2,6 +2,8 @@
 
 <div align="center">
 
+<img src="assets/squrvebridge-icon.png" alt="SqurveBridge icon" width="180" />
+
 ### Turn released Text-to-SQL methods and databases into reproducible, diagnosable Squrve workflows
 
 **Integrate · Reproduce · Diagnose · Improve**

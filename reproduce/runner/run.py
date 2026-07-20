@@ -35,7 +35,7 @@ from reproduce.eval.utils import (
 from reproduce.metrics.assembly import build_scores
 from reproduce.metrics.diagnostics import extract_unified_log_diagnostics
 from reproduce.metrics.evolution import build_meta_evo_input, compare_scores
-from reproduce.lib.env_config import resolve_config_api_keys
+from reproduce.lib.env_config import api_key_ready, prepare_runtime_llm_config
 from reproduce.lib.checkpoints import (
     checkpoint_run_id,
     resolve_checkpoint_state_path,
@@ -55,7 +55,10 @@ def main(dataset_name, method, resume=False, resume_from=None):
     original_cwd = os.getcwd()
     os.chdir(REPRODUCE_ROOT)
     try:
-        config_dict = resolve_config_api_keys(load_dataset(config_path))
+        config_dict = prepare_runtime_llm_config(load_dataset(config_path))
+        ready, ready_message = api_key_ready(config_dict)
+        if not ready:
+            raise SystemExit(f"LLM provider is not ready for evaluation: {ready_message}")
         config = isolate_files_config(config_dict, run_id)
         _apply_eval_sample_limit(config)
         runtime_config_path = _write_runtime_config(config, run_id)

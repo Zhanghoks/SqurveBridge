@@ -89,6 +89,44 @@ def resolve_config_api_keys(config: dict) -> dict:
     return resolved
 
 
+def apply_runtime_llm_overrides(config: dict) -> dict:
+    """Apply ``SQURVE_LLM_PROVIDER`` / ``SQURVE_LLM_MODEL`` onto a reproduce config.
+
+    Demo Board jobs inherit these from the API process. Without this override,
+    reproduce templates keep their baked-in ``llm.use`` (often ``qwen``) even
+    when the Demo provider is DeepSeek or another configured backend.
+    """
+    load_dotenv()
+    provider = (os.environ.get("SQURVE_LLM_PROVIDER") or "").strip()
+    model = (os.environ.get("SQURVE_LLM_MODEL") or "").strip()
+    if not provider and not model:
+        return config
+
+    resolved = dict(config)
+    llm = dict(resolved.get("llm") or {})
+    api_keys = dict(resolved.get("api_key") or {})
+
+    if provider:
+        if provider not in PROVIDER_ENV_VARS:
+            raise ValueError(f"Unsupported SQURVE_LLM_PROVIDER: {provider}")
+        llm["use"] = provider
+        env_name = PROVIDER_ENV_VARS[provider]
+        if provider not in api_keys or not resolve_api_key(provider, api_keys.get(provider)):
+            api_keys[provider] = f"${{ENV:{env_name}}}"
+        resolved["api_key"] = api_keys
+
+    if model:
+        llm["model_name"] = model
+
+    resolved["llm"] = llm
+    return resolved
+
+
+def prepare_runtime_llm_config(config: dict) -> dict:
+    """Apply Demo LLM overrides, then resolve ``api_key`` values from the environment."""
+    return resolve_config_api_keys(apply_runtime_llm_overrides(config))
+
+
 def api_key_ready(config: dict) -> tuple[bool, str | None]:
     """Check whether the active ``llm.use`` provider has a non-placeholder key."""
     load_dotenv()

@@ -1495,17 +1495,69 @@ def _artifact_comparison(
     return _comparison_payload(selected, methods)
 
 
+def _checkpoint_state_path(job: dict) -> Path:
+    run_id = f"{job['dataset']}-{job['method']}-{job['job_id']}"
+    return _project_root / "files" / "runs" / run_id / "checkpoints" / "state.json"
+
+
+def _job_has_checkpoint(job: dict) -> bool:
+    return _checkpoint_state_path(job).is_file()
+
+
+def _job_resumable(job: dict) -> bool:
+    """Mirror reproduce ``--resume``: failed/cancelled jobs with a checkpoint can continue."""
+    return job.get("status") in {"failed", "cancelled"} and _job_has_checkpoint(job)
+
+
+def _summarize_run_progress(log_text: str, job: dict | None = None) -> dict:
+    """Derive Board progress from a full reproduce run log.
+
+    Sample completion is ``样本 <id> 处理完成``; ``样本 <id> @ <stage>`` only marks
+    stage entry and must not count as finished work.
+    """
+    text = log_text or ""
+    job = job or {}
+    target = int(job.get("sample_limit") or 0)
+    started = set(re.findall(r"开始处理样本\s+(\S+)", text))
+    finished = set(re.findall(r"样本\s+(\S+)\s+处理完成", text))
+    stage_hits = re.findall(r"样本\s+(\S+)\s+@\s+(\S+)", text)
+    for sample_id, _stage in stage_hits:
+        started.add(sample_id)
+    current_stage = stage_hits[-1][1] if stage_hits else "准备中"
+
+    report_total = None
+    report_match = re.search(r"评估结果[^\n]*\n\s*样本\s+(\d+)\s*条", text)
+    if report_match:
+        report_total = int(report_match.group(1))
+        current_stage = "评估完成"
+
+    total = target or report_total or max(len(started), len(finished), 1)
+    completed = len(finished)
+    if job.get("status") == "completed" or report_total is not None:
+        completed = max(completed, report_total or total)
+        if job.get("status") == "completed":
+            current_stage = "评估完成"
+    completed = min(completed, total)
+    started_count = max(len(started), completed)
+    percent = 100 if job.get("status") == "completed" else min(100, round(100 * completed / total))
+    return {
+        "current_stage": current_stage,
+        "started": started_count,
+        "completed": completed,
+        "total": total,
+        "percent": percent,
+    }
+
+
 def _public_job(job: dict) -> dict:
-    return {key: value for key, value in job.items() if key not in {"scores_path"}}
+    public = {key: value for key, value in job.items() if key not in {"scores_path"}}
+    public["checkpoint_present"] = _job_has_checkpoint(job)
+    public["resumable"] = _job_resumable(job)
+    return public
 
 
 def _job_state_path(job_id: str) -> Path:
     return _run_dir / job_id / "job.json"
-
-
-def _checkpoint_state_path(job: dict) -> Path:
-    run_id = f"{job['dataset']}-{job['method']}-{job['job_id']}"
-    return _project_root / "files" / "runs" / run_id / "checkpoints" / "state.json"
 
 
 def _persist_job(job: dict) -> None:
@@ -1553,9 +1605,11 @@ def _spawn_evaluation_job(
         try:
             log_handle = log_path.open("a" if resume else "w", encoding="utf-8")
             if resume:
+                kind = "manual" if job.get("resume_mode") == "manual" else "autonomous"
                 log_handle.write(
-                    f"\n[demo] autonomous resume {job['resume_count']}/{_max_resume_attempts} "
-                    f"from {checkpoint_path.relative_to(_project_root)}\n"
+                    f"\n[demo] {kind} resume {job['resume_count']}/{job.get('max_resume_attempts', _max_resume_attempts)} "
+                    f"from {checkpoint_path.relative_to(_project_root)} "
+                    f"(reproduce/run.py --resume-from)\n"
                 )
                 log_handle.flush()
             process = subprocess.Popen(
@@ -1668,9 +1722,22 @@ def _watch_restored_process(job_id: str, pid: int) -> None:
 
 
 @app.get("/api/session")
+def _job_with_progress(job: dict) -> dict:
+    public = _public_job(dict(job))
+    log_path = _project_root / str(job.get("log_path") or "")
+    log_text = ""
+    if log_path.is_file():
+        try:
+            log_text = log_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            log_text = ""
+    public["progress"] = _summarize_run_progress(log_text, job)
+    return public
+
+
 def session_state():
     with _jobs_lock:
-        jobs = [_public_job(dict(job)) for job in _jobs.values()]
+        jobs = [_job_with_progress(job) for job in _jobs.values()]
     jobs.sort(key=lambda item: item.get("started_at", 0), reverse=True)
     return jsonify({"jobs": jobs})
 
@@ -1922,6 +1989,8 @@ def evaluation_detail(job_id: str):
         return _json_error("Job not found.", 404)
     log_path = _project_root / job["log_path"]
     log_text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
+    # Progress must use the full log; the UI only receives a truncated tail for display.
+    job["progress"] = _summarize_run_progress(log_text, job)
     job["log"] = log_text[-20000:]
     return jsonify(_public_job(job))
 
@@ -1941,6 +2010,45 @@ def cancel_evaluation(job_id: str):
         if process is not None:
             process.terminate()
         return jsonify(_public_job(dict(job)))
+
+
+@app.post("/api/evaluations/<job_id>/resume")
+def resume_evaluation(job_id: str):
+    """Manual resume aligned with ``python reproduce/run.py … --resume-from <checkpoint>``."""
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if not job:
+            return _json_error("Evaluation not found.", 404)
+        if job.get("status") in {"running", "resuming", "starting"}:
+            return _json_error("Evaluation is already active.", 409)
+        if not _job_resumable(job):
+            return _json_error(
+                "Only a failed or cancelled evaluation with a checkpoint can be resumed.",
+                409,
+            )
+        dataset = str(job["dataset"])
+        method = str(job["method"])
+    try:
+        _evaluation_llm_preflight(dataset, method)
+    except ValueError as exc:
+        return _json_error(str(exc))
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if not job or not _job_resumable(job):
+            return _json_error(
+                "Only a failed or cancelled evaluation with a checkpoint can be resumed.",
+                409,
+            )
+        job["status"] = "resuming"
+        job["resume_mode"] = "manual"
+        job.pop("finished_at", None)
+        job.pop("recovery_error", None)
+        job.pop("launch_error", None)
+        _persist_job(job)
+    if not _spawn_evaluation_job(job_id, resume=True, expected_status="resuming"):
+        return _json_error("Evaluation resume could not be started.", 503)
+    with _jobs_lock:
+        return jsonify(_public_job(dict(_jobs[job_id]))), 202
 
 
 @app.post("/api/evaluations/<job_id>/profile")

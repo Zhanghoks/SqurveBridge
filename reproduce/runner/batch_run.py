@@ -43,7 +43,7 @@ from reproduce.runner.batch_utils import (
     split_batches,
     cumulative_to_report,
 )
-from reproduce.lib.env_config import resolve_config_api_keys
+from reproduce.lib.env_config import prepare_runtime_llm_config
 from reproduce.lib.paths import REPRODUCE_ROOT, config_filename, config_repo_path, run_identifier
 from reproduce.eval.report import print_eval_report, print_report_header
 from core.llm.token_logger import collect_all_token_data
@@ -88,7 +88,7 @@ def main():
 
 
 def _run_batches(args, identifier: str, config_path: str, reproduce_dir: Path) -> None:
-    base_config = resolve_config_api_keys(load_dataset(config_path))
+    base_config = prepare_runtime_llm_config(load_dataset(config_path))
     data_source = base_config["task"]["task_meta"][0]["data_source"]
     sys_config_path = (reproduce_dir / "../config/sys_config.json").resolve()
 

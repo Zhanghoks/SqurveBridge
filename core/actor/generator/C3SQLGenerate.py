@@ -40,10 +40,11 @@ from loguru import logger
 from core.actor.generator.BaseGenerate import BaseGenerator
 from core.data_manage import Dataset, single_central_process
 from core.actor.parser.parse_utils import format_schema_links, normalize_schema_links
+from core.llm.completion_limits import chat_extra_body_for_llm, max_chat_completion_n
 from core.utils import load_dataset, parse_schema_from_df, sql_clean
 
 
-# OpenAI-compatible APIs (e.g. Qwen) cap chat.completions `n` at 4.
+# Default chunk size when the provider allows multi-sample `n` (e.g. Qwen).
 MAX_BATCH_N = 4
 
 
@@ -642,19 +643,22 @@ Standalone fallback: uses full schema directly.
     def _generate_batch(self, messages: List[Dict[str, str]], n: int) -> List[str]:
         """Single API call generating n candidate SQLs (matching original generate_reply).
 
-        Uses raw OpenAI-compatible client for n= parameter support.
+        Uses raw OpenAI-compatible client for n= parameter support, chunked by
+        provider limits (DeepSeek: n=1, Qwen: n<=4).
         """
         llm = self.get_llm()
         client = getattr(llm, "client", None)
         model = getattr(llm, "model_name", "gpt-3.5-turbo")
+        max_n = max(1, min(MAX_BATCH_N, max_chat_completion_n(llm, default=MAX_BATCH_N)))
+        extra_body = chat_extra_body_for_llm(llm)
 
         if client is not None:
             try:
                 results: List[str] = []
                 remaining = n
                 while remaining > 0:
-                    batch_n = min(remaining, MAX_BATCH_N)
-                    response = client.chat.completions.create(
+                    batch_n = min(remaining, max_n)
+                    create_kwargs = dict(
                         model=model,
                         messages=messages,
                         n=batch_n,
@@ -662,8 +666,10 @@ Standalone fallback: uses full schema directly.
                         temperature=getattr(llm, "temperature", 0.7),
                         top_p=getattr(llm, "top_p", 0.8),
                         timeout=getattr(llm, "time_out", 300.0),
-                        extra_body={"enable_thinking": False},
                     )
+                    if extra_body:
+                        create_kwargs["extra_body"] = extra_body
+                    response = client.chat.completions.create(**create_kwargs)
                     results.extend(
                         (choice.message.content or "").replace("\n", " ")
                         for choice in response.choices
