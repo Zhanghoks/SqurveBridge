@@ -76,6 +76,31 @@ def resolve_api_key(provider: str, configured: Any) -> str | None:
     return None
 
 
+REDACTED_PLACEHOLDER = "__redacted__"
+
+
+def redact_config_secrets(config: dict) -> dict:
+    """Return a copy of *config* that is safe to persist to disk.
+
+    Resolved ``api_key`` literals are replaced with ``${ENV:<VAR>}`` references
+    (or a fixed placeholder for unknown providers) so runtime configs and score
+    bundles never contain plaintext credentials. The in-memory config used for
+    execution is left untouched.
+    """
+    redacted = dict(config)
+    api_keys = dict(redacted.get("api_key") or {})
+    for provider, value in list(api_keys.items()):
+        if value in PLACEHOLDER_KEYS:
+            continue
+        if isinstance(value, str) and _ENV_REF_PATTERN.match(value.strip()):
+            continue
+        env_name = PROVIDER_ENV_VARS.get(provider)
+        api_keys[provider] = f"${{ENV:{env_name}}}" if env_name else REDACTED_PLACEHOLDER
+    if api_keys:
+        redacted["api_key"] = api_keys
+    return redacted
+
+
 def resolve_config_api_keys(config: dict) -> dict:
     """Return a shallow copy of *config* with ``api_key`` filled from ``.env`` when needed."""
     load_dotenv()

@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-`core/` contains Squrve runtime extensions and native Text-to-SQL Actors. Reproducible experiments live in `reproduce/`; benchmark contracts are in `benchmarks/`, and deterministic utilities in `tools/`. The Flask/Pi backend is in `demo/`, the React/Vite interface in `demo-app/`, and the reviewed Pi upstream source in `pi/`. Deployment overlays live in `deploy/`, examples in `evidence/`, and Python regressions in `tests/`. Agent workflow contracts use `skills/`, `templates/`, and `harness/`.
+`core/` contains Squrve runtime extensions and native Text-to-SQL Actors. Reproducible experiments live in `reproduce/`; benchmark contracts are in `benchmarks/`, and deterministic utilities in `tools/`. The Flask/Pi backend is in `demo/`, the React/Vite interface in `demo-app/`, and the reviewed Pi upstream source in `pi/`. Deployment overlays live in `deploy/`, examples in `evidence/`, and Python regressions in `tests/`. Agent workflow contracts use `skills/`, `templates/`, and `harness/`. Local runtime data (Demo jobs, reproduce intermediates, uploads, score bundles) lives under `workspace/` and must not be committed except `workspace/README.md`.
 
 This repository is the authoritative source for the real interactive demo
 deployed as a configured Hugging Face Space. The separate
@@ -41,8 +41,9 @@ submission/venue/review information, internal roadmap material, benchmark
 questions or SQL, provider payloads, or unpublished claims. User-approved
 author names and affiliations are allowed.
 Space secrets belong only in encrypted Hugging Face settings; never put them in
-Git, example configs, browser storage, logs, screenshots, or fixtures. Use
-repository-relative links. Before publication, run
+Git, example configs, browser storage, logs, screenshots, or fixtures. Runtime
+configs and score-bundle `config.json` files must redact resolved API keys
+before write. Use repository-relative links. Before publication, run
 `python tools/anonymity_scan.py`, `python tools/security_scan.py`, and the
 release gate. Also run `python tools/security_scan.py --history` and manually
 inspect commit authors, deleted-but-reachable files, untracked files, benchmark

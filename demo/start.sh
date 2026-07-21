@@ -3,7 +3,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RUNTIME_DIR="${ROOT}/tmp/demo-runtime"
+WORKSPACE_DIR="${SQURVE_WORKSPACE_DIR:-${ROOT}/workspace}"
+RUNTIME_DIR="${WORKSPACE_DIR}/sessions/runtime"
 API_PORT="${SQURVE_DEMO_API_PORT:-7861}"
 WEB_PORT="${SQURVE_DEMO_WEB_PORT:-5173}"
 API_HOST="${SQURVE_DEMO_API_HOST:-127.0.0.1}"

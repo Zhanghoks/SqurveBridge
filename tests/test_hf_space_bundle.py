@@ -245,6 +245,8 @@ class HuggingFaceBundleTests(unittest.TestCase):
             "docs/superpowers",
             "tmp",
             "artifacts",
+            "workspace",
+            "output",
             "paper",
             "benchmarks",
             "demo-app/node_modules",

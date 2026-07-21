@@ -38,6 +38,13 @@ from demo.gradio_demo import (
     get_router_config_path,
     get_uploaded_db_root,
 )
+from demo.workspace import (
+    artifacts_dir,
+    ensure_layout,
+    evaluations_dir,
+    run_dir as workspace_run_dir,
+    workspace_root,
+)
 from reproduce.lib.env_config import (
     PROVIDER_ENV_VARS,
     api_key_ready,
@@ -85,7 +92,8 @@ _demo_lock = threading.Lock()
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
 _processes: dict[str, subprocess.Popen] = {}
-_run_dir = _project_root / "tmp" / "demo-runs"
+ensure_layout()
+_run_dir = evaluations_dir()
 _job_restore_lock = threading.Lock()
 _jobs_restored = False
 _max_resume_attempts = max(0, int(os.environ.get("SQURVE_EVAL_MAX_RESUMES", "2")))
@@ -230,7 +238,9 @@ def _sql_provider_catalog() -> list[dict[str, object]]:
                 {"id": "china", "label": "China (Beijing) · shared legacy"},
                 {"id": "international", "label": "Singapore · shared legacy"},
             ]
-            item["default_endpoint_id"] = "china_workspace"
+            # Keep the default usable with only an API key. Workspace-scoped
+            # endpoints remain available when the caller explicitly selects one.
+            item["default_endpoint_id"] = "china"
         catalog.append(item)
     return catalog
 
@@ -248,7 +258,7 @@ def _credential_from_payload(payload: dict) -> SqlCredential:
     endpoint_id = str(payload.get("endpoint_id") or "").strip()
     base_url = None
     if provider == "qwen":
-        endpoint_id = endpoint_id or "china_workspace"
+        endpoint_id = endpoint_id or "china"
         if endpoint_id in _QWEN_WORKSPACE_REGIONS:
             workspace_id = str(payload.get("workspace_id") or "").strip()
             if not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", workspace_id):
@@ -1456,7 +1466,7 @@ def _artifact_comparison(
         sample_seed: int,
 ) -> dict:
     candidates = []
-    for path in (_project_root / "artifacts").glob(f"{dataset}-*/scores.json"):
+    for path in artifacts_dir().glob(f"{dataset}-*/scores.json"):
         scores = _read_scores(path)
         if not scores or scores.get("dataset") != dataset or scores.get("method") not in methods:
             continue
@@ -1471,7 +1481,7 @@ def _artifact_comparison(
             continue
         candidates.append(_serialize_comparison_run(
             scores,
-            artifact_ref=path.relative_to(_project_root).as_posix(),
+            artifact_ref=f"workspace/artifacts/{path.parent.name}/scores.json",
         ))
 
     groups: dict[tuple, list[dict]] = {}
@@ -1495,9 +1505,35 @@ def _artifact_comparison(
     return _comparison_payload(selected, methods)
 
 
+def _display_path(path: Path) -> str:
+    """Prefer a repo-relative path; then workspace-relative; absolute only as last resort."""
+    resolved = path.resolve()
+    for root in (_project_root, workspace_root()):
+        try:
+            return resolved.relative_to(root.resolve()).as_posix()
+        except ValueError:
+            continue
+    return str(resolved)
+
+
+def _resolve_job_log_path(job: dict) -> Path:
+    raw = str(job.get("log_path") or "")
+    job_id = str(job.get("job_id") or "")
+    if not raw:
+        return _run_dir / job_id / "run.log"
+    path = Path(raw)
+    if path.is_absolute():
+        return path
+    project_candidate = _project_root / path
+    if project_candidate.exists() or path.parts[:1] == ("workspace",) or path.parts[:1] == ("tmp",):
+        return project_candidate
+    # External SQURVE_WORKSPACE_DIR storage may persist workspace-relative paths.
+    return workspace_root() / path
+
+
 def _checkpoint_state_path(job: dict) -> Path:
     run_id = f"{job['dataset']}-{job['method']}-{job['job_id']}"
-    return _project_root / "files" / "runs" / run_id / "checkpoints" / "state.json"
+    return workspace_run_dir(run_id) / "checkpoints" / "state.json"
 
 
 def _job_has_checkpoint(job: dict) -> bool:
@@ -1550,9 +1586,29 @@ def _summarize_run_progress(log_text: str, job: dict | None = None) -> dict:
 
 
 def _public_job(job: dict) -> dict:
-    public = {key: value for key, value in job.items() if key not in {"scores_path"}}
+    # Keep filesystem locations server-side; absolute workstation paths must not reach the UI.
+    public = {
+        key: value
+        for key, value in job.items()
+        if key not in {"scores_path", "log_path"}
+    }
     public["checkpoint_present"] = _job_has_checkpoint(job)
     public["resumable"] = _job_resumable(job)
+    scores_path = Path(job.get("scores_path") or "")
+    if scores_path.is_file():
+        scores = _read_scores(scores_path)
+        if scores:
+            public["result"] = _summarize_scores(scores_path)
+            public["run_id"] = public["result"].get("run_id") or public.get("run_id")
+            public["artifact"] = _serialize_comparison_run(
+                scores,
+                job=job,
+                source="session",
+                artifact_ref=(
+                    f"session:{scores.get('run_id') or job.get('run_id') or job.get('job_id')}"
+                    "/scores.json"
+                ),
+            )
     return public
 
 
@@ -1608,7 +1664,7 @@ def _spawn_evaluation_job(
                 kind = "manual" if job.get("resume_mode") == "manual" else "autonomous"
                 log_handle.write(
                     f"\n[demo] {kind} resume {job['resume_count']}/{job.get('max_resume_attempts', _max_resume_attempts)} "
-                    f"from {checkpoint_path.relative_to(_project_root)} "
+                    f"from {_display_path(checkpoint_path)} "
                     f"(reproduce/run.py --resume-from)\n"
                 )
                 log_handle.flush()
@@ -1721,10 +1777,9 @@ def _watch_restored_process(job_id: str, pid: int) -> None:
         _resume_job_after_backoff(job_id)
 
 
-@app.get("/api/session")
 def _job_with_progress(job: dict) -> dict:
     public = _public_job(dict(job))
-    log_path = _project_root / str(job.get("log_path") or "")
+    log_path = _resolve_job_log_path(job)
     log_text = ""
     if log_path.is_file():
         try:
@@ -1735,6 +1790,7 @@ def _job_with_progress(job: dict) -> dict:
     return public
 
 
+@app.get("/api/session")
 def session_state():
     with _jobs_lock:
         jobs = [_job_with_progress(job) for job in _jobs.values()]
@@ -1846,7 +1902,7 @@ def _launch_evaluation(
         "sample_seed": sample_seed,
         "status": "starting",
         "pid": None,
-        "log_path": str((job_dir / "run.log").relative_to(_project_root)),
+        "log_path": _display_path(job_dir / "run.log"),
         "started_at": time.time(),
         "run_id": None,
         "resume_count": 0,
@@ -1987,12 +2043,43 @@ def evaluation_detail(job_id: str):
         job = dict(_jobs.get(job_id) or {})
     if not job:
         return _json_error("Job not found.", 404)
-    log_path = _project_root / job["log_path"]
+    log_path = _resolve_job_log_path(job)
     log_text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
     # Progress must use the full log; the UI only receives a truncated tail for display.
     job["progress"] = _summarize_run_progress(log_text, job)
     job["log"] = log_text[-20000:]
     return jsonify(_public_job(job))
+
+
+def _evaluation_llm_preflight(dataset: str, method: str) -> None:
+    """Raise ValueError when the active provider cannot launch this config."""
+    load_dotenv(_project_root / ".env")
+    config_path = _project_root / "reproduce" / "configs" / dataset / f"{method}.json"
+    if not config_path.is_file():
+        raise ValueError(f"Unknown reproduce configuration: {method} / {dataset}")
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Reproduce configuration is unreadable: {exc}") from exc
+    from reproduce.lib.env_config import prepare_runtime_llm_config
+
+    resolved = prepare_runtime_llm_config(config)
+    ready, message = api_key_ready(resolved)
+    if not ready:
+        raise ValueError(message or "LLM provider is not ready for evaluation.")
+
+
+def _terminate_job_process(process: subprocess.Popen, job_id: str) -> None:
+    """Stop an evaluation child process and drop it from the live registry."""
+    try:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                process.kill()
+    finally:
+        _processes.pop(job_id, None)
 
 
 @app.post("/api/evaluations/<job_id>/cancel")
@@ -2008,7 +2095,8 @@ def cancel_evaluation(job_id: str):
         job["finished_at"] = time.time()
         _persist_job(job)
         if process is not None:
-            process.terminate()
+            _terminate_job_process(process, job_id)
+        _processes.pop(job_id, None)
         return jsonify(_public_job(dict(job)))
 
 
@@ -2082,8 +2170,8 @@ _ARCHIVE_MAX_BYTES = 2_000_000
 def _archive_roots() -> list[tuple[str, Path]]:
     return [
         ("evidence", _project_root / "evidence" / "reported-results"),
-        ("artifacts", _project_root / "artifacts"),
-        ("demo-runs", _project_root / "tmp" / "demo-runs"),
+        ("artifacts", artifacts_dir()),
+        ("demo-runs", evaluations_dir()),
     ]
 
 
@@ -2106,12 +2194,12 @@ def _archive_run_dirs() -> list[tuple[str, Path]]:
             except EvidenceError:
                 continue
             found.append(("evidence", path))
-    artifacts_root = _project_root / "artifacts"
+    artifacts_root = artifacts_dir()
     if artifacts_root.is_dir():
         for path in sorted(artifacts_root.iterdir()):
             if path.is_dir() and (path / "scores.json").is_file():
                 found.append(("artifacts", path))
-    demo_root = _project_root / "tmp" / "demo-runs"
+    demo_root = evaluations_dir()
     if demo_root.is_dir():
         for job_dir in sorted(demo_root.iterdir()):
             bundle = job_dir / "score-bundle"

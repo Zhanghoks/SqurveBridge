@@ -90,7 +90,6 @@ class EvaluationLlmPreflightTests(unittest.TestCase):
         )
         self.patches = (
             patch.object(api_server, "_project_root", self.root),
-            patch("demo.api_server.config_repo_path", return_value=self.config_path),
         )
         for item in self.patches:
             item.start()

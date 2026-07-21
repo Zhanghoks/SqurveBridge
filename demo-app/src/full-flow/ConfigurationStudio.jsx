@@ -22,55 +22,61 @@ export default function ConfigurationStudio({
         </div>
       </header>
 
-      <div className="flow-configuration-layout studio-explain-layout">
-        <div className="catalog-workspaces" data-testid="catalog-workspaces">
-          <section className="catalog-workspace" aria-labelledby="catalog-methods-title">
-            <header>
-              <h3 id="catalog-methods-title">{t('configure.methods')}</h3>
-              <p>{t('catalog.methodsHint')}</p>
-            </header>
-            <div className="catalog-card-list">
-              {METHOD_CATALOG.map(entry => (
-                <CatalogCard
-                  key={entry.name}
-                  name={entry.name}
-                  teaser={t(`catalog.method.${entry.slug}.teaser`)}
-                  openLabel={t('catalog.openMethodFlashcard', { name: entry.name })}
-                  onOpenFlashcard={() => setFlashcard({ kind: 'method', entry })}
-                />
-              ))}
-            </div>
-          </section>
-
-          <section className="catalog-workspace" aria-labelledby="catalog-databases-title">
-            <header>
-              <h3 id="catalog-databases-title">{t('configure.databases')}</h3>
-              <p>{t('catalog.databasesHint')}</p>
-            </header>
-            <div className="catalog-card-list">
-              {DATABASE_CATALOG.map(entry => (
-                <CatalogCard
-                  key={entry.name}
-                  name={entry.name}
-                  teaser={t(`catalog.database.${entry.slug}.teaser`)}
-                  openLabel={t('catalog.openDatabaseFlashcard', { name: entry.name })}
-                  onOpenFlashcard={() => setFlashcard({ kind: 'database', entry })}
-                />
-              ))}
-            </div>
-          </section>
-        </div>
-
-        <aside className="studio-guide" data-testid="studio-guide">
+      <aside className="studio-guide studio-guide-inline" data-testid="studio-guide">
+        <div className="studio-guide-copy">
           <span>{t('configure.guideEyebrow')}</span>
           <strong>{t('configure.guideTitle')}</strong>
-          <ol>
-            <li>{t('configure.guideStepBrowse')}</li>
-            <li>{t('configure.guideStepFlashcard')}</li>
-            <li>{t('configure.guideStepCompose')}</li>
-          </ol>
-          <p>{t('configure.composeHint')}</p>
-        </aside>
+        </div>
+        <ol>
+          <li>{t('configure.guideStepBrowse')}</li>
+          <li>{t('configure.guideStepFlashcard')}</li>
+          <li>{t('configure.guideStepCompose')}</li>
+        </ol>
+        <p>{t('configure.composeHint')}</p>
+      </aside>
+
+      <div className="catalog-workspaces catalog-workspaces-stack" data-testid="catalog-workspaces">
+        <section
+          className="catalog-workspace catalog-workspace-methods"
+          aria-labelledby="catalog-methods-title"
+        >
+          <header>
+            <h3 id="catalog-methods-title">{t('configure.methods')}</h3>
+            <p>{t('configure.methodsLead')}</p>
+          </header>
+          <div className="catalog-card-list">
+            {METHOD_CATALOG.map(entry => (
+              <CatalogCard
+                key={entry.name}
+                name={entry.name}
+                teaser={t(`catalog.method.${entry.slug}.teaser`)}
+                openLabel={t('catalog.openMethodFlashcard', { name: entry.name })}
+                onOpenFlashcard={() => setFlashcard({ kind: 'method', entry })}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section
+          className="catalog-workspace catalog-workspace-databases"
+          aria-labelledby="catalog-databases-title"
+        >
+          <header>
+            <h3 id="catalog-databases-title">{t('configure.databases')}</h3>
+            <p>{t('configure.databasesLead')}</p>
+          </header>
+          <div className="catalog-card-list">
+            {DATABASE_CATALOG.map(entry => (
+              <CatalogCard
+                key={entry.name}
+                name={entry.name}
+                teaser={t(`catalog.database.${entry.slug}.teaser`)}
+                openLabel={t('catalog.openDatabaseFlashcard', { name: entry.name })}
+                onOpenFlashcard={() => setFlashcard({ kind: 'database', entry })}
+              />
+            ))}
+          </div>
+        </section>
       </div>
 
       <FlashcardDialog

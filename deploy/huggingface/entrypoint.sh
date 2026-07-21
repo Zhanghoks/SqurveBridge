@@ -2,6 +2,9 @@
 set -euo pipefail
 
 export SQURVE_DEPLOYMENT_TARGET=hf-space
+export SQURVE_WORKSPACE_DIR="${SQURVE_WORKSPACE_DIR:-/app/workspace}"
+
+mkdir -p "${SQURVE_WORKSPACE_DIR}"
 
 python demo/runtime_check.py
 

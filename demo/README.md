@@ -20,7 +20,7 @@
 - 工作台：<http://127.0.0.1:5173>
 - API 健康检查：<http://127.0.0.1:7861/api/health>
 
-运行时 PID / 日志目录：`tmp/demo-runtime/`（已被 gitignore）。
+运行时 PID / 日志目录：`workspace/sessions/runtime/`（已被 gitignore；可用 `SQURVE_WORKSPACE_DIR` 覆盖）。
 
 | 文件 | 说明 |
 |------|------|
@@ -64,7 +64,7 @@ python3 -m venv .venv
 |------|------|
 | **01 SQL Studio** | 选择 method/benchmark、配置 Actor 工作流并生成与执行 SQL |
 | **02 Experiment Board** | 同一 dataset 上多方法对比（雷达、Formal tables、错误/特征、成本） |
-| **03 Archive** | 浏览 `artifacts/` 与 `tmp/demo-runs/` 中的 score bundle 与报告 |
+| **03 Archive** | 浏览 `workspace/artifacts/` 与 `workspace/sessions/evaluations/` 中的 score bundle 与报告 |
 
 ## Hugging Face Space 凭据
 
@@ -104,7 +104,7 @@ lsof -nP -iTCP:5173 -sTCP:LISTEN
 
 **前端 Bad Gateway**
 
-通常是 API 未起来。查看 `tmp/demo-runtime/api.log`，确认 `/api/health` 可访问后再刷新页面。
+通常是 API 未起来。查看 `workspace/sessions/runtime/api.log`，确认 `/api/health` 可访问后再刷新页面。
 
 **重复启动**
 

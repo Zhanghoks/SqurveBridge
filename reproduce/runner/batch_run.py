@@ -50,6 +50,7 @@ from core.llm.token_logger import collect_all_token_data
 from reproduce.eval.utils import evaluate, evaluate_with_details, load_router
 from reproduce.metrics.assembly import build_scores
 from reproduce.metrics.persistence import persist_scores_bundle
+from demo.workspace import artifacts_dir
 from reproduce.runner.run import (
     _load_custom_metrics,
     _run_custom_metrics,
@@ -253,7 +254,7 @@ def _persist_batch_scores(
         cumulative: dict,
 ) -> Path:
     run_id = f"{identifier}-batch-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-    output_dir = Path(os.environ.get("SQURVE_EVAL_OUTPUT_DIR", project_root / "artifacts" / run_id))
+    output_dir = Path(os.environ.get("SQURVE_EVAL_OUTPUT_DIR", str(artifacts_dir() / run_id)))
     output_dir.mkdir(parents=True, exist_ok=True)
     with _suppress_eval_warnings():
         ex_result = evaluate_with_details(save_lis, config=eval_config, quiet=True)

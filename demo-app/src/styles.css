@@ -953,8 +953,8 @@ select:focus, textarea:focus { border-color: #679b77; box-shadow: 0 0 0 2px rgb(
 }
 .archive-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+  gap: 18px;
   align-items: start;
 }
 .archive-list,
@@ -1028,11 +1028,15 @@ select:focus, textarea:focus { border-color: #679b77; box-shadow: 0 0 0 2px rgb(
   gap: 14px;
   min-width: 0;
 }
-.archive-metric-strip {
+.archive-metric-strip,
+.archive-metric-board {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
-  margin: 12px 0;
+  gap: 14px;
+  margin: 14px 0;
+}
+.archive-metric-strip {
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 10px;
 }
 .archive-metric-strip > div {
   display: grid;
@@ -1053,14 +1057,24 @@ select:focus, textarea:focus { border-color: #679b77; box-shadow: 0 0 0 2px rgb(
 }
 .archive-reader {
   display: grid;
-  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+  grid-template-columns: 1fr;
   gap: 14px;
   align-items: start;
+}
+.archive-file-groups {
+  display: grid;
+  gap: 14px;
+  margin-top: 4px;
+}
+.archive-file-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .archive-file-group {
   display: grid;
   gap: 6px;
-  margin-top: 12px;
+  margin-top: 0;
 }
 .archive-file-group header {
   color: #8ee1ae;
@@ -1068,10 +1082,12 @@ select:focus, textarea:focus { border-color: #679b77; box-shadow: 0 0 0 2px rgb(
   letter-spacing: .06em;
   text-transform: uppercase;
 }
-.archive-file-group button {
+.archive-file-group button,
+.archive-file-chips button {
   display: grid;
   gap: 3px;
-  width: 100%;
+  width: auto;
+  min-width: 140px;
   border: 1px solid #303830;
   border-radius: 4px;
   padding: 8px 9px;
@@ -1178,20 +1194,11 @@ select:focus, textarea:focus { border-color: #679b77; box-shadow: 0 0 0 2px rgb(
 
 @media (max-width: 1100px) {
   .archive-layout,
-  .archive-reader,
   .archive-filter-grid {
     grid-template-columns: 1fr;
   }
-  .archive-metric-strip {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
   .archive-run-list {
     max-height: 320px;
-  }
-}
-@media (max-width: 760px) {
-  .archive-metric-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

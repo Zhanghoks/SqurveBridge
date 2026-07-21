@@ -315,9 +315,8 @@ html:has(.agent-shell) #root {
   line-height: 1.55;
 }
 
-.agent-live-workspace-body .studio-guide {
-  position: sticky;
-  top: 0;
+.agent-live-workspace-body .studio-guide-inline {
+  position: static;
 }
 
 .agent-live-workspace-body .connection-composer .flow-compose-grid {

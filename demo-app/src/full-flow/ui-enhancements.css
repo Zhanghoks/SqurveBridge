@@ -1,0 +1,628 @@
+/**
+ * SqurveBridge UI Enhancements
+ * Sophisticated visual refinements for the research framework
+ */
+
+/* ========================================
+   Enhanced Background & Atmosphere
+   ======================================== */
+
+.hosted-matrix-shell {
+  background:
+    radial-gradient(ellipse 80% 50% at 15% -5%, rgb(212 165 116 / 12%), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 85% 95%, rgb(90 140 160 / 8%), transparent 50%),
+    linear-gradient(180deg, #0e0e0e 0, #141414 100%);
+}
+
+.flow-demo {
+  background:
+    radial-gradient(ellipse 70% 50% at 10% 0%, rgb(212 165 116 / 8%), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 90% 100%, rgb(90 140 160 / 6%), transparent 50%),
+    #0e0e0e;
+}
+
+/* ========================================
+   Refined Glass Surfaces
+   ======================================== */
+
+.flow-glass,
+.tool-panel,
+.board-panel,
+.archive-list,
+.archive-summary {
+  background: linear-gradient(145deg, rgba(26, 26, 26, 0.95), rgba(22, 22, 22, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px) saturate(120%);
+}
+
+.flow-module {
+  box-shadow:
+    0 12px 48px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(212, 165, 116, 0.08) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ========================================
+   Enhanced Typography Scale
+   ======================================== */
+
+.flow-module-header h2 {
+  font-weight: 750;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  background: linear-gradient(135deg, #ffffff 0%, #e8e8ea 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.flow-page-heading h2 {
+  background: linear-gradient(135deg, #ffffff 0%, #d4d4d6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ========================================
+   Sophisticated Buttons & Controls
+   ======================================== */
+
+.flow-header-actions button:first-child,
+.run-primary-action,
+.button.primary {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #e08a6c 0%, #c4613f 100%);
+  box-shadow:
+    0 8px 24px rgba(218, 119, 86, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.flow-header-actions button:first-child::before,
+.run-primary-action::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.flow-header-actions button:first-child:hover::before,
+.run-primary-action:hover::before {
+  opacity: 1;
+}
+
+.flow-header-actions button:first-child:hover,
+.run-primary-action:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 12px 32px rgba(218, 119, 86, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.flow-header-actions button:first-child:active,
+.run-primary-action:active {
+  transform: translateY(0);
+}
+
+/* Secondary buttons */
+.flow-header-actions button:not(:first-child),
+.button:not(.primary):not(.danger) {
+  background: linear-gradient(145deg, rgba(38, 38, 42, 0.9), rgba(28, 28, 32, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.flow-header-actions button:not(:first-child):hover {
+  border-color: rgba(212, 165, 116, 0.4);
+  background: linear-gradient(145deg, rgba(42, 38, 36, 0.95), rgba(34, 30, 28, 0.98));
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* ========================================
+   Connection Matrix Enhancements
+   ======================================== */
+
+.flow-connection-graph {
+  position: relative;
+}
+
+.flow-connection-graph::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(212, 165, 116, 0.03) 0%, transparent 15%, transparent 85%, rgba(90, 140, 160, 0.03) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.flow-graph-nodes button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.flow-graph-nodes button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(212, 165, 116, 0.1), transparent);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.flow-graph-nodes button:hover::after {
+  opacity: 1;
+}
+
+.flow-graph-nodes button:hover {
+  transform: translateX(-2px);
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px rgba(212, 165, 116, 0.2);
+}
+
+.flow-method-nodes button:hover {
+  transform: translateX(-2px);
+}
+
+.flow-database-nodes button:hover {
+  transform: translateX(2px);
+}
+
+.flow-graph-nodes button.selected {
+  box-shadow:
+    0 8px 24px rgba(218, 119, 86, 0.2),
+    inset 0 0 0 1px rgba(218, 119, 86, 0.3);
+}
+
+/* Enhanced connection paths */
+.flow-connection-graph path {
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.flow-connection-graph path.selected {
+  filter: drop-shadow(0 0 12px rgba(212, 165, 116, 0.4));
+}
+
+.flow-connection-graph path.focused {
+  filter: drop-shadow(0 0 16px rgba(224, 138, 108, 0.6));
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 16px rgba(224, 138, 108, 0.6));
+  }
+  50% {
+    filter: drop-shadow(0 0 24px rgba(224, 138, 108, 0.8));
+  }
+}
+
+/* ========================================
+   Catalog Cards Enhancement
+   ======================================== */
+
+.catalog-card {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.catalog-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(212, 165, 116, 0.5), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.catalog-card:hover::before {
+  opacity: 1;
+}
+
+.catalog-card:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(212, 165, 116, 0.2);
+}
+
+/* ========================================
+   Process Rail Enhancement
+   ======================================== */
+
+.flow-process-rail button {
+  position: relative;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.flow-process-rail button::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0;
+  background: linear-gradient(180deg, #e89274, #da7756);
+  border-radius: 0 2px 2px 0;
+  transition: height 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.flow-process-rail button:hover::before {
+  height: 60%;
+}
+
+.flow-process-rail button.active::before {
+  height: 80%;
+}
+
+.flow-process-rail button.active span {
+  animation: number-pulse 2s ease-in-out infinite;
+}
+
+@keyframes number-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+/* ========================================
+   Status Indicators Enhancement
+   ======================================== */
+
+.status,
+.flow-status {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+
+.status::before,
+.flow-status::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), transparent);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.status:hover::before,
+.flow-status:hover::before {
+  opacity: 1;
+}
+
+.status-success i,
+.flow-status-success i {
+  animation: success-pulse 2s ease-in-out infinite;
+}
+
+@keyframes success-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.2);
+  }
+}
+
+/* ========================================
+   Data Visualization Refinements
+   ======================================== */
+
+.board-chart svg {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+}
+
+.radar-grid {
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-dasharray: 2 4;
+}
+
+.radar-axis {
+  stroke: rgba(255, 255, 255, 0.12);
+}
+
+/* Chart labels with better readability */
+.radar-label,
+.bar-label,
+.chart-caption {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* ========================================
+   Table Enhancements
+   ======================================== */
+
+.results-table-wrap table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.results-table-wrap th {
+  position: sticky;
+  top: 0;
+  background: linear-gradient(180deg, rgba(26, 26, 26, 0.98), rgba(22, 22, 22, 0.98));
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
+  z-index: 10;
+}
+
+.results-table-wrap tr {
+  transition: background 0.2s ease;
+}
+
+.results-table-wrap tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* ========================================
+   Form Controls Enhancement
+   ======================================== */
+
+.flow-demo input:not([type="checkbox"]):not([type="radio"]),
+.flow-demo select,
+.flow-demo textarea {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.flow-demo input:focus,
+.flow-demo select:focus,
+.flow-demo textarea:focus {
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 3px rgba(212, 165, 116, 0.15),
+    0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* ========================================
+   Loading & Skeleton States
+   ======================================== */
+
+.flow-agent-loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.flow-agent-loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(212, 165, 116, 0.1), transparent);
+  animation: loading-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes loading-shimmer {
+  to {
+    left: 100%;
+  }
+}
+
+/* ========================================
+   Archive & Evidence Hub
+   ======================================== */
+
+.archive-run-list > button,
+.archive-file-group button {
+  position: relative;
+  overflow: hidden;
+}
+
+.archive-run-list > button::after,
+.archive-file-group button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(212, 165, 116, 0.08), transparent);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.archive-run-list > button:hover::after,
+.archive-file-group button:hover::after {
+  opacity: 1;
+}
+
+/* ========================================
+   Metric Cards Enhancement
+   ======================================== */
+
+.archive-metric-strip > div,
+.archive-metric-hero,
+.run-artifact-metrics > div,
+.score-metrics > div {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+
+.archive-metric-strip > div::before,
+.archive-metric-hero::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #e89274, #da7756);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.archive-metric-strip > div:hover::before,
+.archive-metric-hero:hover::before {
+  transform: scaleX(1);
+}
+
+.archive-metric-strip > div:hover,
+.archive-metric-hero:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* ========================================
+   Agent Shell Enhancements
+   ======================================== */
+
+.agent-shell-divider span {
+  background: linear-gradient(180deg, transparent, rgba(212, 165, 116, 0.3), transparent);
+  transition: background 0.25s ease;
+}
+
+.agent-shell-divider:hover span,
+.agent-shell-resizing .agent-shell-divider span {
+  background: linear-gradient(180deg, transparent, rgba(212, 165, 116, 0.6), transparent);
+  box-shadow: 0 0 12px rgba(212, 165, 116, 0.4);
+}
+
+/* Enhanced chat messages */
+.pi-message {
+  position: relative;
+  transition: all 0.25s ease;
+}
+
+.pi-message:hover {
+  transform: translateX(2px);
+  box-shadow:
+    -3px 0 0 rgba(212, 165, 116, 0.3),
+    0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* ========================================
+   Smooth Page Transitions
+   ======================================== */
+
+.flow-stage-page {
+  animation: page-fade-in 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========================================
+   Micro-interactions
+   ======================================== */
+
+.chip-row button,
+.method-chip-grid button,
+.board-tabs button {
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chip-row button:hover,
+.method-chip-grid button:hover {
+  transform: translateY(-1px);
+}
+
+.chip-row button:active,
+.method-chip-grid button:active {
+  transform: translateY(0);
+}
+
+/* ========================================
+   Accessibility Enhancements
+   ======================================== */
+
+.flow-demo *:focus-visible {
+  outline: 2px solid rgba(212, 165, 116, 0.7);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .flow-demo *,
+  .flow-demo *::before,
+  .flow-demo *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ========================================
+   Dark Mode Optimization
+   ======================================== */
+
+@media (prefers-color-scheme: dark) {
+  .flow-glass,
+  .tool-panel {
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+}
+
+/* ========================================
+   Tooltip Enhancement
+   ======================================== */
+
+.flow-connection-tooltip {
+  animation: tooltip-float 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(16px) saturate(140%);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+@keyframes tooltip-float {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* ========================================
+   Mobile Optimizations
+   ======================================== */
+
+@media (max-width: 719px) {
+  .flow-graph-nodes button:hover {
+    transform: none;
+  }
+
+  .catalog-card:hover {
+    transform: translateY(-2px);
+  }
+
+  .archive-metric-strip > div:hover,
+  .archive-metric-hero:hover {
+    transform: none;
+  }
+}

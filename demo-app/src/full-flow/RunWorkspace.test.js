@@ -12,7 +12,13 @@ const userEvent = (await import('@testing-library/user-event')).default
 registerLoader('../cssTestLoader.mjs', import.meta.url)
 const unregister = register()
 
-const { default: RunWorkspace, sanitizeRunError, summarizeRunProgress } = await import('./RunWorkspace.jsx')
+const {
+  default: RunWorkspace,
+  mergeJobDetail,
+  resolveJobArtifact,
+  sanitizeRunError,
+  summarizeRunProgress,
+} = await import('./RunWorkspace.jsx')
 const { default: ResultWorkspace } = await import('./ResultWorkspace.jsx')
 
 const translations = {
@@ -32,6 +38,17 @@ const translations = {
   'run.batchEmpty': 'No config jobs yet.',
   'run.batchLog': 'Selected job log',
   'run.batchLogEmpty': 'Waiting for job output…',
+  'run.viewDebugLog': 'View debug log',
+  'run.artifactTitle': 'Run artifacts',
+  'run.artifactPending': 'Score bundle is not available for this completed job yet.',
+  'run.artifactSplit': 'Split',
+  'run.artifactSamples': 'Samples',
+  'run.artifactTokens': 'Tokens',
+  'run.artifactLatency': 'Latency',
+  'run.artifactComponentF1': 'Component F1',
+  'run.artifactErrorRoots': 'Error roots',
+  'run.artifactStages': 'Actor stages',
+  'run.artifactEmptySlice': 'No slice evidence in this score bundle.',
   'run.action': 'Run config',
   'run.stop': 'Stop run',
   'run.resume': 'Resume run',
@@ -328,6 +345,117 @@ test('stops active board jobs through the cancel endpoint', async () => {
 
   assert.deepEqual(calls, [['/api/evaluations/job-stop/cancel', {}]])
   await waitFor(() => assert.match(screen.getByTestId('run-batch-monitor').textContent, /cancelled/i))
+})
+
+test('visualizes completed job score-bundle artifacts in the run monitor', async () => {
+  renderRun({
+    api: async path => {
+      if (path === '/api/session') {
+        return {
+          jobs: [{
+            job_id: 'job-done',
+            method: 'c3sql',
+            dataset: 'spider',
+            status: 'completed',
+            progress: { current_stage: '评估完成', started: 20, completed: 20, total: 20, percent: 100 },
+            result: {
+              run_id: 'spider-c3sql-job-done',
+              method: 'c3sql',
+              dataset: 'spider',
+              split: 'dev',
+              sample_count: 20,
+              metrics: { ex: 0.9, em: 0.85, sf1: 0.88, ves: 0.7, rves: 0.65 },
+              component_f1: { select: 0.92, where: 0.8 },
+              error_roots: [{ name: 'schema_link', count: 3, rate: 0.15 }],
+              token: { total_tokens: 12000, avg_per_sample: 600 },
+              stages: [{ name: 'generate', task_type: 'GenerateTask' }],
+            },
+            artifact: {
+              run_id: 'spider-c3sql-job-done',
+              artifact_ref: 'session:spider-c3sql-job-done/scores.json',
+              latency: { mean_s: 1.25 },
+            },
+          }],
+        }
+      }
+      if (path === '/api/evaluations/job-done') {
+        return {
+          job_id: 'job-done',
+          method: 'c3sql',
+          dataset: 'spider',
+          status: 'completed',
+          log: '评估完成',
+          progress: { current_stage: '评估完成', started: 20, completed: 20, total: 20, percent: 100 },
+          result: {
+            run_id: 'spider-c3sql-job-done',
+            method: 'c3sql',
+            dataset: 'spider',
+            split: 'dev',
+            sample_count: 20,
+            metrics: { ex: 0.9, em: 0.85, sf1: 0.88, ves: 0.7, rves: 0.65 },
+            component_f1: { select: 0.92, where: 0.8 },
+            error_roots: [{ name: 'schema_link', count: 3, rate: 0.15 }],
+            token: { total_tokens: 12000 },
+            stages: [{ name: 'generate', task_type: 'GenerateTask' }],
+          },
+          artifact: {
+            run_id: 'spider-c3sql-job-done',
+            artifact_ref: 'session:spider-c3sql-job-done/scores.json',
+            latency: { mean_s: 1.25 },
+          },
+        }
+      }
+      return {}
+    },
+  })
+
+  const panel = await screen.findByTestId('run-artifact-panel')
+  assert.match(panel.textContent, /90\.0%/)
+  assert.match(panel.textContent, /Component F1/)
+  assert.match(panel.textContent, /schema_link/)
+  assert.match(panel.textContent, /session:spider-c3sql-job-done\/scores\.json/)
+})
+
+test('resolveJobArtifact maps summary metrics for visualization', () => {
+  const resolved = resolveJobArtifact({
+    job_id: 'x',
+    result: {
+      metrics: { ex: 0.5 },
+      component_f1: { select: 0.7 },
+      error_roots: [],
+      token: { total_tokens: 10 },
+      stages: [],
+    },
+  })
+  assert.equal(resolved.metricCards.find(item => item.key === 'ex').value, 0.5)
+  assert.equal(resolved.componentF1[0].name, 'select')
+})
+
+test('mergeJobDetail keeps terminal status and preserves newer artifacts', () => {
+  const merged = mergeJobDetail(
+    {
+      job_id: 'job-1',
+      status: 'completed',
+      progress: { percent: 100 },
+      result: { metrics: { ex: 0.9 } },
+      artifact: { run_id: 'done' },
+      resumable: false,
+    },
+    {
+      job_id: 'job-1',
+      status: 'running',
+      progress: { percent: 40 },
+      log: 'stale log should not be merged into job state',
+      log_path: '/Users/example/secret/run.log',
+      resumable: false,
+    },
+  )
+  assert.equal(merged.status, 'completed')
+  assert.equal(merged.progress.percent, 100)
+  assert.equal(merged.result.metrics.ex, 0.9)
+  assert.equal(merged.artifact.run_id, 'done')
+  assert.equal(merged.log, undefined)
+  assert.equal(merged.log_path, undefined)
 })
 
 test('restores supervised jobs from the backend session after a page reload', async () => {

@@ -66,17 +66,17 @@ Depending on the run mode and configuration, outputs include:
 | detailed report | Human-readable evaluation evidence |
 | evaluation store | Queryable sample- and run-level records |
 
-Runtime files are written below ignored `files/` and `artifacts/` directories. A
-reported result is reproducible only when its configuration and concrete run
-artifacts are retained together.
+Runtime files are written under the ignored `workspace/` tree (override with
+`SQURVE_WORKSPACE_DIR`). A reported result is reproducible only when its
+configuration and concrete run artifacts are retained together.
 
 ## Run Isolation and Resume
 
 Every invocation receives a run ID and owns one runtime workspace:
 
 ```text
-files/runs/<run-id>/
-  config.json
+workspace/runs/<run-id>/
+  config.json          # secrets redacted before write
   checkpoints/
     state.json
     state-2.json       # when generate_num > 1
@@ -101,10 +101,10 @@ Or select a concrete recorded run:
 
 ```bash
 python reproduce/run.py spider c3sql \
-  --resume-from files/runs/<run-id>/checkpoints/state.json
+  --resume-from workspace/runs/<run-id>/checkpoints/state.json
 ```
 
-An explicit checkpoint outside `files/runs/<run-id>/checkpoints/` is rejected.
+An explicit checkpoint outside `workspace/runs/<run-id>/checkpoints/` is rejected.
 Missing or malformed checkpoint state fails loudly rather than silently starting a
 new run.
 

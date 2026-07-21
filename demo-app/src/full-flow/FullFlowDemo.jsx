@@ -21,6 +21,7 @@ import { INITIAL_RUN_STATE } from './RunWorkspace.jsx'
 import { FlowStatus } from './flowUi.jsx'
 import './full-flow.css'
 import './agent-shell.css'
+import './ui-enhancements.css'
 
 const AgentHarness = lazy(() => import('../AgentHarness.jsx'))
 const SPLIT_STORAGE_KEY = 'squrve-demo-shell-layout'
@@ -62,7 +63,6 @@ export default function FullFlowDemo({
   const [sampleMode, setSampleMode] = useState('slice')
   const [sampleSeed, setSampleSeed] = useState(42)
   const [runState, setRunState] = useState(INITIAL_RUN_STATE)
-  const [archiveFocusRunId, setArchiveFocusRunId] = useState('')
   const [chatKey, setChatKey] = useState(0)
   const [harnessTask, setHarnessTask] = useState(null)
   const [shellLayout, setShellLayout] = useState(loadShellLayout)
@@ -140,11 +140,6 @@ export default function FullFlowDemo({
     applyFocus(method, database)
   }
 
-  const openArchiveInVisualize = runId => {
-    setArchiveFocusRunId(runId)
-    navigateToStep('visualize')
-  }
-
   const selection = {
     selectedMethods,
     selectedDatabases,
@@ -201,10 +196,9 @@ export default function FullFlowDemo({
         t={t}
       />
     ),
-    visualize: (
+    evidence: (
       <EvidenceHub
-        pageId="visualize"
-        initialTab="visualize"
+        pageId="evidence"
         capabilities={capabilities}
         api={api}
         postJson={postJson}
@@ -214,27 +208,7 @@ export default function FullFlowDemo({
         sampleLimit={sampleLimit}
         sampleMode={sampleMode}
         sampleSeed={sampleSeed}
-        archiveFocusRunId={archiveFocusRunId}
-        onClearArchiveFocus={() => setArchiveFocusRunId('')}
-        onNavigate={navigateToStep}
         t={t}
-      />
-    ),
-    archive: (
-      <EvidenceHub
-        pageId="archive"
-        initialTab="archive"
-        capabilities={capabilities}
-        api={api}
-        postJson={postJson}
-        focusedConfig={focusedConfig}
-        selectedMethods={selectedMethods}
-        sampleLimit={sampleLimit}
-        sampleMode={sampleMode}
-        sampleSeed={sampleSeed}
-        t={t}
-        onNavigate={navigateToStep}
-        onOpenInVisualize={openArchiveInVisualize}
       />
     ),
   }

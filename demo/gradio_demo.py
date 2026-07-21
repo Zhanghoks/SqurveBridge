@@ -180,14 +180,20 @@ def load_demo_config() -> dict:
 
 def get_uploaded_db_root() -> Path:
     cfg = load_demo_config()
-    p = cfg.get("paths", {}).get("uploaded_db_root", "files/uploaded_db")
-    return _project_root / p
+    p = cfg.get("paths", {}).get("uploaded_db_root")
+    if p:
+        return _project_root / p
+    from demo.workspace import uploaded_db_dir
+    return uploaded_db_dir()
 
 
 def get_temp_data_dir() -> Path:
     cfg = load_demo_config()
-    p = cfg.get("paths", {}).get("temp_data_dir", "files/temp_demo_data")
-    return _project_root / p
+    p = cfg.get("paths", {}).get("temp_data_dir")
+    if p:
+        return _project_root / p
+    from demo.workspace import temp_data_dir
+    return temp_data_dir()
 
 
 def get_router_config_path() -> str:

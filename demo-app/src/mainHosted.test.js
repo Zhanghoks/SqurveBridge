@@ -93,21 +93,19 @@ test('hosted App exposes session SQL configuration instead of local env configur
   assert.deepEqual(
     [...document.querySelectorAll('.flow-module h2')].map(heading => heading.textContent),
     [
-      'Studio',
+      'Methods & Databases',
       'Workflow Composition',
       'Experiment Board',
-      'Evaluation Visualization',
-      'Experiment Archive',
+      'Run History',
     ],
   )
   assert.match(document.body.textContent, /64 canonical configurations/i)
   assert.match(document.body.textContent, /Method × Database/i)
   const tabs = screen.getByRole('navigation', { name: 'Workflow stages' })
   assert.ok(within(tabs).getByRole('button', { name: 'Run' }))
-  assert.ok(within(tabs).getByRole('button', { name: 'Visualize' }))
-  assert.ok(within(tabs).getByRole('button', { name: 'Archive' }))
+  assert.ok(within(tabs).getByRole('button', { name: 'History' }))
   await waitFor(() => {
-    assert.ok(requested.some(path => String(path).startsWith('/api/comparisons/latest/results')))
+    // History mounts the archive catalog; charts load on demand when expanded.
     assert.ok(requested.some(path => String(path).startsWith('/api/archive')))
   })
   await userEvent.setup().click(configure)
@@ -166,7 +164,7 @@ test('local App renders the same full-flow surface as the hosted deployment', as
 
   render(React.createElement(HostedApp))
 
-  assert.equal((await screen.findByRole('heading', { level: 2, name: 'Studio' })).textContent, 'Studio')
+  assert.equal((await screen.findByRole('heading', { level: 2, name: 'Methods & Databases' })).textContent, 'Methods & Databases')
   await userEvent.setup().click(screen.getByRole('button', { name: 'Configure LLM' }))
   assert.ok(screen.getByRole('dialog', { name: 'Configure LLM' }))
   assert.ok(document.querySelector('.flow-provider-dialog'))

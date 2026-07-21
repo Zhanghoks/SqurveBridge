@@ -37,7 +37,7 @@ RUN python -m pip install --upgrade pip \
     && python -m pip install -r deploy/huggingface/requirements.txt \
     && python demo/runtime_check.py \
     && chmod +x deploy/huggingface/entrypoint.sh \
-    && mkdir -p /app/tmp /app/artifacts \
+    && mkdir -p /app/workspace \
     && chown -R node:node /app
 USER node
 EXPOSE 7860

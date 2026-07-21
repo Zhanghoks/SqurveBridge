@@ -27,6 +27,6 @@ npm run dev     # http://127.0.0.1:5173 ，/api → :7861
 
 - **SQL Studio**：选择 method/benchmark、配置 Actor 工作流、生成并执行 SQL
 - **Experiment Board**：多方法同协议对比与 Formal tables
-- **Archive**：阅读 `artifacts/` / `tmp/demo-runs/` 产物
+- **Archive**：阅读 `workspace/artifacts/` / `workspace/sessions/evaluations/` 产物
 
 LLM 凭据可在顶栏 **Configure LLM** 写入仓库根目录 `.env`（不会回显密钥）。

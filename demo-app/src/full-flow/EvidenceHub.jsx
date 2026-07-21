@@ -1,11 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Archive from '../Archive.jsx'
 import ExperimentBoard from '../ExperimentBoard.jsx'
 import { FlowEmpty, FlowPageHeading, FlowStatus } from './flowUi.jsx'
 
 export default function EvidenceHub({
-  pageId,
-  initialTab = 'visualize',
+  pageId = 'evidence',
   capabilities,
   api,
   postJson,
@@ -18,96 +17,138 @@ export default function EvidenceHub({
   archiveFocusRunId = '',
   onClearArchiveFocus,
   t,
-  onNavigate,
-  onOpenInVisualize,
 }) {
-  const [tab, setTab] = useState(archiveFocusRunId ? 'visualize' : initialTab)
-  const sectionId = pageId || initialTab
-  const titleKey = initialTab === 'archive' ? 'archive.title' : 'visualize.title'
-  const descriptionKey = initialTab === 'archive' ? 'archive.description' : 'visualize.description'
+  const [expandedRunId, setExpandedRunId] = useState(archiveFocusRunId || '')
+  const [chartsOpen, setChartsOpen] = useState(Boolean(archiveFocusRunId))
+  const expanded = Boolean(expandedRunId)
   const initialMethods = selectedMethods.length
     ? selectedMethods.map(item => String(item).toLowerCase())
     : focusedConfig?.method
       ? [String(focusedConfig.method).toLowerCase()]
       : undefined
-  const openRun = runId => {
-    setTab('visualize')
-    onOpenInVisualize?.(runId)
-    onNavigate?.('visualize')
-    window.dispatchEvent(new window.CustomEvent('squrve:archive-focus', { detail: runId }))
+
+  useEffect(() => {
+    if (!archiveFocusRunId) return
+    setExpandedRunId(archiveFocusRunId)
+    setChartsOpen(true)
+  }, [archiveFocusRunId])
+
+  const expandRun = runId => {
+    const id = String(runId || '')
+    if (!id) return
+    setExpandedRunId(id)
+    setChartsOpen(false)
+  }
+
+  const collapseRun = () => {
+    setExpandedRunId('')
+    setChartsOpen(false)
+    onClearArchiveFocus?.()
+  }
+
+  const expandCharts = runId => {
+    const id = String(runId || expandedRunId || '')
+    if (!id) return
+    setExpandedRunId(id)
+    setChartsOpen(true)
+    window.dispatchEvent(new window.CustomEvent('squrve:archive-focus', { detail: id }))
+  }
+
+  const collapseCharts = () => {
+    setChartsOpen(false)
+    onClearArchiveFocus?.()
   }
 
   return (
     <section
-      id={sectionId}
-      className={`flow-module flow-glass evidence-hub ${
-        tab === 'archive' ? 'archive-workspace-flow' : 'visualize-workspace'
-      }`}
-      data-testid={tab === 'archive' ? 'archive-workspace' : 'visualize-workspace'}
+      id={pageId}
+      className={`flow-module flow-glass evidence-hub${expanded ? ' evidence-hub-expanded' : ' evidence-hub-browse'}`}
+      data-testid="evidence-workspace"
+      data-expanded={expanded ? 'true' : 'false'}
+      data-charts-open={chartsOpen ? 'true' : 'false'}
     >
-      <header className="flow-module-header">
+      <header className="flow-module-header evidence-hub-header">
         <div>
-          <span>{t(`process.${initialTab}`)}</span>
-          <h2>{t(titleKey)}</h2>
-          <p>{t(descriptionKey)}</p>
+          <span>{t('process.evidence')}</span>
+          <h2>{expanded ? t('evidence.runTitle') : t('evidence.title')}</h2>
+          <p>{expanded ? t('evidence.runDescription') : t('evidence.browseDescription')}</p>
         </div>
-        {archiveFocusRunId && tab === 'visualize' ? (
-          <button type="button" className="flow-secondary-action" onClick={onClearArchiveFocus}>
-            {t('visualize.clearArchiveFocus')}
-          </button>
+        {expanded ? (
+          <div className="evidence-hub-toolbar">
+            {chartsOpen ? (
+              <button type="button" className="flow-secondary-action" onClick={collapseCharts}>
+                {t('evidence.collapseCharts')}
+              </button>
+            ) : null}
+            <button type="button" className="flow-secondary-action" onClick={collapseRun}>
+              {t('evidence.collapseRun')}
+            </button>
+          </div>
         ) : null}
-        <div className="evidence-hub-tabs" role="tablist" aria-label={t(titleKey)}>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'visualize'}
-            className={tab === 'visualize' ? 'active' : ''}
-            onClick={() => { setTab('visualize'); onNavigate?.('visualize') }}
-          >
-            {t('process.visualize')}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'archive'}
-            className={tab === 'archive' ? 'active' : ''}
-            onClick={() => { setTab('archive'); onNavigate?.('archive') }}
-          >
-            {t('process.archive')}
-          </button>
-        </div>
       </header>
-      {tab === 'archive' ? (
-        <Archive
-          embedded
-          allowFileContent={capabilities?.deployment?.target !== 'hf-space'}
-          api={api}
-          Status={FlowStatus}
-          PageHeading={FlowPageHeading}
-          Empty={FlowEmpty}
-          onOpenInVisualize={openRun}
-          t={t}
-        />
-      ) : (
-        <ExperimentBoard
-          embedded
-          viewOnly
-          capabilities={capabilities}
-          liveEvaluation={liveEvaluation}
-          api={api}
-          postJson={postJson}
-          Status={FlowStatus}
-          PageHeading={FlowPageHeading}
-          Empty={FlowEmpty}
-          initialDataset={focusedConfig?.dataset}
-          initialSplit={focusedConfig?.split}
-          initialMethods={initialMethods}
-          initialSampleLimit={sampleLimit}
-          initialSampleMode={sampleMode}
-          initialSampleSeed={sampleSeed}
-          archiveRunId={archiveFocusRunId}
-        />
-      )}
+
+      <div className="evidence-hub-body">
+        {!expanded ? (
+          <Archive
+            embedded
+            mode="browse"
+            allowFileContent={capabilities?.deployment?.target !== 'hf-space'}
+            api={api}
+            Status={FlowStatus}
+            PageHeading={FlowPageHeading}
+            Empty={FlowEmpty}
+            onExpandRun={expandRun}
+            t={t}
+          />
+        ) : (
+          <div className="evidence-run-page" data-testid="evidence-run-page">
+            <Archive
+              embedded
+              mode="detail"
+              runId={expandedRunId}
+              allowFileContent={capabilities?.deployment?.target !== 'hf-space'}
+              api={api}
+              Status={FlowStatus}
+              PageHeading={FlowPageHeading}
+              Empty={FlowEmpty}
+              onOpenInVisualize={expandCharts}
+              t={t}
+            />
+
+            {chartsOpen ? (
+              <section className="evidence-charts-panel" data-testid="evidence-charts-panel">
+                <header className="evidence-charts-panel-head">
+                  <div>
+                    <span>{t('evidence.chartsEyebrow')}</span>
+                    <strong>{expandedRunId}</strong>
+                  </div>
+                  <button type="button" className="flow-secondary-action" onClick={collapseCharts}>
+                    {t('evidence.collapseCharts')}
+                  </button>
+                </header>
+                <ExperimentBoard
+                  embedded
+                  viewOnly
+                  capabilities={capabilities}
+                  liveEvaluation={liveEvaluation}
+                  api={api}
+                  postJson={postJson}
+                  Status={FlowStatus}
+                  PageHeading={FlowPageHeading}
+                  Empty={FlowEmpty}
+                  initialDataset={focusedConfig?.dataset}
+                  initialSplit={focusedConfig?.split}
+                  initialMethods={initialMethods}
+                  initialSampleLimit={sampleLimit}
+                  initialSampleMode={sampleMode}
+                  initialSampleSeed={sampleSeed}
+                  archiveRunId={expandedRunId}
+                />
+              </section>
+            ) : null}
+          </div>
+        )}
+      </div>
     </section>
   )
 }

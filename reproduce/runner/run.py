@@ -35,7 +35,7 @@ from reproduce.eval.utils import (
 from reproduce.metrics.assembly import build_scores
 from reproduce.metrics.diagnostics import extract_unified_log_diagnostics
 from reproduce.metrics.evolution import build_meta_evo_input, compare_scores
-from reproduce.lib.env_config import api_key_ready, prepare_runtime_llm_config
+from reproduce.lib.env_config import api_key_ready, prepare_runtime_llm_config, redact_config_secrets
 from reproduce.lib.checkpoints import (
     checkpoint_run_id,
     resolve_checkpoint_state_path,
@@ -43,6 +43,11 @@ from reproduce.lib.checkpoints import (
 )
 from reproduce.lib.paths import REPRODUCE_ROOT, config_filename, config_repo_path, run_identifier
 from reproduce.metrics.persistence import persist_scores_bundle
+from demo.workspace import (
+    artifacts_dir,
+    eval_store_path,
+    run_dir as workspace_run_dir,
+)
 
 
 def main(dataset_name, method, resume=False, resume_from=None):
@@ -157,7 +162,7 @@ def main(dataset_name, method, resume=False, resume_from=None):
 
 
 def isolate_files_config(config: dict, run_id: str) -> dict:
-    """Return a config copy whose ../files outputs/cache live under this run."""
+    """Return a config copy whose file outputs/cache live under workspace/runs/<run_id>."""
     isolated = copy.deepcopy(config)
     isolated = _isolate_files_value(isolated, run_id)
     _apply_isolated_file_defaults(isolated, run_id)
@@ -181,7 +186,19 @@ def _is_file_cache_path(value: str) -> bool:
         or normalized.startswith("../files/")
         or normalized == "files"
         or normalized.startswith("files/")
+        or normalized == "../workspace/runs"
+        or normalized.startswith("../workspace/runs/")
+        or "/workspace/runs/" in normalized
     )
+
+
+def _run_relative_path(run_id: str, *parts: str, trailing_slash: bool = False) -> str:
+    """Absolute path under workspace/runs/<run_id>/... (safe when workspace is outside the repo)."""
+    path = workspace_run_dir(run_id).joinpath(*parts)
+    text = path.as_posix()
+    if trailing_slash and not text.endswith("/"):
+        text = f"{text}/"
+    return text
 
 
 def _rewrite_files_path(value: str, run_id: str) -> str:
@@ -193,10 +210,17 @@ def _rewrite_files_path(value: str, run_id: str) -> str:
         suffix = normalized[len("../files/"):]
     elif normalized == "files":
         suffix = ""
-    else:
+    elif normalized.startswith("files/"):
         suffix = normalized[len("files/"):]
+    elif "/workspace/runs/" in normalized:
+        # Already isolated under a run; keep only the trailing suffix after run id.
+        after = normalized.split("/workspace/runs/", 1)[1]
+        parts = after.split("/", 1)
+        suffix = parts[1] if len(parts) > 1 else ""
+    else:
+        suffix = ""
 
-    rewritten = f"../files/runs/{run_id}"
+    rewritten = _run_relative_path(run_id)
     if suffix:
         rewritten = f"{rewritten}/{suffix}"
     if had_trailing_slash and not rewritten.endswith("/"):
@@ -205,34 +229,37 @@ def _rewrite_files_path(value: str, run_id: str) -> str:
 
 
 def _apply_isolated_file_defaults(config: dict, run_id: str) -> None:
-    config.setdefault("dataset_save_dir", f"../files/runs/{run_id}/datasets/")
-    config.setdefault("sql_save_dir", f"../files/runs/{run_id}/pred_sql/")
+    config.setdefault("dataset_save_dir", _run_relative_path(run_id, "datasets", trailing_slash=True))
+    config.setdefault("sql_save_dir", _run_relative_path(run_id, "pred_sql", trailing_slash=True))
 
     config.setdefault("dataset", {})
-    config["dataset"].setdefault("data_source_dir", f"../files/runs/{run_id}/data_source")
-    config["dataset"].setdefault("few_shot_save_dir", f"../files/runs/{run_id}/reasoning_examples/user")
-    config["dataset"].setdefault("external_save_dir", f"../files/runs/{run_id}/external")
+    config["dataset"].setdefault("data_source_dir", _run_relative_path(run_id, "data_source"))
+    config["dataset"].setdefault("few_shot_save_dir", _run_relative_path(run_id, "reasoning_examples", "user"))
+    config["dataset"].setdefault("external_save_dir", _run_relative_path(run_id, "external"))
 
     config.setdefault("database", {})
-    config["database"].setdefault("schema_source_dir", f"../files/runs/{run_id}/schema_source")
+    config["database"].setdefault("schema_source_dir", _run_relative_path(run_id, "schema_source"))
 
     config.setdefault("reducer", {})
-    config["reducer"].setdefault("reduce_save_dir", f"../files/runs/{run_id}/instance_schemas")
+    config["reducer"].setdefault("reduce_save_dir", _run_relative_path(run_id, "instance_schemas"))
 
     config.setdefault("parser", {})
-    config["parser"].setdefault("parse_save_dir", f"../files/runs/{run_id}/schema_links")
+    config["parser"].setdefault("parse_save_dir", _run_relative_path(run_id, "schema_links"))
 
     config.setdefault("generator", {})
-    config["generator"].setdefault("generate_save_dir", f"../files/runs/{run_id}/pred_sql")
+    config["generator"].setdefault("generate_save_dir", _run_relative_path(run_id, "pred_sql"))
 
     config.setdefault("task", {})
-    config["task"].setdefault("default_log_save_dir", f"../files/runs/{run_id}/log")
+    config["task"].setdefault("default_log_save_dir", _run_relative_path(run_id, "log"))
 
 
 def _write_runtime_config(config: dict, run_id: str) -> Path:
-    path = Path("../files/runs") / run_id / "config.json"
+    path = workspace_run_dir(run_id) / "config.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+    path.write_text(
+        json.dumps(redact_config_secrets(config), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
     return path
 
 
@@ -318,7 +345,7 @@ def _build_checkpoint_config(
     if not checkpoint_raw.get("enabled", True):
         return None
 
-    ckpt_dir = Path(project_root) / "files" / "runs" / run_id / "checkpoints"
+    ckpt_dir = workspace_run_dir(run_id) / "checkpoints"
     if not resume and not resume_from and ckpt_dir.exists():
         import shutil
         shutil.rmtree(ckpt_dir)
@@ -567,7 +594,13 @@ def _persist_scores(
     )
     if stage_results:
         scores["stage_metrics"] = stage_results
-    persisted = persist_scores_bundle(output_dir=output_dir, scores=scores, token_data=token_data, config=config)
+    persisted = persist_scores_bundle(
+        output_dir=output_dir,
+        scores=scores,
+        token_data=token_data,
+        config=config,
+        eval_store_path=eval_store_path(),
+    )
     scores_path = persisted["scores"]
 
     # Save detailed report text for offline review
@@ -622,7 +655,7 @@ def _scores_output_dir(run_id):
     configured = os.environ.get("SQURVE_EVAL_OUTPUT_DIR")
     if configured:
         return Path(configured)
-    return Path(project_root) / "artifacts" / run_id
+    return artifacts_dir() / run_id
 
 
 def _env_true(name):

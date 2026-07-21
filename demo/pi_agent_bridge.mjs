@@ -66,9 +66,12 @@ function writeEvent(event) {
 }
 
 export function resourceLoaderOptions(config) {
+  const workspaceRoot = process.env.SQURVE_WORKSPACE_DIR
+    ? path.resolve(process.env.SQURVE_WORKSPACE_DIR)
+    : path.join(config.cwd, 'workspace')
   return {
     cwd: config.cwd,
-    agentDir: path.join(config.cwd, 'tmp', 'pi-agent'),
+    agentDir: path.join(workspaceRoot, 'sessions', 'pi-agent'),
     additionalSkillPaths: [path.join(config.cwd, 'skills')],
     noSkills: true,
     noExtensions: true,

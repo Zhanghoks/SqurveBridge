@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from reproduce.lib.paths import PROJECT_ROOT
@@ -45,7 +46,11 @@ def select_resume_checkpoint(
         _require_checkpoint_identifier(candidate, identifier)
         return candidate
 
-    runs_root = Path(project_root) / "files" / "runs"
+    runs_root = Path(project_root) / "workspace" / "runs"
+    # Allow SQURVE_WORKSPACE_DIR override without importing demo at module load in tests.
+    configured = os.environ.get("SQURVE_WORKSPACE_DIR", "").strip()
+    if configured:
+        runs_root = Path(configured).expanduser().resolve() / "runs"
     candidates = sorted(
         (
             path
@@ -87,7 +92,7 @@ def _require_checkpoint_identifier(state_path: Path, identifier: str) -> None:
 
 
 def checkpoint_run_id(state_path: str | Path) -> str:
-    """Extract <run-id> from files/runs/<run-id>/checkpoints/state*.json."""
+    """Extract <run-id> from workspace/runs/<run-id>/checkpoints/state*.json."""
     path = Path(state_path).expanduser().resolve()
     if path.parent.name != "checkpoints" or path.parent.parent.parent.name != "runs":
         raise ValueError(f"checkpoint is outside the run-local layout: {path}")

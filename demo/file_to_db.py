@@ -199,7 +199,7 @@ def process_uploaded_files(
 
     Args:
         files: List of file paths (from Gradio upload)
-        base_root: Root directory (e.g. files/uploaded_db)
+        base_root: Root directory (e.g. workspace/uploads/uploaded_db)
         db_id: Optional db_id (auto-generated if not provided)
 
     Returns:

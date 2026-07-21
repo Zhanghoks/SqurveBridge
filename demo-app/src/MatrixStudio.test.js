@@ -68,21 +68,21 @@ test.after(() => {
   closeDom()
 })
 
-test('renders five bilingual modules in process order', () => {
+test('renders four bilingual modules in process order', () => {
   renderDemo('en-US')
   assert.ok(document.querySelector('.flow-demo.agent-shell'))
   assert.equal(document.querySelector('.agent-icon-rail'), null)
   assert.ok(document.querySelector('.agent-chat-column'))
   assert.ok(document.querySelector('.agent-dashboard-pane'))
-  assert.equal(document.querySelectorAll('.flow-module').length, 5)
+  assert.equal(document.querySelectorAll('.flow-module').length, 4)
   assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'configure')
   assert.deepEqual(
     [...document.querySelectorAll('.flow-module')].map(section => section.id),
-    ['configure', 'compose', 'board', 'visualize', 'archive'],
+    ['configure', 'compose', 'board', 'evidence'],
   )
-  assert.equal(document.querySelector('#configure h2')?.textContent, 'Studio')
+  assert.equal(document.querySelector('#configure h2')?.textContent, 'Methods & Databases')
   const tabs = screen.getByRole('navigation', { name: 'Workflow stages' })
-  assert.equal(within(tabs).getAllByRole('button').length, 5)
+  assert.equal(within(tabs).getAllByRole('button').length, 4)
   assert.ok(document.querySelector('.agent-chat-body'))
   assert.ok(screen.getByTestId('pi-backend-badge'))
   assert.match(screen.getByTestId('pi-backend-badge').textContent, /Pi/)
@@ -117,16 +117,16 @@ test('switches process pages from the stage tabs', async () => {
   assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'board')
   assert.equal(document.querySelector('#board h2')?.textContent, 'Experiment Board')
 
-  await goToStep(user, 'Archive')
-  assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'archive')
+  await goToStep(user, 'History')
+  assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'evidence')
   const tabs = screen.getByRole('navigation', { name: 'Workflow stages' })
   assert.equal(
-    within(tabs).getByRole('button', { name: 'Archive' }).getAttribute('aria-current'),
+    within(tabs).getByRole('button', { name: 'History' }).getAttribute('aria-current'),
     'page',
   )
 })
 
-test('maps legacy process hashes onto the five-step flow', () => {
+test('maps legacy process hashes onto the four-step flow', () => {
   localStorage.setItem('squrve-demo-locale', 'en-US')
   window.history.replaceState(null, '', '#run')
   render(React.createElement(FullFlowDemo, {
@@ -149,7 +149,31 @@ test('maps legacy process hashes onto the five-step flow', () => {
     postJson: async () => ({}),
     onConfigureSql: () => {},
   }))
-  assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'visualize')
+  assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'evidence')
+  cleanup()
+  localStorage.clear()
+  window.history.replaceState(null, '', '#archive')
+  render(React.createElement(FullFlowDemo, {
+    capabilities: baseCapabilities,
+    databases: [],
+    sqlAuth: { configured: false },
+    api: async () => ({ runs: [] }),
+    postJson: async () => ({}),
+    onConfigureSql: () => {},
+  }))
+  assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'evidence')
+  cleanup()
+  localStorage.clear()
+  window.history.replaceState(null, '', '#visualize')
+  render(React.createElement(FullFlowDemo, {
+    capabilities: baseCapabilities,
+    databases: [],
+    sqlAuth: { configured: false },
+    api: async () => ({ runs: [] }),
+    postJson: async () => ({}),
+    onConfigureSql: () => {},
+  }))
+  assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'evidence')
 })
 
 test('keeps functional controls and technical metadata readable', () => {
@@ -175,7 +199,7 @@ test('keeps functional controls and technical metadata readable', () => {
 test('switches to Chinese and persists the locale', async () => {
   renderDemo('en-US')
   await userEvent.setup().click(screen.getByRole('button', { name: '切换到中文' }))
-  assert.equal(document.querySelector('#configure h2')?.textContent, '工作室')
+  assert.equal(document.querySelector('#configure h2')?.textContent, '方法与数据库')
   assert.equal(localStorage.getItem('squrve-demo-locale'), 'zh-CN')
   assert.equal(document.documentElement.lang, 'zh-CN')
 })
@@ -186,6 +210,10 @@ test('supports additive method and database selection on Compose without clearin
 
   assert.ok(document.querySelector('[data-testid="catalog-workspaces"]'))
   assert.equal(document.querySelectorAll('.catalog-workspace').length, 2)
+  assert.ok(document.querySelector('.catalog-workspace-methods'))
+  assert.ok(document.querySelector('.catalog-workspace-databases'))
+  assert.equal(document.querySelector('#catalog-methods-title')?.textContent, 'Methods')
+  assert.equal(document.querySelector('#catalog-databases-title')?.textContent, 'Databases')
   assert.equal(screen.getAllByRole('button', { name: /^Open flashcard for method / }).length, 8)
   assert.equal(screen.getAllByRole('button', { name: /^Open flashcard for database / }).length, 8)
 
@@ -210,7 +238,7 @@ test('keeps Studio focused on explaining methods and databases', async () => {
 
   assert.equal(screen.queryByTestId('configure-agent-panel'), null)
   assert.match(document.querySelector('#configure').textContent, /Studio|工作室/)
-  assert.match(screen.getByTestId('studio-guide').textContent, /Explain methods|讲解方法/)
+  assert.match(screen.getByTestId('studio-guide').textContent, /Browse, then open|先浏览/)
   assert.ok(document.querySelector('.agent-chat-column'))
   assert.match(screen.getByRole('heading', { level: 2, name: 'SqurveBridge Agent' }).textContent, /SqurveBridge Agent/)
   assert.equal(document.querySelector('#configure .flow-connection-graph'), null)
@@ -363,10 +391,9 @@ test('renders real board controls for config runs', async () => {
   assert.equal(screen.getByRole('button', { name: 'Run config' }).disabled, true)
   assert.equal(document.querySelector('#board .diagnosis-workspace'), null)
   assert.equal(document.querySelector('#board .improvement-workspace'), null)
-  await goToStep(user, 'Visualize')
-  assert.match(document.querySelector('#visualize').textContent, /Evaluation Visualization|No evaluation charts yet|No aligned score/)
-  await goToStep(user, 'Archive')
-  assert.match(document.querySelector('#archive').textContent, /Experiment Archive|No archived runs/)
+  await goToStep(user, 'History')
+  assert.match(document.querySelector('#evidence').textContent, /Run History|No archived runs/)
+  assert.ok(screen.getByTestId('evidence-workspace'))
 })
 
 test('translates the process navigation and board controls', async () => {
@@ -394,10 +421,14 @@ test('renders only configuration-backed workflow and provenance', async () => {
   assert.match(screen.getByTestId('actor-workflow').textContent, /C3SQLGenerator/)
   assert.match(screen.getByTestId('actor-workflow').textContent, /GenerateTask/)
 
-  await user.click(screen.getByRole('button', { name: 'Behind this configuration' }))
+  assert.ok(screen.getByTestId('integration-provenance'))
   const provenance = screen.getByTestId('integration-provenance').textContent
   assert.match(provenance, /reproduce\/configs\/spider\/c3sql\.json/)
   assert.match(provenance, /C3SQLGenerator/)
+  assert.match(provenance, /GenerateTask|Actors/)
+  assert.doesNotMatch(provenance, /Unavailable/)
+  await user.click(screen.getByRole('button', { name: /Configuration provenance/ }))
+  assert.equal(screen.getByTestId('integration-provenance').hidden, true)
 })
 
 test('does not invent stages for an unavailable connection', async () => {
@@ -414,7 +445,7 @@ test('does not invent stages for an unavailable connection', async () => {
   assert.equal(screen.getByRole('button', { name: 'Run config' }).disabled, true)
 })
 
-test('opens a hosted archive summary in Visualize without requesting raw files', async () => {
+test('expands archive charts inline without requesting raw files on hosted demo', async () => {
   const calls = []
   const api = async path => {
     calls.push(String(path))
@@ -464,14 +495,19 @@ test('opens a hosted archive summary in Visualize without requesting raw files',
   }, { api })
   const user = userEvent.setup()
 
-  await goToStep(user, 'Archive')
+  await goToStep(user, 'History')
   await screen.findByText('run-archive-1')
-  await screen.findByRole('button', { name: 'Open in Visualize' })
-  await user.click(screen.getByRole('button', { name: 'Open in Visualize' }))
+  await screen.findByRole('button', { name: 'Open run' })
+  await user.click(screen.getByRole('button', { name: 'Open run' }))
+  assert.ok(screen.getByTestId('evidence-run-page'))
+  await screen.findByRole('button', { name: 'Expand charts' })
+  await user.click(screen.getByRole('button', { name: 'Expand charts' }))
 
-  assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'visualize')
-  assert.equal(window.location.hash, '#visualize')
+  assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'evidence')
+  assert.equal(window.location.hash, '#evidence')
+  assert.ok(screen.getByTestId('evidence-charts-panel'))
   await screen.findByText(/Archive run · run-archive-1/)
+  // Hosted History keeps raw archive files closed; charts use sanitized summary fields.
   assert.equal(calls.some(path => path.includes('/files/')), false)
 })
 

@@ -34,9 +34,11 @@ yarn-error.log*
 # Runtime and build outputs
 tmp
 artifacts
+workspace
 build
 dist
 files
+output
 *.log
 *.sqlite-shm
 *.sqlite-wal

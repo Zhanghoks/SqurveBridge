@@ -1,5 +1,6 @@
 import io
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,7 +13,8 @@ class EvaluationResumeTests(unittest.TestCase):
     def setUp(self):
         self.temp_directory = tempfile.TemporaryDirectory()
         self.root = Path(self.temp_directory.name)
-        self.run_dir = self.root / "tmp" / "demo-runs"
+        self.workspace = self.root / "workspace"
+        self.run_dir = self.workspace / "sessions" / "evaluations"
         self.job = {
             "job_id": "resumejob1",
             "dataset": "spider",
@@ -29,6 +31,7 @@ class EvaluationResumeTests(unittest.TestCase):
             patch.object(api_server, "_run_dir", self.run_dir),
             patch.object(api_server, "_resume_backoff_seconds", 0),
             patch.object(api_server, "_max_resume_attempts", 2),
+            patch.dict(os.environ, {"SQURVE_WORKSPACE_DIR": str(self.workspace)}),
         )
         for item in self.patches:
             item.start()
@@ -42,8 +45,7 @@ class EvaluationResumeTests(unittest.TestCase):
 
     def _write_checkpoint(self):
         checkpoint = (
-            self.root
-            / "files"
+            self.workspace
             / "runs"
             / "spider-c3sql-resumejob1"
             / "checkpoints"
@@ -174,6 +176,57 @@ class EvaluationResumeTests(unittest.TestCase):
         public = api_server._public_job(api_server._jobs[self.job["job_id"]])
         self.assertTrue(public["checkpoint_present"])
         self.assertTrue(public["resumable"])
+        self.assertNotIn("log_path", public)
+        self.assertNotIn("scores_path", public)
+
+    def test_public_job_hides_filesystem_paths(self):
+        job = dict(api_server._jobs[self.job["job_id"]])
+        job["log_path"] = str(self.root / "workspace" / "sessions" / "evaluations" / "x" / "run.log")
+        job["scores_path"] = str(self.root / "workspace" / "sessions" / "evaluations" / "x" / "scores.json")
+        public = api_server._public_job(job)
+        self.assertNotIn("log_path", public)
+        self.assertNotIn("scores_path", public)
+        dumped = json.dumps(public)
+        self.assertNotIn(str(self.root), dumped)
+    def test_public_job_exposes_score_bundle_artifact(self):
+        scores_path = self.run_dir / self.job["job_id"] / "score-bundle" / "scores.json"
+        scores_path.parent.mkdir(parents=True)
+        scores_path.write_text(json.dumps({
+            "run_id": "spider-c3sql-resumejob1",
+            "method": "c3sql",
+            "dataset": "spider",
+            "split": "dev",
+            "sample_count": 3,
+            "timestamp": "2026-07-19T00:00:00Z",
+            "aggregate": {
+                "ex": {"avg": 0.9, "valid": 3, "total": 3},
+                "em": {"avg": 0.8, "valid": 3, "total": 3},
+                "token": {"total_tokens": 1000, "avg_per_sample": 333},
+            },
+            "per_sample": [{"instance_id": "dev_0"}, {"instance_id": "dev_1"}, {"instance_id": "dev_2"}],
+            "stage_metrics": {},
+            "workflow_trace": {"workflows": [], "aggregate": {}},
+        }), encoding="utf-8")
+        api_server._jobs[self.job["job_id"]].update({
+            "status": "completed",
+            "scores_path": str(scores_path),
+        })
+
+        public = api_server._public_job(api_server._jobs[self.job["job_id"]])
+        self.assertEqual(public["result"]["metrics"]["ex"], 0.9)
+        self.assertEqual(public["artifact"]["method"], "c3sql")
+        self.assertEqual(
+            public["artifact"]["artifact_ref"],
+            "session:spider-c3sql-resumejob1/scores.json",
+        )
+
+    def test_session_endpoint_lists_jobs(self):
+        client = api_server.app.test_client()
+        response = client.get("/api/session")
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertIn("jobs", payload)
+        self.assertEqual(payload["jobs"][0]["job_id"], self.job["job_id"])
 
     def test_run_progress_counts_finished_samples_not_stage_entries(self):
         log = "\n".join([

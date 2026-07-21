@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
+from reproduce.lib.env_config import redact_config_secrets
 from reproduce.metrics.profile import build_weakness_profile
 from reproduce.metrics.eval_store import persist_eval_store
 
@@ -16,6 +17,7 @@ def persist_scores_bundle(
         scores: dict[str, Any],
         token_data: dict[str, Any] | None = None,
         config: dict[str, Any] | None = None,
+        eval_store_path: str | Path | None = None,
 ) -> Dict[str, Path]:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -29,11 +31,12 @@ def persist_scores_bundle(
 
     paths = {"scores": scores_path, "weakness_profile": weakness_path}
 
-    # Persist a copy of the config for full reproducibility
+    # Persist a redacted config copy — never write resolved API keys to disk.
     if config:
         config_copy_path = output_dir / "config.json"
         config_copy_path.write_text(
-            json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8"
+            json.dumps(redact_config_secrets(config), ensure_ascii=False, indent=2),
+            encoding="utf-8",
         )
         paths["config"] = config_copy_path
 
@@ -49,6 +52,6 @@ def persist_scores_bundle(
         )
         paths["token_usage"] = usage_path
         paths["token_summary"] = summary_path
-    store_path = output_dir.parent / "eval-store.sqlite"
+    store_path = Path(eval_store_path) if eval_store_path is not None else output_dir.parent / "eval-store.sqlite"
     paths["eval_store"] = persist_eval_store(scores, store_path)
     return paths

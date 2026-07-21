@@ -1,10 +1,12 @@
-export const PROCESS_STEPS = ['configure', 'compose', 'board', 'visualize', 'archive']
+export const PROCESS_STEPS = ['configure', 'compose', 'board', 'evidence']
 
 const LEGACY_STEP_MAP = {
   run: 'board',
   diagnose: 'board',
   improve: 'board',
-  inspect: 'visualize',
+  inspect: 'evidence',
+  visualize: 'evidence',
+  archive: 'evidence',
 }
 
 export function resolveProcessStep(hashOrId, fallback = PROCESS_STEPS[0]) {

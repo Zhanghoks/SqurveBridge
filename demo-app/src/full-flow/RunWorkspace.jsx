@@ -103,6 +103,29 @@ const jobTone = status => {
 
 const isActiveJob = job => ['running', 'resuming', 'starting'].includes(job?.status)
 
+const TERMINAL_JOB_STATUSES = new Set(['completed', 'failed', 'cancelled'])
+
+/** Merge a detail poll into local job state without regressing terminal status or dumping the log. */
+export function mergeJobDetail(job, detail) {
+  if (!job || !detail) return job
+  if (detail.job_id && detail.job_id !== job.job_id) return job
+  const incoming = detail.status ?? job.status
+  const keepTerminal = TERMINAL_JOB_STATUSES.has(job.status) && isActiveJob({ status: incoming })
+  const status = keepTerminal ? job.status : incoming
+  return {
+    ...job,
+    status,
+    progress: keepTerminal ? (job.progress ?? detail.progress) : (detail.progress ?? job.progress),
+    checkpoint_present: detail.checkpoint_present ?? job.checkpoint_present,
+    resumable: detail.resumable ?? job.resumable,
+    resume_count: detail.resume_count ?? job.resume_count,
+    max_resume_attempts: detail.max_resume_attempts ?? job.max_resume_attempts,
+    result: detail.result ?? job.result,
+    artifact: detail.artifact ?? job.artifact,
+    run_id: detail.run_id ?? job.run_id,
+  }
+}
+
 export const isResumableJob = job => Boolean(
   job?.resumable
   || (['failed', 'cancelled'].includes(job?.status) && job?.checkpoint_present),
@@ -130,6 +153,169 @@ const jobResumeLabel = (job, t) => {
     return t('run.resumeMeta', { count, max })
   }
   return t('run.resumeCount', { count })
+}
+
+const percentLabel = value => {
+  if (value == null || Number.isNaN(Number(value))) return '—'
+  return `${(Number(value) * 100).toFixed(1)}%`
+}
+
+const compactNumber = value => {
+  if (value == null || Number.isNaN(Number(value))) return '—'
+  return Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(value))
+}
+
+const metricAverage = block => {
+  if (block == null) return null
+  if (typeof block === 'number') return block
+  if (typeof block === 'object' && typeof block.avg === 'number') return block.avg
+  return null
+}
+
+export function resolveJobArtifact(job) {
+  const result = job?.result
+  const artifact = job?.artifact
+  if (!result && !artifact) return null
+  const metrics = result?.metrics || {}
+  const aggregate = artifact?.aggregate || {}
+  const keys = ['ex', 'em', 'sf1', 'ves', 'rves']
+  const metricCards = keys.map(key => ({
+    key,
+    label: key.toUpperCase(),
+    value: metrics[key] ?? metricAverage(aggregate[key]),
+  }))
+  const componentF1 = Object.entries(result?.component_f1 || {})
+    .map(([name, value]) => ({ name, value: Number(value) }))
+    .filter(item => Number.isFinite(item.value))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8)
+  const errorRoots = Array.isArray(result?.error_roots)
+    ? result.error_roots.slice(0, 6)
+    : Object.entries(artifact?.errors || {})
+      .map(([name, value]) => ({
+        name,
+        count: value?.count,
+        rate: value?.pct ?? value?.rate,
+      }))
+      .sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0))
+      .slice(0, 6)
+  const stages = Array.isArray(result?.stages) ? result.stages : []
+  const token = result?.token || artifact?.token || {}
+  const latency = artifact?.latency || {}
+  return {
+    runId: result?.run_id || artifact?.run_id || job?.run_id || job?.job_id,
+    method: result?.method || artifact?.method || job?.method,
+    dataset: result?.dataset || artifact?.dataset || job?.dataset,
+    split: result?.split || artifact?.split || '—',
+    sampleCount: result?.sample_count ?? artifact?.sample_count ?? job?.sample_limit,
+    artifactRef: artifact?.artifact_ref || '',
+    metricCards,
+    componentF1,
+    errorRoots,
+    stages,
+    token,
+    latency,
+  }
+}
+
+function MetricBarList({ items, valueOf, labelOf, empty }) {
+  if (!items.length) return <p className="run-artifact-empty">{empty}</p>
+  const max = Math.max(...items.map(item => Number(valueOf(item)) || 0), 0.0001)
+  return (
+    <ul className="run-artifact-bars">
+      {items.map(item => {
+        const value = Number(valueOf(item)) || 0
+        const width = Math.max(4, Math.round((value / max) * 100))
+        return (
+          <li key={labelOf(item)}>
+            <span>{labelOf(item)}</span>
+            <div className="run-artifact-bar-track" aria-hidden="true">
+              <i style={{ width: `${width}%` }} />
+            </div>
+            <strong>{percentLabel(value)}</strong>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+function RunArtifactPanel({ job, t }) {
+  const artifact = resolveJobArtifact(job)
+  if (!artifact) return null
+  return (
+    <section className="run-artifact-panel" data-testid="run-artifact-panel">
+      <header className="run-artifact-head">
+        <div>
+          <span>{t('run.artifactTitle')}</span>
+          <strong>{artifact.method} / {artifact.dataset}</strong>
+          <small>{artifact.runId}</small>
+        </div>
+        <div className="run-artifact-meta">
+          <span>{t('run.artifactSplit')} <b>{artifact.split}</b></span>
+          <span>{t('run.artifactSamples')} <b>{artifact.sampleCount ?? '—'}</b></span>
+          {artifact.artifactRef ? <span><b>{artifact.artifactRef}</b></span> : null}
+        </div>
+      </header>
+
+      <div className="run-artifact-metrics">
+        {artifact.metricCards.map(card => (
+          <div key={card.key}>
+            <span>{card.label}</span>
+            <b>{percentLabel(card.value)}</b>
+          </div>
+        ))}
+        <div>
+          <span>{t('run.artifactTokens')}</span>
+          <b>{compactNumber(artifact.token.total_tokens)}</b>
+        </div>
+        <div>
+          <span>{t('run.artifactLatency')}</span>
+          <b>{artifact.latency.mean_s != null ? `${Number(artifact.latency.mean_s).toFixed(2)}s` : '—'}</b>
+        </div>
+      </div>
+
+      <div className="run-artifact-grid">
+        <div>
+          <h4>{t('run.artifactComponentF1')}</h4>
+          <MetricBarList
+            items={artifact.componentF1}
+            valueOf={item => item.value}
+            labelOf={item => item.name}
+            empty={t('run.artifactEmptySlice')}
+          />
+        </div>
+        <div>
+          <h4>{t('run.artifactErrorRoots')}</h4>
+          {artifact.errorRoots.length ? (
+            <ul className="run-artifact-errors">
+              {artifact.errorRoots.map(item => (
+                <li key={item.name}>
+                  <span>{item.name}</span>
+                  <strong>{item.count ?? '—'}</strong>
+                  <small>{item.rate == null ? '' : percentLabel(item.rate)}</small>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="run-artifact-empty">{t('run.artifactEmptySlice')}</p>}
+        </div>
+      </div>
+
+      {artifact.stages.length ? (
+        <div className="run-artifact-stages">
+          <h4>{t('run.artifactStages')}</h4>
+          <ol>
+            {artifact.stages.map(stage => (
+              <li key={stage.name || stage.task_type}>
+                <strong>{stage.name || stage.task_type || 'stage'}</strong>
+                <small>{stage.task_type || ''}</small>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
+    </section>
+  )
 }
 
 function describeTarget(connection, configs, databases) {
@@ -281,17 +467,7 @@ export default function RunWorkspace({
       if (!active) return
       setLog(detail.log || '')
       setJobs(current => current.map(job => (
-        job.job_id === selectedJobId
-          ? {
-            ...job,
-            status: detail.status ?? job.status,
-            progress: detail.progress ?? job.progress,
-            log: detail.log ?? job.log,
-            checkpoint_present: detail.checkpoint_present ?? job.checkpoint_present,
-            resumable: detail.resumable ?? job.resumable,
-            resume_count: detail.resume_count ?? job.resume_count,
-          }
-          : job
+        job.job_id === selectedJobId ? mergeJobDetail(job, detail) : job
       )))
     }).catch(err => {
       if (active) setLog(sanitizeRunError(err))
@@ -521,20 +697,29 @@ export default function RunWorkspace({
         {!jobs.length
           ? <p className="run-empty">{t('run.batchEmpty')}</p>
           : <ul>
-            {jobs.map(job => (
-              <li key={job.job_id} data-state={jobTone(job.status)}>
-                <button
-                  type="button"
-                  className={selectedJobId === job.job_id ? 'active' : ''}
-                  onClick={() => setSelectedJobId(job.job_id)}
-                >
-                  <strong>{job.method} / {job.dataset}</strong>
-                  <span>{job.status}</span>
-                  {jobResumeLabel(job, t) && <small>{jobResumeLabel(job, t)}</small>}
-                  {isResumableJob(job) && <em>{t('run.checkpointReady')}</em>}
-                </button>
-              </li>
-            ))}
+            {jobs.map(job => {
+              const resumeLabel = jobResumeLabel(job, t)
+              return (
+                <li key={job.job_id} data-state={jobTone(job.status)}>
+                  <button
+                    type="button"
+                    className={selectedJobId === job.job_id ? 'active' : ''}
+                    onClick={() => setSelectedJobId(job.job_id)}
+                  >
+                    <span className="run-batch-job-main">
+                      <strong>{job.method} / {job.dataset}</strong>
+                      <span className="run-batch-job-status">{job.status}</span>
+                    </span>
+                    {(resumeLabel || isResumableJob(job)) && (
+                      <span className="run-batch-job-meta">
+                        {resumeLabel && <small>{resumeLabel}</small>}
+                        {isResumableJob(job) && <em>{t('run.checkpointReady')}</em>}
+                      </span>
+                    )}
+                  </button>
+                </li>
+              )
+            })}
           </ul>}
       </div>
       <div className="run-progress-card">
@@ -559,9 +744,14 @@ export default function RunWorkspace({
           </p>
         )}
         <details className="run-log-details">
-          <summary>查看调试日志</summary>
+          <summary>{t('run.viewDebugLog')}</summary>
           <pre className="run-batch-log" aria-label={t('run.batchLog')}>{log || t('run.batchLogEmpty')}</pre>
         </details>
+        {selectedJob?.result || selectedJob?.artifact
+          ? <RunArtifactPanel job={selectedJob} t={t} />
+          : selectedJob?.status === 'completed'
+            ? <p className="run-artifact-pending" data-testid="run-artifact-pending">{t('run.artifactPending')}</p>
+            : null}
       </div>
     </div>
 

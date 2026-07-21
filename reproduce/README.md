@@ -130,7 +130,7 @@ python reproduce/run.py <dataset> <method>
 1. 加载 `configs/<dataset>/<method>.json`，构建 `Router` + `Engine`
 2. `engine.execute()` 执行 pipeline
 3. 评估并打印报告
-4. （full 模式）写入 `artifacts/<run_id>/scores.json`
+4. （full 模式）写入 `workspace/artifacts/<run_id>/scores.json`
 
 ### `batch_run.py` — 分批直到指标收敛
 
@@ -151,12 +151,12 @@ python reproduce/batch_run.py spider c3sql --dry-run          # 只看 batch 划
 单次 reproduce run 的 checkpoint 与该 run 的数据快照绑定在同一个目录：
 
 ```text
-files/runs/<run-id>/checkpoints/
+workspace/runs/<run-id>/checkpoints/
 ```
 
 ```bash
 python reproduce/run.py spider c3sql --resume
-python reproduce/run.py spider c3sql --resume-from files/runs/<run-id>/checkpoints/state.json
+python reproduce/run.py spider c3sql --resume-from workspace/runs/<run-id>/checkpoints/state.json
 ```
 
 `--resume` 选择该 dataset-method 最近一次可恢复的 run；`--resume-from` 则恢复
@@ -167,20 +167,20 @@ completed IDs、却丢失历史行数据的新 workspace。
 
 ## 产物与路径
 
-Config 中路径均相对 `reproduce/`，常见落盘位置：
+运行时数据统一落在 `workspace/`（可用 `SQURVE_WORKSPACE_DIR` 覆盖）。Config 模板里的
+`../files/...` 路径在启动时会被改写到 `workspace/runs/<run-id>/`：
 
 | 类型 | 典型路径 | 说明 |
 |------|----------|------|
-| 数据源缓存 | `../files/data_source/` | benchmark 加载后的 JSON |
-| Schema | `../files/schema_source/` | 解析后的 schema |
-| 阶段 dataset | `../files/datasets/{dataset}_{method}_{stage}.json` | 各 stage 中间结果 |
-| 预测 SQL | `../files/pred_sql/{dataset}_{method}/` | Actor 写出的 SQL 文件 |
-| 评估 scores | `artifacts/<dataset>-<method>-YYYYMMDD-HHMMSS/` | `scores.json`、`meta-evo-input.json` 等 |
+| 单次 run 中间产物 | `workspace/runs/<run-id>/` | datasets、pred_sql、checkpoints、脱敏后的 config.json |
+| 评估 scores | `workspace/artifacts/<run-id>/` | `scores.json`、`meta-evo-input.json` 等 |
+| 跨 run 存储 | `workspace/artifacts/eval-store.sqlite` | 可查询的样本级记录 |
+| Demo 会话 | `workspace/sessions/evaluations/` | Demo Board 任务与 score-bundle |
 
 命名示例（C3SQL）：
 
 - `spider_c3sql_reduce.json` / `spider_c3sql_parse.json` / `spider_c3sql_full.json`
-- `../files/pred_sql/spider_c3sql/`
+- `workspace/runs/<run-id>/pred_sql/`
 
 ---
 
