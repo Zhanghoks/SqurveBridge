@@ -149,6 +149,47 @@ jobs:
       - name: Build the deployable Docker image
         run: docker build --tag squrvebridge-space:test build/hf-space
 
+  deploy-hugging-face:
+    name: Deploy Hugging Face Space
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - contracts
+      - package
+      - frontend
+      - pi-runtime
+      - hosted-space-image
+      - history-security
+    runs-on: ubuntu-latest
+    concurrency:
+      group: hugging-face-space-production
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out the reviewed revision
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the Hugging Face CLI
+        run: python -m pip install --upgrade "huggingface_hub>=1.19.0"
+
+      - name: Build the allowlisted Space context
+        run: python tools/build_hf_space.py
+
+      - name: Publish the Space with a short-lived OIDC token
+        env:
+          HF_OIDC_RESOURCE: spaces/zmmjjkk/SqurveBridge
+        run: |
+          hf upload zmmjjkk/SqurveBridge build/hf-space . \
+            --repo-type space \
+            --delete "*" \
+            --commit-message "Deploy GitHub ${GITHUB_SHA::7}"
+
   history-security:
     name: Reachable history security
     runs-on: ubuntu-latest
