@@ -91,7 +91,7 @@ regex==2024.11.6
 requests==2.32.4
 rsa==4.9.1
 s3transfer==0.13.0
-safetensors==0.5.3
+safetensors==0.8.0
 scikit-learn==1.7.0
 scipy==1.16.0
 sentence-transformers==3.0.1
