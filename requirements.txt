@@ -41,7 +41,7 @@ idna==3.10
 Jinja2==3.1.6
 jiter==0.10.0
 jmespath==1.0.1
-joblib==1.5.1
+joblib==1.5.3
 llama-cloud==0.1.30
 llama-index==0.10.62
 llama-index-agent-openai==0.2.9
