@@ -8,10 +8,17 @@
 
 Integrate · Reproduce · Diagnose · Improve
 
+| | |
+| --- | --- |
+| **Project site** (paper & walkthrough) | [squrvebridge.vercel.app](https://squrvebridge.vercel.app/) |
+| **Live Demo** (interactive workspace) | [Hugging Face Space](https://huggingface.co/spaces/zmmjjkk/SqurveBridge) |
+
+[![Project site](https://img.shields.io/badge/Project%20site-Vercel-000000.svg)](https://squrvebridge.vercel.app/)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Hugging%20Face-FFD21E.svg)](https://huggingface.co/spaces/zmmjjkk/SqurveBridge)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-2ea44f.svg)](LICENSE)
 [![Upstream](https://img.shields.io/badge/Upstream-Squrve-6f42c1.svg)](https://github.com/Satissss/Squrve)
-[![Demo](https://img.shields.io/badge/Demo-Interactive%20Workspace-0ea5e9.svg)](demo/README_EN.md)
+[![Local Demo](https://img.shields.io/badge/Local%20Demo-Interactive%20Workspace-0ea5e9.svg)](demo/README_EN.md)
 
 [Quick Start](#quick-start) · [Architecture](#architecture) · [Demo](#interactive-demo) · [Layout](#project-layout) · [Docs](#documentation)
 
@@ -271,10 +278,13 @@ Agent kernel (full coding tools locally; read-only on the public Space).
 Provider keys stay in `.env` or session memory — they are never written into
 score bundles or runtime configs.
 
-A restricted Hugging Face Space bundle is available for public demos
-([hosted notes](deploy/huggingface/README.space.md)). Hosted mode blocks database
-upload and live evaluation writes; visitors supply their own SQL/Pi credentials,
-which remain in memory only.
+Public **Live Demo**:
+[huggingface.co/spaces/zmmjjkk/SqurveBridge](https://huggingface.co/spaces/zmmjjkk/SqurveBridge)
+([hosted notes](deploy/huggingface/README.space.md)).
+Paper walkthrough site:
+[squrvebridge.vercel.app](https://squrvebridge.vercel.app/).
+Hosted mode blocks database upload and live evaluation writes; visitors supply
+their own SQL/Pi credentials, which remain in memory only.
 
 ## Project Layout
 
