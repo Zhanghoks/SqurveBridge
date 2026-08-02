@@ -14,21 +14,158 @@ Integrate · Reproduce · Diagnose · Improve
 [![License](https://img.shields.io/badge/License-MIT-2ea44f.svg)](LICENSE)
 [![Upstream](https://img.shields.io/badge/Upstream-Squrve-6f42c1.svg)](https://github.com/Satissss/Squrve)
 
-[Features](#features) · [Demo](#demo) · [Quick Start](#quick-start) · [Architecture](#architecture) · [Docs](#documentation)
+[Architecture](#architecture) · [Features](#features) · [Demo](#demo) · [Quick Start](#quick-start) · [Docs](#documentation)
 
 </div>
 
 ---
 
-## About
+## Architecture
 
 SqurveBridge reconstructs released Text-to-SQL methods as inspectable **Squrve Actors**, normalizes benchmarks behind one contract, runs method–database pairs through reproducible configs, and persists sample- and stage-level evidence.
 
-It is **not** another Text-to-SQL model. It is the bridge between released methods, new databases, and trustworthy evaluation — built on upstream [Squrve](https://github.com/Satissss/Squrve), with an embedded [Pi](https://github.com/earendil-works/pi) Agent as the Demo runtime kernel (`pi/`, loaded via `demo/pi_agent_bridge.mjs`; project `skills/` are the capability SSOT).
+It is **not** another Text-to-SQL model — it is the bridge between released methods, new databases, and trustworthy evaluation. Built on upstream [Squrve](https://github.com/Satissss/Squrve), with an embedded [Pi](https://github.com/earendil-works/pi) Agent as the Demo runtime kernel.
+
+<div align="center">
+<img src="assets/squrvebridge-framework.png" alt="SqurveBridge framework overview" width="95%" />
+</div>
+
+### Platform overview (ASCII)
 
 ```text
-candidate → integrate → reproduce config → run → scores + traces → optional improve
+                         SqurveBridge Platform
+  +====================================================================+
+  |                                                                    |
+  |  Inputs              Integration Harness                           |
+  |  +-------------+     +------------------------------------------+  |
+  |  | Existing    |     |  Method Adapter ----> Actor Pipeline     |  |
+  |  | Methods     |---->|       |                     |            |  |
+  |  +-------------+     |       v                     v            |  |
+  |  | External    |     |  Benchmark Adapter -> Normalized Interface| |
+  |  | Benchmarks  |---->|       |                     |            |  |
+  |  +-------------+     |       +----------+----------+            |  |
+  |  | Metrics     |     |                  v                       |  |
+  |  +-------------+     |         Runnable Configuration           |  |
+  |                      +-------------------+----------------------+  |
+  |                                          |                         |
+  |                                          v                         |
+  |                               +---------------------+              |
+  |                               |  Run & Generate SQL |              |
+  |                               +----------+----------+              |
+  |                                          |                         |
+  |                                          v                         |
+  |                      Unified Evaluation System                     |
+  |                      +------------------------------------------+  |
+  |                      |  L1 SQL Quality   |  L2 Runtime Cost     |  |
+  |                      |  L3 Structure     |  L4 Errors           |  |
+  |                      +-------------------+----------------------+  |
+  |                                          |                         |
+  |                                          v                         |
+  |                      Recorded Evidence                             |
+  |                      +------------------------------------------+  |
+  |                      |  Scores  ·  Trace  ·  Report             |  |
+  |                      +-------------------+----------------------+  |
+  +====================================================================+
+                                             |
+                     optional                v
+              +------------------------------------------------------+
+              |     Metric-Guided Loop Engineering (Meta-Evo)        |
+              |  Weakness Profile -> Scoped Candidate                |
+              |       -> Smoke / Bounded Gate -> Full Confirmation   |
+              |       -> Decision Record                             |
+              |              |                                       |
+              |              +-- accepted bounded update ------------>|
+              |                  (feeds back into Runnable Config)   |
+              +------------------------------------------------------+
 ```
+
+**How to read the figure**
+
+| Block | Role |
+| --- | --- |
+| **Inputs** | Community methods, external benchmarks, and metric definitions enter as candidates — not as opaque runtime dependencies. |
+| **Integration Harness** | Method adapters rebuild released logic as native Actor pipelines; benchmark adapters expose a normalized data interface; both land in one **runnable configuration**. |
+| **Run & Generate SQL** | The same Squrve Engine path used by CLI and Demo executes the configured task graph. |
+| **Unified Evaluation** | Four evidence layers: SQL quality (L1), runtime cost (L2), structure (L3), error attribution (L4). |
+| **Recorded Evidence** | Scores, workflow traces, and reports persist as inspectable bundles (publish only via `evidence/`). |
+| **Meta-Evo (optional)** | Metric-guided loop: profile weaknesses → scoped edits → smoke gate → full confirmation → decision record; only accepted updates rewrite the runnable config. |
+
+### End-to-end pipeline
+
+```text
+  candidate
+      |
+      v
+  candidate-reader  --------->  manifest
+      |
+      v
+  integration-pipeline  ----->  native Actors + benchmark registration
+      |                         + reproduce/configs/<bench>/<method>.json
+      v
+  reproduce/run.py  --------->  isolated workspace/runs/<id>/
+      |
+      +-- Router  ->  DataLoader  ->  Engine (Task graph)
+      |                                  |
+      |                    +-------------+-------------+
+      |                    v             v             v
+      |               Reduce/Parse  Generate/Opt  Select/...
+      |                    |             |             |
+      |                    +-------------+-------------+
+      |                                  |
+      v                                  v
+  stage metrics  ---------------->  scores.json + eval-store
+      |
+      +--(optional)-->  Meta-Evo  -->  bounded config/Actor update
+```
+
+### Runtime planes
+
+Two planes share one set of project contracts; credentials and auth stay separate.
+
+```text
+  USER SURFACES
+  +------------------+   +-------------------+   +------------------+
+  | Reproduce CLI    |   | React Demo App    |   | Pi Agent chat    |
+  | reproduce/run.py |   | demo-app/         |   | skills/ + pi/    |
+  +--------+---------+   +---------+---------+   +--------+---------+
+           |                       | REST/WS               |
+           |                       v                       v
+           |             +-------------------+   +------------------+
+           |             | Flask API + jobs  |   | Pi bridge        |
+           |             | demo/api_server   |   | demo/pi_*.py/mjs |
+           |             +---------+---------+   +--------+---------+
+           |                       |                      |
+           v                       v                      v
+  +--------------------------------------------------------------------+
+  | PROJECT CONTRACTS                                                  |
+  |  reproduce/configs/  config/  skills/  templates/  benchmarks/     |
+  +--------------------------------+-----------------------------------+
+                                   |
+                                   v
+  +--------------------------------------------------------------------+
+  | SQURVE RUNTIME                                                     |
+  |  Router -> DataLoader -> Engine -> Task graph -> Actor stages      |
+  |  core/base.py  core/data_manage.py  core/engine.py  core/actor/    |
+  +--------------------------------+-----------------------------------+
+                                   |
+                                   v
+  +--------------------------------------------------------------------+
+  | EVIDENCE                                                           |
+  |  workspace/runs/  ->  metrics  ->  workspace/artifacts/            |
+  |  reviewed publish only via evidence/reported-results/              |
+  +--------------------------------------------------------------------+
+```
+
+| Module | Role |
+| --- | --- |
+| `Router` | Merge system defaults with a reproduce config |
+| `DataLoader` | Normalize benchmark rows, schemas, DBs, and LLM adapters |
+| `Engine` | Build and run checkpoint-aware Task graphs |
+| `Actors` | Stage roles (reduce, parse, generate, optimize, …) |
+| `Evaluation` | Stage/final metrics, diagnostics, four-layer scores |
+| `Persistence` | Redacted configs, score bundles, eval-store |
+
+The **reproduce config** is the main seam: CLI and Demo invoke the same runner with that contract, so browser runs and terminal runs do not diverge.
 
 ## Features
 
@@ -94,7 +231,7 @@ python reproduce/run.py <benchmark> <method>
 python reproduce/run.py spider c3sql
 ```
 
-Configs live under `reproduce/configs/<benchmark>/<method>.json`. The CLI and Demo job manager share the same runner, so terminal and browser runs do not diverge.
+Configs live under `reproduce/configs/<benchmark>/<method>.json`. The CLI and Demo job manager share the same runner.
 
 ### Integrate a candidate (method or database)
 
@@ -109,43 +246,6 @@ See [harness/README.md](harness/README.md) and `skills/*/SKILL.md`. Method work 
 ### Inspect evidence
 
 Published, checksummed examples: [evidence/](evidence/). Local runs write under `workspace/` (gitignored). Claims should cite verified score bundles, not ephemeral paths.
-
-## Architecture
-
-Two runtime planes share one set of project contracts:
-
-- **Evaluation plane** — Text-to-SQL workflows, metrics, and evidence  
-- **Agent plane** — embedded Pi + Skills for inspect / integrate / improve  
-
-The Demo App exposes both in one browser UI; credentials and auth stay separate.
-
-<div align="center">
-<img src="assets/squrvebridge-framework.png" alt="SqurveBridge framework overview" width="90%" />
-</div>
-
-```text
-  CLI / Demo App / Pi chat
-            │
-            ▼
-  reproduce configs · skills · templates · benchmarks
-            │
-            ▼
-  Router → DataLoader → Engine → Task graph → Actors
-            │
-            ▼
-  stage metrics → score bundle → evidence / Meta-Evo
-```
-
-| Module | Role |
-| --- | --- |
-| `Router` | Merge system defaults with a reproduce config |
-| `DataLoader` | Normalize benchmark rows, schemas, DBs, and LLM adapters |
-| `Engine` | Build and run checkpoint-aware Task graphs |
-| `Actors` | Stage roles (reduce, parse, generate, optimize, …) |
-| `Evaluation` | Stage/final metrics, diagnostics, four-layer scores |
-| `Persistence` | Redacted configs, score bundles, eval-store |
-
-The reproduce config is the main seam: both CLI and Demo invoke the same runner with that contract.
 
 ## Project Structure
 
