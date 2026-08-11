@@ -251,7 +251,9 @@ Published, checksummed examples: [evidence/](evidence/). Local runs write under 
 
 ```text
 core/           Squrve runtime: Router, Engine, Tasks, Actors, LLM/DB adapters
-reproduce/      Configs, CLI/batch runners, metrics, checkpoints, Meta-Evo
+reproduce/      Configs, CLI/batch runners, checkpoints
+reproduce/eval/    Registry-driven evaluation: six metric layers, bundles, views
+reproduce/evolve/  Meta-Evo engine: bounded MCTS search, fitness, journal
 benchmarks/     Git LFS packages and installed benchmark layouts
 demo/           Flask API, job manager, Pi bridge, deployment policy
 demo-app/       React/Vite interactive workspace

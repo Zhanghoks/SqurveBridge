@@ -13,9 +13,29 @@ Implementation notes against the original proposal:
   `compare_scores` landing in `reproduce/eval/bundle/compare.py`.
 - The eval-store schema v2 uses long tables (`sample_metrics`, `sample_meta`,
   opt-in `sample_text`); `sql_features` and `stage_metrics` kept their layout.
-- Publication completeness is enforced by `reproduce/eval/views/evidence.py`
-  plus unit tests executed by the release gate, rather than a separate gate
-  step.
+- Publication completeness is enforced twice: unit tests over
+  `reproduce/eval/views/evidence.py` (run by the release gate) and a hard
+  check inside `tools/evidence.py export_bundle`, which refuses to export a
+  bundle whose captured signals are missing from the aggregate.
+- Wilson intervals ship on `aggregate.ex` / `aggregate.em` in production
+  bundles; full per-cell intervals (the aggregate engine supports them)
+  remain gated on the v2 schema bump.
+
+Documented deviations from the target layout (deferred, tracked):
+
+- `sample/` keeps per-sample assembly inside `bundle/build.py`; the
+  quality/cost/structure/attribution file split follows once the
+  `reproduce/metrics/` facades retire. Same for `views/report.py` and
+  `adapters/ehrsql.py` relocations.
+- `workflow.py` / `pipeline_delta.py` share their math kernels through
+  `sample/process.py` but keep separate execution adapters; whole-module
+  merging is the facade-retirement step.
+- Byte-identical replay against recorded fixtures is limited to
+  publication-safe shapes: published bundles are aggregate-only (no
+  `per_sample`), so engine equivalence is proven against the legacy
+  implementation on synthetic rows instead.
+- `bundle/build.py` is a contract-preserving port of the legacy assembly;
+  report rendering does not yet derive from the registry.
 
 ## 1. Motivation
 

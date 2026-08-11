@@ -10,9 +10,14 @@ import math
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Iterable
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 
 SCHEMA_VERSION = "1.0"
@@ -260,6 +265,30 @@ def _read_diagnostics(path: Path) -> list[dict[str, Any]]:
     return records
 
 
+def _require_publication_completeness(scores: Any) -> None:
+    """Refuse to export a bundle that silently drops declared-public metrics.
+
+    The metric registry declares which aggregates a bundle must carry; a
+    metric only counts as missing when its raw signal was captured (so legacy
+    aggregate-only inputs still export cleanly).
+    """
+    if not isinstance(scores, dict):
+        return
+    aggregate = scores.get("aggregate")
+    if not isinstance(aggregate, dict) or not (aggregate.keys() & {"ex", "em", "sf1", "ves", "rves"}):
+        # Not a runner score bundle (freeform/legacy payload); the sanitizer
+        # still applies, but there is no declared-metric contract to enforce.
+        return
+    from reproduce.eval.views.evidence import publication_completeness
+
+    missing = publication_completeness(scores)
+    if missing:
+        raise EvidenceError(
+            "scores: declared publishable metrics missing from aggregate: "
+            + ", ".join(sorted(missing))
+        )
+
+
 def _json_bytes(value: Any) -> bytes:
     return (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
@@ -292,7 +321,9 @@ def export_bundle(args: argparse.Namespace) -> Path:
         raise EvidenceError("run-id must be a safe portable directory name")
     metadata = _validate_metadata(_read_json(args.metadata))
     config = _sanitise_config(_read_json(args.config))
-    scores = _sanitise_scores(_read_json(args.scores))
+    raw_scores = _read_json(args.scores)
+    _require_publication_completeness(raw_scores)
+    scores = _sanitise_scores(raw_scores)
     diagnostics = _read_diagnostics(args.diagnostics)
     try:
         report = args.report.read_text(encoding="utf-8")

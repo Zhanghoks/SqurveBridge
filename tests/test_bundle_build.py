@@ -90,6 +90,19 @@ class BundleBuildTests(unittest.TestCase):
         self.assertEqual(scores["sample_count"], 2)
         self.assertEqual(scores["aggregate"]["ex"]["avg"], 0.5)
 
+    def test_bernoulli_metrics_carry_wilson_intervals(self):
+        ex_cell = _build()["aggregate"]["ex"]
+        self.assertEqual(ex_cell["interval_kind"], "wilson95")
+        low, high = ex_cell["interval"]
+        self.assertLess(low, 0.5)
+        self.assertGreater(high, 0.5)
+
+    def test_gate_funnel_lands_in_aggregate(self):
+        funnel = _build()["aggregate"]["funnel"]["gate"]
+        self.assertEqual(
+            list(funnel["survival"]), ["parseable", "timely", "executable", "correct", "efficient"])
+        self.assertEqual(funnel["survival"]["correct"], 0.5)
+
     def test_latency_is_aggregated(self):
         latency = _build()["aggregate"]["latency"]
         self.assertEqual(latency["sample_count"], 2)

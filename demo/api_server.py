@@ -373,6 +373,79 @@ def _tables_from_schema_document(document: object, db_path: str) -> list:
     return item.get("table_names_original") or item.get("table_names") or []
 
 
+def _schema_document_for_db(document: object, db_path: str) -> dict | None:
+    if document is None:
+        return None
+    schemas = document if isinstance(document, list) else [document]
+    item = next(
+        (
+            candidate
+            for candidate in schemas
+            if isinstance(candidate, dict) and candidate.get("db_id") == database_schema_id(db_path)
+        ),
+        schemas[0] if schemas and isinstance(schemas[0], dict) else None,
+    )
+    return item if isinstance(item, dict) else None
+
+
+def _schema_tree_from_document(document: object, db_path: str) -> list[dict] | None:
+    """Build a public table/column tree (names, types, keys only) from a Spider-format schema."""
+    item = _schema_document_for_db(document, db_path)
+    if item is None:
+        return None
+    table_names = item.get("table_names_original") or item.get("table_names") or []
+    column_entries = item.get("column_names_original") or item.get("column_names") or []
+    column_types = item.get("column_types") or []
+
+    primary_indexes: set[int] = set()
+    for key in item.get("primary_keys") or []:
+        if isinstance(key, bool):
+            continue
+        if isinstance(key, int):
+            primary_indexes.add(key)
+        elif isinstance(key, (list, tuple)):
+            primary_indexes.update(
+                index for index in key if isinstance(index, int) and not isinstance(index, bool)
+            )
+
+    tables: list[dict] = [
+        {"name": str(name)[:120], "columns": []}
+        for name in table_names[:300]
+        if isinstance(name, str)
+    ]
+    columns_by_index: dict[int, dict] = {}
+    location_by_index: dict[int, tuple[int, str]] = {}
+    for index, entry in enumerate(column_entries):
+        if not isinstance(entry, (list, tuple)) or len(entry) != 2:
+            continue
+        table_index, column_name = entry
+        if isinstance(table_index, bool) or not isinstance(table_index, int):
+            continue
+        if not 0 <= table_index < len(tables):
+            continue
+        column: dict = {
+            "name": str(column_name)[:120],
+            "type": str(column_types[index])[:40] if index < len(column_types) else "",
+        }
+        if index in primary_indexes:
+            column["primary_key"] = True
+        tables[table_index]["columns"].append(column)
+        columns_by_index[index] = column
+        location_by_index[index] = (table_index, column["name"])
+
+    for pair in item.get("foreign_keys") or []:
+        if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+            continue
+        source, target = pair
+        column = columns_by_index.get(source) if isinstance(source, int) else None
+        location = location_by_index.get(target) if isinstance(target, int) else None
+        if column is None or location is None:
+            continue
+        table_index, column_name = location
+        column["foreign_key"] = {"table": tables[table_index]["name"], "column": column_name}
+    return tables
+
+
 def _database_records() -> list[dict]:
     global _DATABASE_RECORDS_CACHE
     available = tuple(get_available_databases())
@@ -751,6 +824,20 @@ def databases():
     })
 
 
+@app.get("/api/databases/<db_id>/schema")
+def database_schema(db_id: str):
+    database = _find_database(db_id)
+    if not database:
+        return _json_error("Unknown database.", 404)
+    tables = _schema_tree_from_document(
+        _load_schema_document(database["schema_path"], {}),
+        database["db_path"],
+    )
+    if tables is None:
+        return _json_error("Schema details are unavailable for this database.", 404)
+    return jsonify({"db_id": database["id"], "tables": tables})
+
+
 @app.post("/api/databases/upload")
 def upload_database():
     files = request.files.getlist("files")
@@ -1008,6 +1095,9 @@ def _latency_summary(scores: dict, job: dict | None = None) -> dict:
         row.get("act_elapsed_s") for row in per_sample
         if isinstance(row.get("act_elapsed_s"), (int, float))
     ]
+    # The metrics layer owns latency aggregation (aggregate.latency, added by
+    # reproduce.eval.bundle.build); recompute locally only for older bundles.
+    aggregated = scores.get("aggregate", {}).get("latency") if isinstance(scores.get("aggregate"), dict) else None
     stage_values: dict[str, list[float]] = {}
     workflow_rows = ((scores.get("workflow_trace") or {}).get("per_sample") or [])
     for row in workflow_rows:
@@ -1026,6 +1116,15 @@ def _latency_summary(scores: dict, job: dict | None = None) -> dict:
     wall_time = None
     if job and isinstance(job.get("started_at"), (int, float)) and isinstance(job.get("finished_at"), (int, float)):
         wall_time = round(job["finished_at"] - job["started_at"], 4)
+    if isinstance(aggregated, dict) and isinstance(aggregated.get("avg_s"), (int, float)):
+        return {
+            "sample_count": aggregated.get("sample_count"),
+            "mean_s": round(aggregated["avg_s"], 4),
+            "p50_s": round(aggregated["p50_s"], 4) if isinstance(aggregated.get("p50_s"), (int, float)) else None,
+            "p95_s": round(aggregated["p95_s"], 4) if isinstance(aggregated.get("p95_s"), (int, float)) else None,
+            "wall_time_s": wall_time,
+            "by_stage": by_stage,
+        }
     return {
         "sample_count": len(sample_values),
         "mean_s": round(sum(sample_values) / len(sample_values), 4) if sample_values else None,

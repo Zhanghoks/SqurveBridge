@@ -27,6 +27,21 @@ of this automatically; adapters only need to respect the naming rules.
   `dataset_save_path` checkpoint; stage metrics (recall/precision/...) are
   recomputed offline from these checkpoints, never live.
 
+## Run gate events (derived, no new hooks)
+
+Every evaluated sample yields an ordered five-gate outcome with early
+termination, derived from already-captured fields by
+`reproduce.eval.sample.process.gate_outcome`:
+
+1. `parseable` — a non-empty `pred_sql` was produced
+2. `timely` — execution was not killed by a timeout (`exec_error` text)
+3. `executable` — `exec_error` is empty
+4. `correct` — `ex == 1`
+5. `efficient` — only with an explicit latency budget; `act_elapsed_s <= budget`
+
+Per-run survival rates land in `aggregate.funnel.gate`; the first failed gate
+per sample answers "where did this run die".
+
 ## Canonical roles
 
 Process metrics compare methods through the Squrve task taxonomy:

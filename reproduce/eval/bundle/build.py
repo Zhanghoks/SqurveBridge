@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional
 
 from reproduce.eval.aggregate.slicing import slice_rows
-from reproduce.eval.aggregate.statistics import percentile
+from reproduce.eval.aggregate.statistics import percentile, wilson_interval
 from reproduce.eval.registry import default_registry
 from reproduce.eval.sample.process import gate_funnel, process_summary, stage_survival_funnel
 from reproduce.metrics.errors import classify_error
@@ -156,6 +156,7 @@ def build_scores(
         "gate": gate_funnel(per_sample),
         "stage": stage_survival_funnel(per_sample),
     }
+    _attach_intervals(aggregate, per_sample)
 
     result = {
         "run_id": run_id,
@@ -474,6 +475,26 @@ def _token_by_sample(token_data: dict) -> Dict[str, Dict[str, int]]:
         step = parts[-1] if len(parts) > 1 else "unknown"
         result[sample_id][step] = result[sample_id].get(step, 0) + record.get("total_tokens", 0)
     return dict(result)
+
+
+def _attach_intervals(aggregate: Dict[str, Any], per_sample: List[dict]) -> None:
+    """Wilson 95% intervals for the Bernoulli quality metrics.
+
+    Bounded slices (n=50 smoke runs) must not read like full-split results;
+    the interval makes the sample-size caveat part of the number itself.
+    """
+    for metric in ("ex", "em"):
+        cell = aggregate.get(metric)
+        values = [
+            float(sample[metric])
+            for sample in per_sample
+            if isinstance(sample.get(metric), (int, float))
+        ]
+        if isinstance(cell, dict) and values:
+            interval = wilson_interval(sum(values), len(values))
+            if interval:
+                cell["interval"] = [round(bound, 6) for bound in interval]
+                cell["interval_kind"] = "wilson95"
 
 
 def _aggregate_latency(per_sample: List[dict]) -> dict:
