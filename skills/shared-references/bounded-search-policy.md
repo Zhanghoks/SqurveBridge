@@ -10,4 +10,4 @@ Smoke and bounded runs should set `SQURVE_EVAL_SCOPE=smoke`, `SQURVE_EVAL_SAMPLE
 
 Full confirmation must not use smoke scope. It compares the best candidate against baseline with `SQURVE_EVAL_BASELINE_SCORES`.
 
-Dry-round termination: when global stagnation repeats until `dry_rounds >= 2`, stop search and report the best available node.
+Dry-round termination: `dry_rounds` counts fresh (non-memoized) evaluations that fail to improve the global best; when `dry_rounds >= 4` (policy `dry_round_limit`), stop search and report the best available node.

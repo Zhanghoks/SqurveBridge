@@ -34,7 +34,8 @@ from reproduce.eval.utils import (
 )
 from reproduce.metrics.assembly import build_scores
 from reproduce.metrics.diagnostics import extract_unified_log_diagnostics
-from reproduce.metrics.evolution import build_meta_evo_input, compare_scores
+from reproduce.eval.bundle.compare import compare_scores
+from reproduce.evolve.meta_input import build_meta_evo_input
 from reproduce.lib.env_config import api_key_ready, prepare_runtime_llm_config, redact_config_secrets
 from reproduce.lib.checkpoints import (
     checkpoint_run_id,

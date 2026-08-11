@@ -7,8 +7,8 @@ import argparse
 import json
 from pathlib import Path
 
-from reproduce.metrics.evolution import compare_scores
-from reproduce.metrics.mcts.rollout import score_from_scores, rollout_verdict
+from reproduce.eval.bundle.compare import compare_scores
+from reproduce.evolve.mcts.rollout import score_from_scores, rollout_verdict
 
 
 def build_delta_report(

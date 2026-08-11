@@ -528,7 +528,7 @@ and the optional `metric-adapter` flow. It must not become part of default
 | File | Built by | Purpose |
 |---|---|---|
 | `weakness_profile.md` | `metrics/profile.py:build_weakness_profile` | Narrative digest for the `/meta-evo` consumer. |
-| `meta-evo-input.json` | `metrics/evolution.py:37` (`build_meta_evo_input`) | Condensed input for the MCTS search controller. |
+| `meta-evo-input.json` | `reproduce/evolve/meta_input.py` (`build_meta_evo_input`) | Condensed input for the MCTS search controller. |
 | `token-summary.json` | `metrics/assembly.py` (summary only) | Aggregated token stats without per-record detail. |
 | `token-usage.jsonl` | `core/llm/token_logger.py` | One JSON record per LLM call, tagged `sample:<id>\|<step>`. |
 | `config.json` | `metrics/persistence.py` | Full config snapshot for reproducibility. |
@@ -604,7 +604,7 @@ and the optional `metric-adapter` flow. It must not become part of default
 | Scores assembly | `reproduce/metrics/assembly.py` |
 | Persistence | `reproduce/metrics/persistence.py` |
 | eval-store sqlite | `reproduce/metrics/eval_store.py` |
-| meta-evo input | `reproduce/metrics/evolution.py:37` `build_meta_evo_input` |
+| meta-evo input | `reproduce/evolve/meta_input.py` `build_meta_evo_input` |
 | Weakness profile | `reproduce/metrics/profile.py` `build_weakness_profile` |
 | EHR-SQL reliability | `reproduce/metrics/ehrsql_eval.py:118` `ehrsql_evaluate` ⚠️ not in runner |
 

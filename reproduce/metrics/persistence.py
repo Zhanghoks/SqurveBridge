@@ -8,7 +8,7 @@ from typing import Any, Dict
 
 from reproduce.lib.env_config import redact_config_secrets
 from reproduce.metrics.profile import build_weakness_profile
-from reproduce.metrics.eval_store import persist_eval_store
+from reproduce.eval.views.store import persist_eval_store
 
 
 def persist_scores_bundle(

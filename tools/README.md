@@ -18,4 +18,4 @@
 - `eval_scores.py`: 对已保存的 reproduce 输出运行带明细评估，组装并写出 `scores.json`。
 - `delta_report.py`: 对比两份 `scores.json`，输出 Markdown delta 报告和 JSON verdict。
 - `profile_weakness.py`: 从 `scores.json` 生成 Meta-Evo 可读的弱点画像 Markdown，并可用 `--json-output` 写结构化 `weakness-profile.json`。
-- `mcts/orchestrator.py`: tools 边界下的 MCTS 搜索入口，转发到 `reproduce.metrics.mcts.orchestrator`。
+- `mcts/orchestrator.py`: tools 边界下的 MCTS 搜索入口，转发到 `reproduce.evolve.mcts.orchestrator`。

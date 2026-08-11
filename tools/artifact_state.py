@@ -250,27 +250,6 @@ def check_branch(args: argparse.Namespace) -> None:
         print(f"branch OK: {branch or 'unknown'} (database 可在 main 接入)")
 
 
-CASCADE = {
-    "llm_provider": (
-        "embedding", "prompt", "rag", "few_shot", "external", "actor",
-        "workflow", "adapter",
-    ),
-    "embedding": ("rag", "few_shot", "adapter"),
-    "prompt": ("adapter",),
-    "rag": ("few_shot", "adapter"),
-    "few_shot": ("adapter",),
-    "external": ("adapter",),
-    "actor": ("workflow", "adapter"),
-    "workflow": ("adapter",),
-    "benchmark_data": (
-        "sysconfig", "schema", "db_backend", "credential", "rag",
-        "few_shot", "external", "adapter",
-    ),
-    "sysconfig": ("adapter",),
-    "schema": ("adapter",),
-    "db_backend": ("adapter",),
-    "credential": ("adapter",),
-}
 STAGE_TO_SKILL: dict[str, str] = {
     "llm_provider": "llm-provider-adapter",
     "embedding": "embedding-adapter",
@@ -1439,7 +1418,7 @@ def prepare_run(args: argparse.Namespace) -> None:
         raise SystemExit(f"config not found: {config_path}")
 
     config = read_json(config_path)
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = Path(__file__).resolve().parents[1]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
     from reproduce.lib.env_config import api_key_ready

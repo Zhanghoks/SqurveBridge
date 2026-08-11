@@ -66,7 +66,7 @@ artifacts/evolve/<evolve_slug>/
 4. **CANDIDATE GENERATION**：由 Meta-Evo 生成候选改进节点；每个 node 必须说明目标弱点、允许修改范围、change plan、patch、运行命令。
 5. **SMOKE GATE**：每个候选先跑 bounded smoke（默认 50 samples）。目的不是最终排名，而是筛掉跑不通、严重退化、成本爆炸的候选。
 6. **BOUNDED EVAL**：通过 smoke gate 的 top candidate 再跑更大切片（默认 200 samples），比较 EX、EM、VES/CF1/FD、HardSliceScore、cost、latency。
-7. **MCTS LOOP**：真实搜索循环由 `reproduce/metrics/mcts/orchestrator.py` 执行；run-level phase 和 resume 由 `reproduce/metrics/evolution_pkg/state_machine.py` 控制。`skills/Meta-Evo/SKILL.md` 只负责入口编排和人工 review，不维护第二套搜索逻辑。
+7. **MCTS LOOP**：真实搜索循环由 `reproduce/evolve/mcts/orchestrator.py` 执行；run-level phase 和 resume 由 `reproduce/evolve/state_machine.py` 控制。`skills/Meta-Evo/SKILL.md` 只负责入口编排和人工 review，不维护第二套搜索逻辑。
 8. **FULL CONFIRMATION**：只对 best node 做 full reproduce confirmation。
 9. **USER REVIEW**：展示 best node、patch、delta、改善/退化样本；用户选择 accept / continue / rollback。
 
@@ -76,10 +76,10 @@ artifacts/evolve/<evolve_slug>/
 
 Meta-Evo 可以编排和审查，但确定性逻辑不得写在 skill 中：
 
-- MCTS 主循环：`reproduce/metrics/mcts/orchestrator.py`（`run_search()` 单阶段搜索，`run_bounded_funnel()` 串联 smoke → bounded → optional full）
-- fitness：`reproduce/metrics/evolution_pkg/fitness.py`
-- node / journal：`reproduce/metrics/evolution_pkg/node.py`、`journal.py`
-- artifact IO：`reproduce/metrics/evolution_pkg/artifacts.py`
+- MCTS 主循环：`reproduce/evolve/mcts/orchestrator.py`（`run_search()` 单阶段搜索，`run_bounded_funnel()` 串联 smoke → bounded → optional full）
+- fitness：`reproduce/evolve/fitness.py`
+- node / journal：`reproduce/evolve/node.py`、`journal.py`
+- artifact IO：`reproduce/evolve/artifacts.py`
 - budget / sampling / experience：`budget.py`、`sampling.py`、`experience.py`
 
 如果这些模块尚不存在，本 skill 只能生成设计和待办，不能在聊天中假装已经完成 rollout。

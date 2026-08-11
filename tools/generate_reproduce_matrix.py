@@ -115,7 +115,7 @@ def resdsql(database_slug: str, data_source: str, schema_source: str, database: 
         ]
     return [
         stage(database_slug, method, data_source, schema_source, "resdsql_parse", "ParseTask", "parse_type", "RESDSQLParser",
-              ["schema_linking_eval"],
+              ["parse_recall", "parse_precision", "parse_exact_matching"],
               {"save_dir": f"../files/schema_links/{database_slug}_{method}", "top_k_tables": 5, "top_k_columns": 7}),
         stage(database_slug, method, data_source, schema_source, "resdsql_reduce", "ReduceTask", "reduce_type", "RESDSQLReducer",
               ["reduce_recall", "reduce_precision", "reduce_rate"],

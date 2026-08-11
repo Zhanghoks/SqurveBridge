@@ -6,8 +6,8 @@ Meta-Evo is the only public evolution-controller entry. It must not introduce a 
 
 - `skills/Meta-Evo/SKILL.md` frontmatter registers `/meta-evo`; its body handles user interaction, workflow sequencing, and human review.
 - `tools/` exposes thin deterministic wrappers only.
-- `reproduce/metrics/mcts/orchestrator.py` owns MCTS search stages and delegates run-level phase transitions to the evolution state machine.
-- `reproduce/metrics/evolution_pkg/` owns deterministic state, process artifacts, node, journal, budget, fitness, sampling, experience, and artifact helpers.
+- `reproduce/evolve/mcts/orchestrator.py` owns MCTS search stages and delegates run-level phase transitions to the evolution state machine.
+- `reproduce/evolve/` owns deterministic state, process artifacts, node, journal, budget, fitness, sampling, experience, and artifact helpers.
 - `artifacts/evolve/` is the artifact source for every evolution run.
 
 ## State And Evidence Split

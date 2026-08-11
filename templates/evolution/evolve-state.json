@@ -12,7 +12,7 @@
   "budget": {
     "smoke_rollouts": 20,
     "bounded_rollouts": 10,
-    "dry_round_limit": 2
+    "dry_round_limit": 4
   },
   "last_transition": null,
   "human_gate": null,

@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from typing import Any, List, Optional
 
+from reproduce.eval.sample.process import find_before_key, refinement_outcome, selection_outcome
 from reproduce.metrics.evaluators import _dataframes_equal, _execute_sql, _resolve_sql
 
 
 def compute_pipeline_delta(row: dict, dataset: Any = None) -> dict:
-    before_keys = [key for key in row if key.startswith("pred_sql_before_")]
-    scaler_key = _find_key(before_keys, ("scale", "scaler"))
-    optimizer_key = _find_key(before_keys, ("optimiz", "optimizer"))
-    selector_key = _find_key(before_keys, ("select", "selector"))
+    scaler_key = find_before_key(row, needles=("scale", "scaler"))
+    optimizer_key = find_before_key(row, needles=("optimiz", "optimizer"))
+    selector_key = find_before_key(row, needles=("select", "selector"))
     decomposer_triggered = bool(row.get("sub_questions"))
 
     return {
@@ -56,11 +56,12 @@ def _optimizer_delta(row: dict, dataset: Any, before_key: Optional[str]) -> dict
     before = _score_sql(_first_sql(row.get(before_key)), row, dataset)
     after_scores = [_score_sql(sql, row, dataset) for sql in _sql_list(row.get("pred_sql"))]
     after = max((s for s in after_scores if s is not None), default=None) if after_scores else None
+    outcome = refinement_outcome(before, after)
     result.update({
-        "ex_before": before,
-        "ex_after": after,
-        "fix_success": before == 0 and after == 1,
-        "degradation": before == 1 and after == 0,
+        "ex_before": outcome["ex_before"],
+        "ex_after": outcome["ex_after"],
+        "fix_success": outcome["fix_success"],
+        "degradation": outcome["degradation"],
         "debug_turns": row.get("debug_turns") or row.get("optimize_debug_turns"),
     })
     return result
@@ -76,16 +77,15 @@ def _selector_delta(row: dict, dataset: Any, before_key: Optional[str]) -> dict:
     selected = _first_sql(row.get("pred_sql"))
     candidate_scores = [_score_sql(sql, row, dataset) for sql in candidates]
     selected_ex = _score_sql(selected, row, dataset)
-    oracle = max((s for s in candidate_scores if s is not None), default=None) if candidate_scores else None
-    first = candidate_scores[0] if candidate_scores else None
+    outcome = selection_outcome(candidate_scores, selected_ex)
     result.update({
         "candidate_count": len(candidates),
-        "oracle_ex": oracle,
-        "selected_ex": selected_ex,
-        "first_ex": first,
-        "selection_accuracy": selected_ex,
-        "selection_gain": None if selected_ex is None or first is None else selected_ex - first,
-        "selection_loss": None if oracle is None or selected_ex is None else oracle - selected_ex,
+        "oracle_ex": outcome["oracle_ex"],
+        "selected_ex": outcome["selected_ex"],
+        "first_ex": outcome["first_ex"],
+        "selection_accuracy": outcome["selected_ex"],
+        "selection_gain": outcome["selection_gain"],
+        "selection_loss": outcome["selection_loss"],
     })
     return result
 
@@ -101,14 +101,6 @@ def _score_sql(sql: Optional[str], row: dict, dataset: Any) -> Optional[int]:
     if pred_df is None:
         return 0
     return 1 if _dataframes_equal(pred_df, gold_df) else 0
-
-
-def _find_key(keys: List[str], needles: tuple[str, ...]) -> Optional[str]:
-    for key in keys:
-        lowered = key.lower()
-        if any(needle in lowered for needle in needles):
-            return key
-    return None
 
 
 def _sql_list(value: Any) -> List[str]:

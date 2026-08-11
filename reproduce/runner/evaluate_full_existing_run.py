@@ -27,7 +27,7 @@ from reproduce.eval.utils import (
 from reproduce.lib.env_config import prepare_runtime_llm_config
 from reproduce.metrics.diagnostics import evaluate_execution_detail
 from reproduce.metrics.assembly import build_scores
-from reproduce.metrics.evolution import build_meta_evo_input
+from reproduce.evolve.meta_input import build_meta_evo_input
 from reproduce.metrics.persistence import persist_scores_bundle
 
 

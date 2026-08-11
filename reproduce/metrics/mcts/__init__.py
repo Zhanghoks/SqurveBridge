@@ -1,2 +1,1 @@
-"""MCTS helpers for Meta-Evo method search."""
-
+"""Forwarding facade: moved to ``reproduce.evolve.mcts``."""

@@ -6,6 +6,7 @@ from collections import Counter, defaultdict
 from typing import Any, Dict, List, Optional
 
 from core.evaluate import Evaluator
+from reproduce.eval.sample.process import find_before_key, linking_outcome, selection_outcome
 from reproduce.metrics.diagnostics import evaluate_execution_detail
 from reproduce.metrics.evaluators import _resolve_sql
 
@@ -190,7 +191,7 @@ def _build_actor_trace(
         trace["signals"] = _sql_stage_signals(row, dataset)
         trace["status"] = _status_from_sql(trace["signals"], final, trace["error"])
     elif task_type == "SelectTask":
-        trace["signals"] = _selector_signals(row, dataset)
+        trace["signals"] = _selector_signals(row, dataset, task_id=task_id)
         trace["status"] = _status_from_selector(trace["signals"], final, trace["error"])
     else:
         trace["signals"] = _generic_signals(row)
@@ -214,11 +215,13 @@ def _actor_class(task: dict) -> Optional[str]:
 def _reduce_signals(row: dict, metrics: dict) -> dict:
     gold = _normalize_schema_set(row.get("gold_schemas")) if isinstance(row, dict) else set()
     pred = _load_schema_set(row.get("instance_schemas")) if isinstance(row, dict) else set()
+    outcome = linking_outcome(gold, pred)
     return {
-        "gold_schema_count": len(gold) if gold else None,
-        "pred_schema_count": len(pred) if pred else None,
-        "missing_gold_schemas": sorted(_schema_missing(gold, pred)) if gold and pred is not None else [],
-        "extra_schemas": sorted(pred - gold) if gold and pred else [],
+        "gold_schema_count": outcome["gold_count"],
+        "pred_schema_count": outcome["pred_count"],
+        "missing_gold_schemas": outcome["missing"] if gold and pred is not None else [],
+        "extra_schemas": outcome["extra"] if gold and pred else [],
+        "schema_precision": outcome["precision"] if gold and pred else None,
         "fatal_schema_miss": isinstance(metrics.get("reduce_recall"), (int, float)) and metrics.get("reduce_recall") < 1,
     }
 
@@ -226,11 +229,13 @@ def _reduce_signals(row: dict, metrics: dict) -> dict:
 def _parse_signals(row: dict, metrics: dict) -> dict:
     gold = _normalize_schema_set(row.get("gold_schemas")) if isinstance(row, dict) else set()
     pred = _load_schema_set(row.get("schema_links")) if isinstance(row, dict) else set()
+    outcome = linking_outcome(gold, pred)
     return {
-        "gold_schema_count": len(gold) if gold else None,
-        "linked_schema_count": len(pred) if pred else None,
-        "missing_gold_schemas": sorted(_schema_missing(gold, pred)) if gold and pred is not None else [],
-        "extra_schemas": sorted(pred - gold) if gold and pred else [],
+        "gold_schema_count": outcome["gold_count"],
+        "linked_schema_count": outcome["pred_count"],
+        "missing_gold_schemas": outcome["missing"] if gold and pred is not None else [],
+        "extra_schemas": outcome["extra"] if gold and pred else [],
+        "schema_precision": outcome["precision"] if gold and pred else None,
         "fatal_schema_miss": isinstance(metrics.get("parse_recall"), (int, float)) and metrics.get("parse_recall") < 1,
     }
 
@@ -254,8 +259,8 @@ def _sql_stage_signals(row: dict, dataset: Any) -> dict:
     }
 
 
-def _selector_signals(row: dict, dataset: Any) -> dict:
-    before_key = _find_before_key(row, ("select", "selector"))
+def _selector_signals(row: dict, dataset: Any, task_id: str = "") -> dict:
+    before_key = find_before_key(row, stage_id=task_id, needles=("select", "selector"))
     candidates = _sql_list(row.get(before_key)) if before_key else _sql_list(row.get("pred_sql_before_select"))
     selected = _resolve_sql(row.get("pred_sql")) if isinstance(row, dict) else None
     candidate_scores = [
@@ -266,18 +271,16 @@ def _selector_signals(row: dict, dataset: Any) -> dict:
         evaluate_execution_detail({**row, "pred_sql": selected}, dataset=dataset, index=0).get("ex")
         if selected and dataset is not None and isinstance(row, dict) else None
     )
-    numeric_scores = [score for score in candidate_scores if isinstance(score, (int, float))]
-    oracle_ex = max(numeric_scores) if numeric_scores else None
-    first_ex = numeric_scores[0] if numeric_scores else None
+    outcome = selection_outcome(candidate_scores, selected_ex)
     return {
         "candidate_count": len(candidates),
-        "selected_ex": selected_ex,
-        "oracle_ex": oracle_ex,
-        "first_ex": first_ex,
+        "selected_ex": outcome["selected_ex"],
+        "oracle_ex": outcome["oracle_ex"],
+        "first_ex": outcome["first_ex"],
         "selected_candidate_index": _candidate_index(candidates, selected),
-        "selection_gain": None if selected_ex is None or first_ex is None else selected_ex - first_ex,
-        "selection_loss": None if selected_ex is None or oracle_ex is None else oracle_ex - selected_ex,
-        "missed_correct_candidate": oracle_ex == 1 and selected_ex == 0,
+        "selection_gain": outcome["selection_gain"],
+        "selection_loss": outcome["selection_loss"],
+        "missed_correct_candidate": outcome["missed_correct"],
     }
 
 
@@ -429,29 +432,11 @@ def _normalize_schema_set(value: Any) -> set:
     return normalized or set()
 
 
-def _schema_missing(gold: set, pred: set) -> set:
-    missing = set()
-    for gold_item in gold:
-        if not any(pred_item in gold_item for pred_item in pred):
-            missing.add(gold_item)
-    return missing
-
-
 def _sql_list(value: Any) -> List[str]:
     if isinstance(value, list):
         return [sql for sql in (_resolve_sql(item) for item in value) if sql]
     sql = _resolve_sql(value)
     return [sql] if sql else []
-
-
-def _find_before_key(row: dict, needles: tuple[str, ...]) -> Optional[str]:
-    if not isinstance(row, dict):
-        return None
-    for key in row:
-        lowered = key.lower()
-        if key.startswith("pred_sql_before_") and any(needle in lowered for needle in needles):
-            return key
-    return None
 
 
 def _candidate_index(candidates: List[str], selected: Optional[str]) -> Optional[int]:

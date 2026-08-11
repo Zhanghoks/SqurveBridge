@@ -38,7 +38,9 @@
         "dataset_save_path": "../files/datasets/bull_cn_resdsql_resdsql_parse.json",
         "is_save_dataset": true,
         "eval_type": [
-          "schema_linking_eval"
+          "parse_recall",
+          "parse_precision",
+          "parse_exact_matching"
         ],
         "meta": {
           "task": {

@@ -1,0 +1,29 @@
+{
+  "policy": "bounded_search_default",
+  "description": "Default bounded-search policy for Meta-Evo MCTS. Loaded via --policy-config; every key mirrors a run_search parameter documented in docs/evolution-harness-design.md.",
+  "dry_round_limit": 4,
+  "stagnation_window": 4,
+  "cumulative_updates": true,
+  "max_chain_depth": 3,
+  "target_bonus_weight": 0.15,
+  "promotion": {
+    "smoke_top_k": 2,
+    "bounded_top_k": 1
+  },
+  "experience": {
+    "discount": 0.3
+  },
+  "fitness_weights": {
+    "ex": 0.45,
+    "em": 0.1,
+    "ves": 0.1,
+    "hard_slice": 0.2,
+    "cost": 0.1,
+    "latency": 0.05,
+    "regression": 0.15
+  },
+  "env": {
+    "SQURVE_EVAL_SCOPE": "smoke",
+    "SQURVE_EVAL_SAMPLE_LIMIT": "50"
+  }
+}

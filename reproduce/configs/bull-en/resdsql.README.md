@@ -33,7 +33,7 @@ For smoke/debug runs, prefer changing only the third `data_source` segment (`<be
 
 | Task | Type | Actor binding | Eval | Snapshot |
 | --- | --- | --- | --- | --- |
-| resdsql_parse | ParseTask | parse_type=RESDSQLParser | schema_linking_eval | `../files/datasets/bull_en_resdsql_resdsql_parse.json` |
+| resdsql_parse | ParseTask | parse_type=RESDSQLParser | parse_recall, parse_precision, parse_exact_matching | `../files/datasets/bull_en_resdsql_resdsql_parse.json` |
 | resdsql_reduce | ReduceTask | reduce_type=RESDSQLReducer | reduce_recall, reduce_precision, reduce_rate | `../files/datasets/bull_en_resdsql_resdsql_reduce.json` |
 | resdsql_generate | GenerateTask | generate_type=RESDSQLGenerator | execute_accuracy | `../files/datasets/bull_en_resdsql_resdsql_generate.json` |
 

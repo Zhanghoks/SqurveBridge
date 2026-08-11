@@ -11,12 +11,18 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# The script is invoked as `python tools/reproduce_contract.py`, which puts
+# tools/ (not the repo root) on sys.path; the reproduce package import below
+# needs the root.
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 CONFIG_ROOT = PROJECT_ROOT / "reproduce" / "configs"
 TEMPLATE_PATH = PROJECT_ROOT / "templates" / "reproduce" / "config-readme.md"
 BEGIN_MARKER = "<!-- SQURVE:CONFIG-README:BEGIN -->"
@@ -448,11 +454,9 @@ def _valid_workspace_output(value: Any) -> bool:
     if path.is_absolute():
         return False
     resolved = (PROJECT_ROOT / "reproduce" / path).resolve()
-    allowed_roots = (
-        PROJECT_ROOT / "files",
-        PROJECT_ROOT / "artifacts",
-    )
-    return any(_is_relative_to(resolved, root) for root in allowed_roots)
+    from reproduce.eval.paths import allowed_config_output_roots
+
+    return any(_is_relative_to(resolved, root) for root in allowed_config_output_roots())
 
 
 def _is_relative_to(path: Path, root: Path) -> bool:
