@@ -125,3 +125,6 @@ benchmarks/spider2/
 .omx/
 .gradio/
 .remember/
+
+# Benchmark archives are distributed via the Hugging Face dataset
+benchmarks/packages/*.zip

@@ -21,7 +21,12 @@ RUNTIME_DIRECTORIES = (
     "evidence/reported-results",
     "tools",
 )
-RUNTIME_FILES = ("LICENSE", "pyproject.toml", "requirements.txt")
+RUNTIME_FILES = (
+    "LICENSE",
+    "pyproject.toml",
+    "requirements.txt",
+    "benchmarks/packages/manifest.json",
+)
 
 
 def _write_minimal_runtime(root: Path) -> None:
@@ -31,7 +36,9 @@ def _write_minimal_runtime(root: Path) -> None:
         (directory / "runtime.txt").write_text(relative, encoding="utf-8")
 
     for relative in RUNTIME_FILES:
-        (root / relative).write_text(relative, encoding="utf-8")
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(relative, encoding="utf-8")
 
     deploy = root / "deploy" / "huggingface"
     deploy.mkdir(parents=True)
@@ -75,8 +82,9 @@ class HuggingFaceBundleContractTests(unittest.TestCase):
             "COPY --from=pi-sdk /build/demo/node_modules /app/demo/node_modules",
             dockerfile,
         )
-        self.assertIn("git lfs pull --include=\"benchmarks/packages/*.zip\"", dockerfile)
+        self.assertIn("python /app/tools/benchmarks.py download all", dockerfile)
         self.assertIn("tools/extract_space_assets.py", dockerfile)
+        self.assertNotIn("git lfs", dockerfile)
         self.assertIn("node --version", dockerfile)
         self.assertIn("python demo/runtime_check.py", dockerfile)
         self.assertNotIn("SQURVE_LLM_PROVIDER=", dockerfile)
@@ -229,6 +237,7 @@ class HuggingFaceBundleTests(unittest.TestCase):
                 "Dockerfile",
                 "LICENSE",
                 "README.md",
+                "benchmarks",
                 "config",
                 "core",
                 "demo",
@@ -256,7 +265,8 @@ class HuggingFaceBundleTests(unittest.TestCase):
             "workspace",
             "output",
             "paper",
-            "benchmarks",
+            "benchmarks/packages/spider.zip",
+            "benchmarks/spider",
             "demo-app/node_modules",
             "demo-app/dist",
         )
@@ -282,10 +292,16 @@ class HuggingFaceBundleTests(unittest.TestCase):
                 self.assertFalse(path.name.startswith("._"))
                 self.assertNotIn(path.suffix.lower(), {".pyc", ".pyo"})
 
-    def test_bundle_defers_all_benchmark_payloads_to_the_docker_lfs_build(self) -> None:
-        self.assertFalse((self.output / "benchmarks").exists())
+    def test_bundle_defers_all_benchmark_payloads_to_the_docker_download(self) -> None:
+        benchmark_files = [
+            path.relative_to(self.output).as_posix()
+            for path in sorted((self.output / "benchmarks").rglob("*"))
+            if path.is_file()
+        ]
+        # Only the checksum manifest ships; payloads are downloaded in-image.
+        self.assertEqual(benchmark_files, ["benchmarks/packages/manifest.json"])
         dockerfile = (self.output / "Dockerfile").read_text(encoding="utf-8")
-        self.assertIn('git lfs pull --include="benchmarks/packages/*.zip"', dockerfile)
+        self.assertIn("python /app/tools/benchmarks.py download all", dockerfile)
         self.assertIn("tools/extract_space_assets.py", dockerfile)
 
     def test_manifest_is_sorted_complete_and_security_clean(self) -> None:

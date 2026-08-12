@@ -21,17 +21,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     SQURVE_DEPLOYMENT_TARGET=hf-space
 WORKDIR /app
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential curl git git-lfs python3 python3-venv \
+    && apt-get install -y --no-install-recommends build-essential curl git python3 python3-venv \
     && rm -rf /var/lib/apt/lists/* \
     && python3 -m venv /opt/venv
 COPY . /app
 COPY --from=frontend /build/demo-app/dist /app/demo-app/dist
 COPY --from=pi-sdk /build/demo/node_modules /app/demo/node_modules
-RUN GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 https://github.com/Zhanghoks/SqurveBridge.git /tmp/squrvebridge-assets \
-    && cd /tmp/squrvebridge-assets \
-    && git lfs pull --include="benchmarks/packages/*.zip" \
+RUN python /app/tools/benchmarks.py download all \
     && python /app/tools/extract_space_assets.py --archive-root benchmarks/packages --output-root /app/benchmarks \
-    && rm -rf /tmp/squrvebridge-assets
+    && rm -f /app/benchmarks/packages/*.zip
 RUN python -m pip install --upgrade pip \
     && python -m pip install -r deploy/huggingface/requirements.txt \
     && python demo/runtime_check.py \

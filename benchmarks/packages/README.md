@@ -1,6 +1,8 @@
 # Packaged benchmarks
 
-SqurveBridge versions its normalized benchmark snapshots as Git LFS archives:
+SqurveBridge versions its normalized benchmark snapshots as checksummed ZIP
+archives distributed through the Hugging Face dataset recorded in
+`manifest.json` (`distribution.hf_dataset`):
 
 - `spider.zip`
 - `bird.zip`
@@ -16,29 +18,17 @@ The archives are redistribution packages for research reproducibility, not new l
 ## Download and install
 
 ```bash
-git lfs install
-git lfs pull --include="benchmarks/packages/*.zip"
+python tools/benchmarks.py download all   # or a single slug, e.g. `download spider`
 
-python tools/benchmarks.py verify-archives
 python tools/benchmarks.py install spider
-python tools/benchmarks.py install bird
-python tools/benchmarks.py install ambidb
-python tools/benchmarks.py install BookSQL
-python tools/benchmarks.py install bull-cn
-python tools/benchmarks.py install bull-en
-python tools/benchmarks.py install ehrsql-2024
-python tools/benchmarks.py install spider2
 python tools/benchmarks.py verify spider
-python tools/benchmarks.py verify bird
-python tools/benchmarks.py verify ambidb
-python tools/benchmarks.py verify BookSQL
-python tools/benchmarks.py verify bull-cn
-python tools/benchmarks.py verify bull-en
-python tools/benchmarks.py verify ehrsql-2024
-python tools/benchmarks.py verify spider2
+# repeat for bird, ambidb, BookSQL, bull-cn, bull-en, ehrsql-2024, spider2
 ```
 
-Installation verifies the archive checksum and layout before replacing a benchmark directory. Pass `--force` only when intentionally replacing an existing verified installation.
+Every download is verified against the manifest SHA-256 and size before it is
+kept. Installation verifies the archive checksum and layout before replacing a
+benchmark directory. Pass `--force` only when intentionally replacing an
+existing verified installation.
 
 ## Maintainer workflow
 
@@ -47,12 +37,14 @@ Prepare the expanded benchmark directory locally, then run:
 ```bash
 python tools/benchmarks.py build all
 python tools/benchmarks.py verify-archives
-git lfs ls-files
 ```
 
 Archive construction uses stable path ordering, fixed timestamps, fixed permissions, and excludes local scripts, caches, `.DS_Store`, and SQLite WAL/SHM files. Rebuilding unchanged inputs must produce the same SHA-256.
 
-Ordinary CI can validate LFS pointer metadata without downloading the payloads:
+After rebuilding, upload the changed archives to the Hugging Face dataset
+declared in `manifest.json` and commit the refreshed manifest in the same
+change. Ordinary CI validates the manifest and any local archives without
+downloading the payloads:
 
 ```bash
 python tools/benchmarks.py verify-pointers

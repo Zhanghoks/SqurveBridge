@@ -1,8 +1,9 @@
 # Local benchmark assets
 
 Benchmark payloads are installed locally and are excluded from Git.  The public
-repository contains only code, registration metadata, and approved Git LFS
-benchmark packages. The packages contain the complete upstream evaluation
+repository contains only code, registration metadata, and the checksummed
+package manifest; the approved benchmark packages are distributed through the
+Hugging Face dataset recorded in `packages/manifest.json`. The packages contain the complete upstream evaluation
 payloads, including questions, labels/reference SQL, databases, and supporting
 documentation where supplied upstream.
 

@@ -19,7 +19,14 @@ RUNTIME_DIRECTORIES = (
     "evidence/reported-results",
     "tools",
 )
-RUNTIME_FILES = ("LICENSE", "pyproject.toml", "requirements.txt")
+RUNTIME_FILES = (
+    "LICENSE",
+    "pyproject.toml",
+    "requirements.txt",
+    # The in-image benchmark download resolves archives and checksums
+    # through this manifest.
+    "benchmarks/packages/manifest.json",
+)
 SPACE_BENCHMARK_DATABASE_DIRECTORIES = (
     "benchmarks/spider/database",
     "benchmarks/bird/dev/database",
@@ -170,10 +177,12 @@ def build_space(
     for relative in RUNTIME_FILES:
         source = root / relative
         _require_file(source)
-        shutil.copy2(source, output / relative)
+        destination = output / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
 
-    # Production Docker builds obtain all benchmark ZIPs from GitHub LFS and
-    # extract them in-image. Local full-bundle checks may opt in to copying the
+    # Production Docker builds download all benchmark ZIPs from the Hugging
+    # Face dataset and extract them in-image. Local full-bundle checks may opt in to copying the
     # same SQLite/schema assets directly.
     if include_benchmarks or require_benchmarks:
         _copy_benchmark_assets(root, output, require_benchmarks=require_benchmarks)

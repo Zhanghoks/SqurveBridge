@@ -24,17 +24,14 @@ Integrate · Reproduce · Diagnose · Improve
 
 SqurveBridge pins one environment and reproduces from source — no package
 install, no version matrix: **Python 3.11**, **Node.js 22.19+** (Demo only),
-**Git LFS**, and an API key for the provider used by your chosen config.
+and an API key for the provider used by your chosen config.
 
 ```bash
 # from your clone of this repository:
-git lfs install
-git lfs pull --include="benchmarks/packages/*.zip"
-
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-python tools/benchmarks.py verify-archives
+python tools/benchmarks.py download spider   # checksummed fetch from the HF dataset
 python tools/benchmarks.py install spider
 
 cp .env.example .env   # add provider keys — never commit .env
@@ -289,7 +286,7 @@ core/           Squrve runtime: Router, Engine, Tasks, Actors, LLM/DB adapters
 reproduce/      Configs, CLI/batch runners, checkpoints
 reproduce/eval/    Registry-driven evaluation: six metric layers, bundles, views
 reproduce/evolve/  Meta-Evo engine: bounded MCTS search, fitness, journal
-benchmarks/     Git LFS packages and installed benchmark layouts
+benchmarks/     Checksummed package manifest and installed benchmark layouts
 demo/           Flask API, job manager, Pi bridge (pinned Pi SDK), deployment policy
 demo-app/       React/Vite interactive workspace
 skills/         Capability contracts (integration, run, Meta-Evo, …)

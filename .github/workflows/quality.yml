@@ -52,7 +52,7 @@ jobs:
       - name: Scan public tree for secrets
         run: python tools/security_scan.py
 
-      - name: Validate benchmark manifest and LFS pointers
+      - name: Validate the benchmark manifest and distribution source
         run: python tools/benchmarks.py verify-pointers
 
       - name: Validate public reproduce configurations
@@ -140,11 +140,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: false
 
-      - name: Verify and install the packaged Spider benchmark
+      - name: Download and install the packaged Spider benchmark
         run: |
-          python tools/benchmarks.py verify-archives
+          python tools/benchmarks.py download spider
           python tools/benchmarks.py install spider
 
       - name: Build the allowlisted Space context
@@ -217,16 +217,19 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'release' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository and LFS payloads
+      - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          lfs: true
+          lfs: false
 
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
           python-version: "3.11"
+
+      - name: Download every distributed benchmark archive
+        run: python tools/benchmarks.py download all
 
       - name: Verify archive checksums, structure, and safety
         run: python tools/benchmarks.py verify-archives

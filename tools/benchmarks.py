@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build, inspect, and install the versioned Spider/BIRD benchmark archives."""
+"""Download, inspect, and install the versioned benchmark archives."""
 
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ import sqlite3
 import stat
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
@@ -32,6 +34,24 @@ MAX_COMPRESSION_RATIO = 2_000
 
 class BenchmarkError(RuntimeError):
     """Raised for an invalid archive, installation, or benchmark layout."""
+
+
+def _distribution_url(manifest: dict[str, Any], entry: dict[str, Any]) -> str:
+    """Canonical download URL for one archive on the Hugging Face dataset."""
+    dataset = (manifest.get("distribution") or {}).get("hf_dataset")
+    if not dataset:
+        raise BenchmarkError("manifest declares no distribution source; cannot download")
+    filename = PurePosixPath(entry["archive"]).name
+    return f"https://huggingface.co/datasets/{dataset}/resolve/main/{filename}"
+
+
+def _archive_matches_manifest(path: Path, entry: dict[str, Any]) -> bool:
+    return (
+        path.is_file()
+        and _is_lfs_pointer(path) is None
+        and path.stat().st_size == entry.get("archive_size")
+        and _sha256(path) == entry.get("sha256")
+    )
 
 
 def _load_manifest() -> dict[str, Any]:
@@ -160,10 +180,14 @@ def _validate_member(
 
 def _inspect_archive(path: Path, entry: dict[str, Any], *, content_hash: bool) -> dict[str, Any]:
     if not path.is_file():
-        raise BenchmarkError(f"missing archive {path.relative_to(PROJECT_ROOT)}; run `git lfs pull`")
+        raise BenchmarkError(
+            f"missing archive {path.relative_to(PROJECT_ROOT)}; run `python tools/benchmarks.py download <benchmark>`"
+        )
     pointer = _is_lfs_pointer(path)
     if pointer:
-        raise BenchmarkError(f"{path.relative_to(PROJECT_ROOT)} is still a Git LFS pointer; run `git lfs pull`")
+        raise BenchmarkError(
+            f"{path.relative_to(PROJECT_ROOT)} is a Git LFS pointer; run `python tools/benchmarks.py download <benchmark>`"
+        )
     expected_hash = entry.get("sha256")
     if content_hash and _sha256(path) != expected_hash:
         raise BenchmarkError(f"SHA-256 mismatch for {path.relative_to(PROJECT_ROOT)}")
@@ -244,7 +268,12 @@ def command_verify_pointers(manifest: dict[str, Any]) -> None:
     for slug, entry in sorted(manifest["benchmarks"].items()):
         archive = _archive_path(entry)
         if not archive.is_file():
-            raise BenchmarkError(f"missing tracked archive path: {archive.relative_to(PROJECT_ROOT)}")
+            # Archives are distributed through the manifest's Hugging Face
+            # dataset; a missing local copy is a valid state as long as the
+            # manifest still knows where to fetch it from.
+            _distribution_url(manifest, entry)
+            print(f"OK {slug}: not downloaded (remote via manifest distribution)")
+            continue
         pointer = _is_lfs_pointer(archive)
         if pointer:
             oid, size = pointer
@@ -256,6 +285,35 @@ def command_verify_pointers(manifest: dict[str, Any]) -> None:
             if _sha256(archive) != entry["sha256"]:
                 raise BenchmarkError(f"archive SHA-256 does not match manifest for {slug}")
         print(f"OK {slug}: archive/LFS metadata matches manifest")
+
+
+def command_download(manifest: dict[str, Any], slugs: Iterable[str], force: bool) -> None:
+    PACKAGE_ROOT.mkdir(parents=True, exist_ok=True)
+    for slug in slugs:
+        entry = _entry(manifest, slug)
+        archive = _archive_path(entry)
+        if not force and _archive_matches_manifest(archive, entry):
+            print(f"OK {slug}: archive already present and verified")
+            continue
+        url = _distribution_url(manifest, entry)
+        temporary = archive.with_suffix(".zip.download")
+        temporary.unlink(missing_ok=True)
+        print(f"downloading {slug} from {url} ...", flush=True)
+        try:
+            with urllib.request.urlopen(url) as response, temporary.open("wb") as target:
+                shutil.copyfileobj(response, target, length=1024 * 1024)
+        except (urllib.error.URLError, OSError) as exc:
+            temporary.unlink(missing_ok=True)
+            raise BenchmarkError(f"cannot download {slug} from {url}: {exc}") from exc
+        try:
+            if temporary.stat().st_size != entry["archive_size"]:
+                raise BenchmarkError(f"downloaded size mismatch for {slug}; refusing to keep the file")
+            if _sha256(temporary) != entry["sha256"]:
+                raise BenchmarkError(f"downloaded SHA-256 mismatch for {slug}; refusing to keep the file")
+            os.replace(temporary, archive)
+        finally:
+            temporary.unlink(missing_ok=True)
+        print(f"OK {slug}: downloaded and verified ({entry['archive_size']} bytes)")
 
 
 def command_verify_archives(manifest: dict[str, Any]) -> None:
@@ -336,8 +394,11 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subcommands = parser.add_subparsers(dest="command", required=True)
     subcommands.add_parser("list", help="list packaged benchmarks and local archive state")
-    subcommands.add_parser("verify-pointers", help="verify manifest against LFS pointers or local archive sizes")
+    subcommands.add_parser("verify-pointers", help="verify local archives or pointers against the manifest")
     subcommands.add_parser("verify-archives", help="fully hash and inspect downloaded ZIP archives")
+    download = subcommands.add_parser("download", help="download archives from the manifest's Hugging Face dataset")
+    download.add_argument("benchmark", help="a benchmark slug or `all`")
+    download.add_argument("--force", action="store_true", help="re-download even if a verified archive exists")
     build = subcommands.add_parser("build", help="build deterministic archives and refresh the manifest")
     build.add_argument("benchmark", help="spider, bird, or all")
     install = subcommands.add_parser("install", help="safely install a downloaded benchmark archive")
@@ -358,6 +419,9 @@ def main(argv: list[str] | None = None) -> int:
             command_verify_pointers(manifest)
         elif args.command == "verify-archives":
             command_verify_archives(manifest)
+        elif args.command == "download":
+            slugs = sorted(manifest["benchmarks"]) if args.benchmark == "all" else [args.benchmark]
+            command_download(manifest, slugs, args.force)
         elif args.command == "build":
             slugs = sorted(manifest["benchmarks"]) if args.benchmark == "all" else [args.benchmark]
             command_build(manifest, slugs)

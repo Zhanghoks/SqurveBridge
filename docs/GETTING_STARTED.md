@@ -5,17 +5,14 @@ live Text-to-SQL run, and the interactive workspace.
 
 ## Prerequisites
 
-- Git LFS
-- Python 3.11 or newer
-- Node.js 20 or newer for the interactive system
+- Python 3.11
+- Node.js 22.19 or newer for the interactive system
 - An API key for the provider selected by the reproduction configuration
 
 ## Install
 
 ```bash
-git lfs install
-# Run the remaining commands from the SqurveBridge repository root.
-git lfs pull --include="benchmarks/packages/*.zip"
+# Run the commands from the SqurveBridge repository root.
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -23,13 +20,16 @@ pip install -r requirements.txt
 
 On Windows, activate the environment with `.venv\Scripts\activate`.
 
-## Verify and Install Benchmark Packages
+## Download and Install Benchmark Packages
 
-Spider and BIRD are versioned as Git LFS ZIP packages. Verify their checksums and
-archive safety before installing them into the paths consumed by the runtime:
+The normalized benchmark snapshots are distributed as checksummed ZIP packages
+through the Hugging Face dataset recorded in
+`benchmarks/packages/manifest.json`. Download verifies each archive's SHA-256
+against the manifest before keeping it:
 
 ```bash
-python tools/benchmarks.py verify-archives
+python tools/benchmarks.py download spider
+python tools/benchmarks.py download bird
 python tools/benchmarks.py install spider
 python tools/benchmarks.py install bird
 python tools/benchmarks.py verify spider

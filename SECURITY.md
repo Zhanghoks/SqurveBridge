@@ -20,8 +20,8 @@ benchmark records, provider responses, and user data from logs.
 - Do not commit private databases, raw provider responses, run workspaces,
   unapproved archives, recordings, or browser traces. The only approved ZIP
   payloads are `benchmarks/packages/spider.zip` and
-  `benchmarks/packages/bird.zip`, governed by the package manifest and stored
-  through Git LFS.
+  `benchmarks/packages/bird.zip`, governed by the package manifest and distributed
+  through the Hugging Face dataset it records.
 - Run `python tools/security_scan.py --history` and
   `python tools/benchmarks.py verify-archives` before a public release.
 

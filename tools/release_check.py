@@ -129,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--full",
         action="store_true",
-        help="also verify LFS payloads and build the Python package and demo workspace",
+        help="also verify downloaded payloads and build the Python package and demo workspace",
     )
     parser.add_argument(
         "--skip-history",

@@ -24,11 +24,12 @@ cd demo-app && npm ci && npm run build
 
 Changes to the two distributed benchmark packages must update the package
 manifest and must pass `python tools/benchmarks.py verify-archives`. Do not commit
-expanded benchmark directories or add another ZIP/LFS payload without an explicit
+expanded benchmark directories or add another ZIP payload without an explicit
 distribution and license review.
 
 Maintainers preparing a release should install the standard Python `build`
-frontend, ensure Node.js 20 is available, pull the LFS payloads, and run:
+frontend, ensure Node.js 22.19+ is available, download the benchmark payloads
+(`python tools/benchmarks.py download all`), and run:
 
 ```bash
 python -m pip install build
