@@ -36,6 +36,9 @@ citable DOI (see `CITATION.cff`).
 - CI pins the single reproduction environment (Python 3.11, Node 22.19) and
   cancels superseded pull-request runs; dependabot updates are grouped into
   one monthly PR per ecosystem.
+- Benchmark packages are distributed through the Hugging Face dataset
+  recorded in `benchmarks/packages/manifest.json` instead of Git LFS;
+  `python tools/benchmarks.py download` fetches and checksum-verifies them.
 
 ### Fixed
 
