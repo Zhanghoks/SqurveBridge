@@ -53,6 +53,45 @@ python tools/verify.py reproduce-contract --path reproduce/configs/spider/c3sql.
 The harness preserves intermediate manifests and decisions so integration evidence
 can be reviewed independently of an agent session.
 
-## Pi Skill Loading
+## Agent Runtimes
 
-The embedded Pi backend (the pinned npm SDK `@earendil-works/pi-coding-agent`, installed via `bash demo/build_embedded_pi.sh`) loads `skills/` directly through Pi's `DefaultResourceLoader`; no Claude Code or Codex installation is required. In the Demo chat, invoke a contract with Pi syntax such as `/skill:candidate-reader` or `/skill:run`. The legacy symlink installer remains only for compatibility with older local checkouts and is not part of the Live Demo runtime.
+The Skill contracts under `skills/` run on three interchangeable agent
+runtimes. `skills/` is the single source of truth for all of them.
+
+### Embedded Pi (zero install)
+
+The embedded Pi backend (the pinned npm SDK `@earendil-works/pi-coding-agent`,
+installed via `bash demo/build_embedded_pi.sh`) loads `skills/` directly
+through Pi's `DefaultResourceLoader`; no external agent installation is
+required. In the Demo chat, invoke a contract with Pi syntax such as
+`/skill:candidate-reader` or `/skill:run`.
+
+### Claude Code and Codex (symlink install)
+
+One installer provisions both platforms in a single run:
+
+```bash
+bash harness/install_squrve_harness.sh .
+```
+
+It creates flat per-skill symlinks so both agents discover every contract
+without copying files:
+
+```text
+.claude/skills/<name> -> ../../skills/<name>   # Claude Code
+.agents/skills/<name> -> ../../skills/<name>   # Codex
+.squrve/tools         -> ../tools              # workbench resources
+.squrve/templates     -> ../templates
+```
+
+Invoke contracts with the plain slash form, e.g. `/candidate-reader` or
+`/run`. The installer is idempotent and safe to rerun after adding, renaming,
+or removing a Skill:
+
+- `--dry-run` — preview every link change without touching the filesystem
+- `--reconcile` — repair drifted or stale links against the current `skills/`
+- `--clear-stale-lock` — recover from an interrupted install
+
+State lives under `.squrve/` (`installed-harness.txt` manifest plus a
+concurrency lock); `update_squrve_harness.sh` verifies an existing install.
+Design notes: [INSTALL_DESIGN.md](INSTALL_DESIGN.md).

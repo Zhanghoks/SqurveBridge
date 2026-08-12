@@ -223,6 +223,35 @@ Remote model calls may incur cost. Full walkthrough: [Getting Started](docs/GETT
 
 ## Usage
 
+### Choose your agent runtime
+
+Every SqurveBridge workflow is a Skill contract under `skills/`. The same
+contracts run on three interchangeable agent runtimes — pick one:
+
+| Runtime | Install | Invoke a Skill |
+| --- | --- | --- |
+| **Embedded Pi** (zero install) | `./demo/start.sh` | `/skill:candidate-reader <path>` in the Demo chat |
+| **Claude Code** | `bash harness/install_squrve_harness.sh .` | `/candidate-reader <path>` |
+| **Codex** | same command as Claude Code | `/candidate-reader <path>` |
+
+**Embedded Pi** ships with the Demo backend (the pinned npm SDK
+`@earendil-works/pi-coding-agent`) and loads `skills/` directly — no external
+agent installation is required.
+
+**Claude Code and Codex** share one installer. A single command creates flat
+symlinks for both platforms at once, so `skills/` stays the single source of
+truth:
+
+```bash
+bash harness/install_squrve_harness.sh .
+# .claude/skills/<name> -> ../../skills/<name>   (Claude Code)
+# .agents/skills/<name> -> ../../skills/<name>   (Codex)
+```
+
+The installer is idempotent: rerun it after adding or renaming a Skill, use
+`--dry-run` to preview, and `--reconcile` to repair drifted links. Details:
+[harness/README.md](harness/README.md).
+
 ### Run a method–benchmark pair
 
 ```bash
@@ -235,7 +264,7 @@ Configs live under `reproduce/configs/<benchmark>/<method>.json`. The CLI and De
 
 ### Integrate a candidate (method or database)
 
-Use the Skill pipeline (via Pi Demo chat or an external harness):
+Use the Skill pipeline on any of the three runtimes above:
 
 1. **candidate-reader** — inspect the candidate and produce a manifest  
 2. **integration-pipeline** — native Actor / benchmark adapters + reproduce config  
