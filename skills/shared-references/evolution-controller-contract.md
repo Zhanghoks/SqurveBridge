@@ -28,8 +28,10 @@ A phase is valid only when `evolve-state.json`, `journal.json`, and the manifest
 single resume entry (`state_machine.next_step`). It returns the phase, the
 review-gate map, consistency, and one ready-to-run `next_command`. Agents must
 resume from this output, never from chat memory. When candidate nodes lack an
-approved review, the resume action is `run_candidate_review` and the search
-stages are withheld.
+approved review, the resume action is `run_candidate_review`, the smoke entry
+is withheld, and `next_command` targets the first blocked node.
+`--record-phase` records the `candidates_reviewed` / `report_reviewed`
+transitions and refuses `candidates_reviewed` while blockers remain.
 
 ## Review-Gate Phases
 

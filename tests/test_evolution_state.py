@@ -97,6 +97,9 @@ class NextStepTests(unittest.TestCase):
             step = next_step(evolve_dir)
             self.assertEqual(step["resume_action"], "run_candidate_review")
             self.assertIn("node:n001_fix (no review ledger)", step["candidate_gate_blockers"])
+            # The suggested command is directly executable for the first blocked node.
+            self.assertIn("evolve_review.py open", step["next_command"])
+            self.assertIn("nodes/n001_fix/review/review-state.json", step["next_command"])
 
     def test_approved_candidates_release_the_smoke_stage(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -122,6 +125,30 @@ class NextStepTests(unittest.TestCase):
             step = next_step(evolve_dir)
             self.assertEqual(step["resume_action"], "await_review")
             self.assertIn("node:n001_fix", step["next_command"])
+
+    def test_record_phase_cli_refuses_while_gate_blocked_then_records(self):
+        import subprocess
+
+        cli = ROOT / "tools" / "evolve_status.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            evolve_dir = self._make_run(tmp)
+            (evolve_dir / "nodes" / "n001_fix").mkdir(parents=True)
+
+            blocked = subprocess.run(
+                [sys.executable, str(cli), "--evolve-dir", str(evolve_dir), "--record-phase", "candidates_reviewed"],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(blocked.returncode, 1)
+            self.assertIn("candidate gate not clear", blocked.stdout)
+
+            self._approve_node(evolve_dir, "n001_fix")
+            recorded = subprocess.run(
+                [sys.executable, str(cli), "--evolve-dir", str(evolve_dir), "--record-phase", "candidates_reviewed"],
+                capture_output=True, text=True, check=True,
+            )
+            payload = json.loads(recorded.stdout)
+            self.assertEqual(payload["phase"], "candidates_reviewed")
+            self.assertEqual(payload["resume_action"], "run_smoke")
 
     def test_gate_blockers_report_missing_and_unapproved_nodes(self):
         with tempfile.TemporaryDirectory() as tmp:

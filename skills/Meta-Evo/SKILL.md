@@ -75,12 +75,12 @@ artifacts/evolve/<evolve_slug>/
 4. **INITIALIZE**：创建 `artifacts/evolve/<evolve_slug>/`，写 baseline summary、初始 journal 与 `evolve-state.json`（模板见 `templates/evolution/`）。
 5. **CANDIDATE GENERATION**：生成候选节点，每个 node 落盘 `node.json`、`change-plan.md`、`patch.diff`、`run-command.sh`，并汇入 `action-pool.json`；必须声明目标弱点、target_metric、允许 scope。
 6. **CANDIDATE REVIEW（循环，硬门控）**：每个 node 跑 `/evolve-review`（target_kind=`change-plan`/`patch`，账本在 `nodes/<id>/review/`）。
-   判据：`tools/evolve_status.py` 的 `candidate_gate_blockers` 为空 → 记录 phase `candidates_reviewed`；否则继续修改或将 escalate 的 node 交用户。评估预算不得花在没审过的候选上。
+   判据：`candidate_gate_blockers` 为空 → `python3 tools/evolve_status.py --evolve-dir <dir> --record-phase candidates_reviewed`（门未清会拒绝记录）；否则继续修改或将 escalate 的 node 交用户。评估预算不得花在没审过的候选上。
 7. **SMOKE GATE**：跑 `evolve_status` 给出的 orchestrator 命令（`--stage smoke`，默认 50 samples）。目的不是最终排名，而是筛掉跑不通、严重退化、成本爆炸的候选。
 8. **BOUNDED EVAL**：`--stage bounded`（默认 200 samples），比较 EX、EM、VES/CF1/FD、HardSliceScore、cost、latency。搜索循环与 phase 流转全部由引擎执行（见"后端边界"）。
 9. **FULL CONFIRMATION**：`--stage full`，只对 best node 做 full reproduce confirmation。
 10. **REPORT REVIEW（循环）**：comparison report 过 `/evolve-review`（target_kind=`comparison-report`，账本在 `reviews/comparison-report/`）。
-    判据：verdict=approve → 记录 phase `report_reviewed`；核对每个分数可回溯、改善/退化成对呈现。
+    判据：verdict=approve → `python3 tools/evolve_status.py --evolve-dir <dir> --record-phase report_reviewed`；核对每个分数可回溯、改善/退化成对呈现。
 11. **USER REVIEW**：展示 best node、patch、delta、改善/退化样本；用户选择 accept / continue / rollback；escalate 的 findings 一并呈上。结果经 `artifacts.record_user_review` 写入经验记忆。
 
 ---
@@ -92,7 +92,8 @@ artifacts/evolve/<evolve_slug>/
 1. **状态驱动，不靠记忆**：每次进入（含恢复会话）先执行
    `python3 tools/evolve_status.py --evolve-dir artifacts/evolve/<slug>`，
    按返回的 `next_command` 执行唯一下一步；不得凭聊天上下文猜进度。
-   review 门未清（`candidate_gate_blockers` 非空或有 escalate）时，status 会扣住搜索阶段。
+   review 门未清（`candidate_gate_blockers` 非空或有 escalate）时，status 会扣住 smoke 入口，
+   并把 `next_command` 指向第一个待审节点。
 2. **一步一落盘**：每个阶段结束时必须存在对应机器可读产物（journal、review-state、scores、delta），
    并通过 process-events / manifest 记账。没有落盘的步骤等于没发生。
 3. **单一下一步输出**：向用户汇报时，结尾给出"当前 phase + 下一条可直接执行的命令"，

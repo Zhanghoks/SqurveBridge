@@ -78,8 +78,9 @@ disable-model-invocation: true
                           → 回到步骤 2 重新 review（必须有一轮零新增 blocker/major 才能 approve）
              - approve  → 循环结束；目标产物获得进入下一阶段的资格
              - escalate → 停止循环，把 open findings + escalation_reason 呈给用户裁决
-5. gate      回到 Meta-Evo：`python3 tools/evolve_status.py --evolve-dir <run_dir>` 确认门控状态；
-             候选门全部 approve 时记录 phase `candidates_reviewed`，报告门 approve 时记录 `report_reviewed`
+5. gate      回到 Meta-Evo：候选门全部 approve 后
+             `python3 tools/evolve_status.py --evolve-dir <run_dir> --record-phase candidates_reviewed`
+             （门未清会拒绝）；报告门 approve 后同法记录 `report_reviewed`
 ```
 
 findings 文件 schema（每条）：

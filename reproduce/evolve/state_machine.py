@@ -314,10 +314,21 @@ def next_step(evolve_dir: str | Path) -> dict[str, Any]:
         next_command = f"present escalated review gates to the user: {', '.join(escalated)}"
     elif action == "run_smoke" and blockers:
         action = "run_candidate_review"
-        next_command = (
-            "python3 tools/evolve_review.py verdict --state "
-            f"{evolve_dir}/nodes/<node_id>/review/review-state.json  # unapproved: {', '.join(blockers)}"
-        )
+        # Make the command directly executable for the first blocked node.
+        first = blockers[0]
+        node_id = first.split(" ", 1)[0].removeprefix("node:")
+        node_state = f"{evolve_dir}/nodes/{node_id}/review/review-state.json"
+        if "no review ledger" in first:
+            next_command = (
+                f"python3 tools/evolve_review.py open --state {node_state} "
+                f"--target-kind change-plan --target-ref nodes/{node_id}/change-plan.md "
+                f"--evolve-dir {evolve_dir}  # blocked: {', '.join(blockers)}"
+            )
+        else:
+            next_command = (
+                f"python3 tools/evolve_review.py verdict --state {node_state}"
+                f"  # blocked: {', '.join(blockers)}"
+            )
     elif action in {"run_smoke", "run_bounded", "run_full"}:
         next_command = stage_command(action.removeprefix("run_"))
     elif action == "reconcile_review":

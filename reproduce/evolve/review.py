@@ -73,10 +73,6 @@ class ReviewRound:
     notes: str = ""
     at: str = field(default_factory=now_iso)
 
-    @property
-    def is_clean(self) -> bool:
-        return not self.new_finding_ids
-
 
 @dataclass
 class ReviewState:
