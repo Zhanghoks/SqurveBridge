@@ -27,7 +27,7 @@ install, no version matrix: **Python 3.11**, **Node.js 22.19+** (Demo only),
 **Git LFS**, and an API key for the provider used by your chosen config.
 
 ```bash
-git clone https://github.com/Zhanghoks/SqurveBridge.git && cd SqurveBridge
+# from your clone of this repository:
 git lfs install
 git lfs pull --include="benchmarks/packages/*.zip"
 
