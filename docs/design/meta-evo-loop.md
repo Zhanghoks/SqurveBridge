@@ -133,6 +133,6 @@ Review outcomes feed the next run:
 - Accepted changes are applied by the agent under review; there is no
   unattended config write-back service, by design.
 
-See `docs/evolution-harness-design.md` for the module-level architecture and
+See `docs/design/evolution-harness-design.md` for the module-level architecture and
 `skills/shared-references/evolution-controller-contract.md` for the layer
 boundaries.

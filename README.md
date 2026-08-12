@@ -357,6 +357,7 @@ Code of conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 | [Hosted Space](deploy/huggingface/README.space.md) | Public Live Demo packaging |
 | [Harness](harness/README.md) | Skills, tools, templates, agent workflows |
 | [Evidence](evidence/README.md) | Published score bundles |
+| [Changelog](CHANGELOG.md) | Notable changes per release |
 | [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md) | Policy and contribution |
 
 ## License

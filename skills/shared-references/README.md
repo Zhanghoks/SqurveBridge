@@ -32,7 +32,7 @@ Skills 之间的**稳定合同**。不维护当前仓库已有 benchmark/方法�
 Public overviews:
 
 - [`docs/harness-state-machine.md`](../../docs/harness-state-machine.md) explains the integration state machine without requiring readers to inspect `tools/artifact_state.py`.
-- [`docs/meta-evo-loop.md`](../../docs/meta-evo-loop.md) explains the lightweight Meta-Evo loop and artifact ownership.
+- [`docs/design/meta-evo-loop.md`](../../docs/design/meta-evo-loop.md) explains the lightweight Meta-Evo loop and artifact ownership.
 
 ## 文档索引
 

@@ -55,7 +55,7 @@ review -> findings -> revise -> re-review until the deterministic verdict in
 target to the human gate. Evaluation budget is only spent on approved
 candidates.
 
-The loop contract is documented in `docs/meta-evo-loop.md` and the broader architecture in `docs/evolution-harness-design.md`.
+The loop contract is documented in `docs/design/meta-evo-loop.md` and the broader architecture in `docs/design/evolution-harness-design.md`.
 
 ## Human Gates
 

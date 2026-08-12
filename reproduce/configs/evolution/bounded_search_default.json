@@ -1,6 +1,6 @@
 {
   "policy": "bounded_search_default",
-  "description": "Default bounded-search policy for Meta-Evo MCTS. Loaded via --policy-config; every key mirrors a run_search parameter documented in docs/evolution-harness-design.md.",
+  "description": "Default bounded-search policy for Meta-Evo MCTS. Loaded via --policy-config; every key mirrors a run_search parameter documented in docs/design/evolution-harness-design.md.",
   "dry_round_limit": 4,
   "stagnation_window": 4,
   "cumulative_updates": true,

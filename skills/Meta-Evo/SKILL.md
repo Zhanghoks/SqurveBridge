@@ -106,7 +106,7 @@ artifacts/evolve/<evolve_slug>/
 
 ## 后端边界
 
-Meta-Evo 可以编排和审查，但确定性逻辑只住在 `reproduce/evolve/`：MCTS 主循环在 `mcts/orchestrator.py`（`run_search()` 单阶段，`run_bounded_funnel()` 串联漏斗），fitness / node / journal / budget / experience / review / state_machine 各占一个模块（模块地图见 `docs/evolution-harness-design.md`）。
+Meta-Evo 可以编排和审查，但确定性逻辑只住在 `reproduce/evolve/`：MCTS 主循环在 `mcts/orchestrator.py`（`run_search()` 单阶段，`run_bounded_funnel()` 串联漏斗），fitness / node / journal / budget / experience / review / state_machine 各占一个模块（模块地图见 `docs/design/evolution-harness-design.md`）。
 
 不得在 `tools/` 或 skill 文档中复制 MCTS selection / rollout / scoring / journal mutation / review verdict 逻辑，避免双实现维护失控。
 

@@ -1,7 +1,7 @@
 # Evolution Harness Design
 
 This document describes the deterministic engine underneath the Meta-Evo loop
-(`docs/meta-evo-loop.md`): module responsibilities, the search algorithm, the
+(`docs/design/meta-evo-loop.md`): module responsibilities, the search algorithm, the
 state machine, and every tunable policy parameter. All components are plain
 Python with no LLM dependency, so the harness is unit-testable end to end
 (`tests/test_evolution_search.py`, `tests/test_evolution_strategy.py`).
@@ -108,7 +108,7 @@ smoke_running -> smoke_promoted -> bounded_running -> bounded_promoted ->
 full_confirming -> report_reviewed -> review_pending ->
 accepted/continued/rolled_back`), resume actions after interruption, and
 Scope C classification. `candidates_reviewed` and `report_reviewed` record
-the AI review gates (`docs/meta-evo-loop.md`); the ungated legacy transitions
+the AI review gates (`docs/design/meta-evo-loop.md`); the ungated legacy transitions
 remain valid for old runs. `next_step(evolve_dir)` — exposed as
 `tools/evolve_status.py` — combines phase, review gates, consistency, and a
 ready-to-run next command into one status object, and withholds search stages
