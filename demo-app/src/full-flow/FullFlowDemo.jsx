@@ -17,7 +17,7 @@ import {
   toggleMethodConnections,
   withConnectionKeys,
 } from './model.js'
-import { PROCESS_STEPS, resolveProcessStep } from './ProcessRail.jsx'
+import { PROCESS_STEPS, resolveProcessStep } from './processSteps.js'
 import { INITIAL_RUN_STATE } from './RunWorkspace.jsx'
 import { FlowStatus } from './flowUi.jsx'
 import './full-flow.css'

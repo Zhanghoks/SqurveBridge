@@ -48,6 +48,8 @@ const warmTheme = EditorView.theme({
   },
 }, { dark: true })
 
+const sqlLanguage = schema => sql({ dialect: SQLite, schema: schema || {}, upperCaseKeywords: true })
+
 const warmHighlight = HighlightStyle.define([
   { tag: tags.keyword, color: 'var(--flow-claude, #d4a574)', fontWeight: '600' },
   { tag: tags.string, color: 'var(--flow-green, #8fbc8f)' },
@@ -101,7 +103,7 @@ export default function SqlEditor({
             warmTheme,
             syntaxHighlighting(warmHighlight),
             editorPlaceholder(placeholder),
-            languageCompartment.of(sql({ dialect: SQLite, schema: schema || {}, upperCaseKeywords: true })),
+            languageCompartment.of(sqlLanguage(schema)),
             editableCompartment.of(EditorView.editable.of(!disabled)),
             keymap.of([
               {
@@ -146,9 +148,7 @@ export default function SqlEditor({
     if (!view || !compartments) return
     view.dispatch({
       effects: [
-        compartments.language.reconfigure(
-          sql({ dialect: SQLite, schema: schema || {}, upperCaseKeywords: true }),
-        ),
+        compartments.language.reconfigure(sqlLanguage(schema)),
         compartments.editable.reconfigure(EditorView.editable.of(!disabled)),
       ],
     })

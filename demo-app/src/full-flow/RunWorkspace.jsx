@@ -348,7 +348,6 @@ export default function RunWorkspace({
   api,
   onRunStateChange,
   liveEvaluation = false,
-  compact = false,
   t,
 }) {
   const connections = useMemo(
@@ -577,13 +576,10 @@ export default function RunWorkspace({
     return t('status.ready')
   }
 
-  const Shell = compact ? 'div' : 'section'
-  return <Shell id={compact ? undefined : 'run'} className={compact ? 'board-section run-workspace' : 'flow-module flow-glass run-workspace'}>
-    <header className={compact ? 'board-section-header' : 'flow-module-header'}>
+  return <div className="board-section run-workspace">
+    <header className="board-section-header">
       <div>
-        {!compact && <span>{t('process.run')}</span>}
-        {compact ? <h3>{t('board.runSection')}</h3> : <h2>{t('run.title')}</h2>}
-        {!compact && <p>{t('run.description')}</p>}
+        <h3>{t('board.runSection')}</h3>
       </div>
       <strong>{statusLabel()}</strong>
     </header>
@@ -756,5 +752,5 @@ export default function RunWorkspace({
     </div>
 
     {error && <p className="error-banner" role="alert">{error}</p>}
-  </Shell>
+  </div>
 }

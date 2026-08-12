@@ -21,9 +21,7 @@ const {
 } = await import('./RunWorkspace.jsx')
 
 const translations = {
-  'process.run': 'Run',
-  'run.title': 'Run Workspace',
-  'run.description': 'Run Compose connections through their reproduce config scripts.',
+  'board.runSection': 'Run & inspect',
   'run.noConnections': 'No connections yet.',
   'run.composeConnections': 'Compose connections',
   'run.parameters': 'Parameter console',
@@ -486,20 +484,20 @@ test('restores supervised jobs from the backend session after a page reload', as
 test('disables config runs when live_evaluation is unavailable', () => {
   renderRun({ liveEvaluation: false })
   assert.equal(screen.getByRole('button', { name: 'Run config' }).disabled, true)
-  assert.match(document.querySelector('#run').textContent, /local demo only/)
+  assert.match(document.querySelector('.run-workspace').textContent, /local demo only/)
 })
 
 test('runs config without requiring a connected model', () => {
   renderRun()
   assert.equal(screen.queryByRole('button', { name: /Configure SQL API|Configure LLM/ }), null)
-  assert.doesNotMatch(document.querySelector('#run').textContent, /\bModel\b/)
+  assert.doesNotMatch(document.querySelector('.run-workspace').textContent, /\bModel\b/)
   assert.equal(screen.getByRole('button', { name: 'Run config' }).disabled, false)
 })
 
 test('disables config runs when the focused configuration is missing', () => {
   renderRun({ configs: [] })
   assert.equal(screen.getByRole('button', { name: 'Run config' }).disabled, true)
-  assert.match(document.querySelector('#run').textContent, /configuration is unavailable/)
+  assert.match(document.querySelector('.run-workspace').textContent, /configuration is unavailable/)
 })
 
 test('sanitizes a rejected config-run error without exposing secrets', async () => {

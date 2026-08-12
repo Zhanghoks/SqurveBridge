@@ -18,18 +18,24 @@ import {
 const PLACEHOLDER_STEP_MS = 900
 const labelSlug = value => String(value || '').trim().toLowerCase().replace(/[_\s]+/g, '-')
 
+const stageStatusLabel = (status, t) => (
+  status === 'failed'
+    ? t('query.stageFailed')
+    : status === 'done'
+      ? t('query.stageDone')
+      : status === 'queued'
+        ? t('query.stageQueued')
+        : t('query.stageRunning')
+)
+
 function StageChip({ stage, active, detailOpen, totalElapsed, onOpenDetail, t }) {
   const status = stage.status
   const share = status === 'done' && stage.elapsedMs != null && totalElapsed > 0
     ? Math.max(2, Math.round((stage.elapsedMs / totalElapsed) * 100))
     : null
-  const sublabel = status === 'running'
-    ? t('query.stageRunning')
-    : status === 'failed'
-      ? t('query.stageFailed')
-      : status === 'done'
-        ? (stage.elapsedMs != null ? formatElapsedMs(stage.elapsedMs) : t('query.stageDone'))
-        : t('query.stageQueued')
+  const sublabel = status === 'done' && stage.elapsedMs != null
+    ? formatElapsedMs(stage.elapsedMs)
+    : stageStatusLabel(status, t)
   return (
     <button
       type="button"
@@ -300,7 +306,7 @@ export default function QueryWorkspace({
       await navigator.clipboard?.writeText(String(text ?? ''))
       showToast(message)
     } catch {
-      showToast(message)
+      showToast(t('query.copyFailed'))
     }
   }
 
@@ -438,7 +444,7 @@ export default function QueryWorkspace({
     const base = phase === 'generating'
       ? pipelineStages.map((stage, index) => ({
         ...stage,
-        status: index < activeStageIndex ? 'running' : index === activeStageIndex ? 'running' : 'queued',
+        status: index < activeStageIndex ? 'done' : index === activeStageIndex ? 'running' : 'queued',
       }))
       : pipelineStages
     return executeStage ? [...base, executeStage] : base
@@ -693,7 +699,7 @@ export default function QueryWorkspace({
                     {detailStage.stage && <div><dt>Stage</dt><dd>{detailStage.stage}</dd></div>}
                     <div>
                       <dt>Status</dt>
-                      <dd>{detailStage.status === 'failed' ? t('query.stageFailed') : detailStage.status === 'done' ? t('query.stageDone') : t('query.stageRunning')}</dd>
+                      <dd>{stageStatusLabel(detailStage.status, t)}</dd>
                     </div>
                     {detailStage.elapsedMs != null && (
                       <div><dt>Elapsed</dt><dd>{formatElapsedMs(detailStage.elapsedMs)}</dd></div>

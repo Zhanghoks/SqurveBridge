@@ -30,7 +30,6 @@ export default function BoardWorkspace({
       </header>
 
       <RunWorkspace
-        compact
         selectedConnections={selectedConnections}
         configs={configs}
         focusedMethod={focusedMethod}

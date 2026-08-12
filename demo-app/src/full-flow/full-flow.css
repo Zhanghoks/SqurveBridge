@@ -23,7 +23,6 @@
   --flow-type-meta: 11px;
   --flow-shadow: none;
   --flow-shadow-soft: none;
-  --flow-rail-width: 196px;
   min-height: 100vh;
   padding: 18px clamp(14px, 2.4vw, 28px) 40px;
   color: var(--flow-text);
@@ -227,123 +226,6 @@
 .flow-demo .flow-header-actions button:first-child:hover {
   color: #fff;
   background: linear-gradient(180deg, #e89274, #c4613f);
-}
-
-.flow-demo .flow-demo-body {
-  display: grid;
-  width: min(1560px, 100%);
-  margin: 0 auto;
-  grid-template-columns: var(--flow-rail-width) minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.flow-demo .flow-process-rail {
-  position: sticky;
-  z-index: 12;
-  top: 14px;
-  display: grid;
-  gap: 10px;
-  border-radius: 14px;
-  padding: 14px 10px;
-  background: var(--flow-panel);
-  box-shadow: inset 0 0 0 1px var(--flow-border);
-}
-
-.flow-demo .flow-process-rail-label {
-  padding: 0 8px;
-  color: var(--flow-muted);
-  font-size: 10px;
-  font-weight: 760;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-}
-
-.flow-demo .flow-process-rail ol {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.flow-demo .flow-process-rail li {
-  position: relative;
-}
-
-.flow-demo .flow-process-rail li:not(:last-child)::after {
-  position: absolute;
-  z-index: 0;
-  top: calc(100% - 1px);
-  left: 19px;
-  width: 1px;
-  height: 4px;
-  background: rgb(255 255 255 / 12%);
-  content: "";
-}
-
-.flow-demo .flow-process-rail button {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  width: 100%;
-  min-height: 48px;
-  grid-template-columns: 28px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  border: 1px solid transparent;
-  border-radius: 11px;
-  padding: 8px 10px;
-  color: var(--flow-muted);
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--flow-type-control);
-  font-weight: 720;
-  text-align: left;
-  transition: border-color 150ms ease, color 150ms ease, background 150ms ease, box-shadow 150ms ease;
-}
-
-.flow-demo .flow-process-rail button:hover {
-  border-color: rgb(218 119 86 / 28%);
-  color: var(--flow-text);
-  background: var(--flow-panel-soft);
-}
-
-.flow-demo .flow-process-rail button.active {
-  border-color: rgb(218 119 86 / 42%);
-  color: var(--flow-text);
-  background: rgb(218 119 86 / 12%);
-  box-shadow: inset 0 0 0 1px rgb(218 119 86 / 10%);
-}
-
-.flow-demo .flow-process-rail button span {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  border-radius: 8px;
-  color: #1a1a1c;
-  background: rgb(138 138 147 / 55%);
-  font: 780 10px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-
-.flow-demo .flow-process-rail button.active span {
-  color: #1a1a1c;
-  background: var(--flow-claude);
-}
-
-.flow-demo .flow-process-rail button strong {
-  overflow: hidden;
-  font-weight: 720;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.flow-demo .flow-stage {
-  display: grid;
-  gap: 14px;
-  min-width: 0;
 }
 
 .flow-demo .flow-stage-page[hidden] {
@@ -4701,33 +4583,6 @@
   .flow-demo .flow-header-actions button {
     min-height: 44px;
     flex: 1 1 0;
-  }
-
-  .flow-demo .flow-demo-body {
-    grid-template-columns: 1fr;
-  }
-
-  .flow-demo .flow-process-rail {
-    position: static;
-    top: auto;
-    overflow-x: auto;
-    padding: 10px;
-  }
-
-  .flow-demo .flow-process-rail ol {
-    display: flex;
-    gap: 6px;
-    min-width: max-content;
-  }
-
-  .flow-demo .flow-process-rail li:not(:last-child)::after {
-    display: none;
-  }
-
-  .flow-demo .flow-process-rail button {
-    min-width: 128px;
-    min-height: 44px;
-    grid-template-columns: 24px minmax(0, 1fr);
   }
 
   .flow-demo .flow-module {

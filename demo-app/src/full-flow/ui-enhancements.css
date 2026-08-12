@@ -244,36 +244,6 @@
    Process Rail Enhancement
    ======================================== */
 
-.flow-process-rail button {
-  position: relative;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.flow-process-rail button::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 0;
-  background: linear-gradient(180deg, #e89274, #da7756);
-  border-radius: 0 2px 2px 0;
-  transition: height 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.flow-process-rail button:hover::before {
-  height: 60%;
-}
-
-.flow-process-rail button.active::before {
-  height: 80%;
-}
-
-.flow-process-rail button.active span {
-  animation: number-pulse 2s ease-in-out infinite;
-}
-
 @keyframes number-pulse {
   0%, 100% {
     transform: scale(1);
