@@ -74,6 +74,25 @@ test('hosted paths cannot escape the project through absolute paths or symlinks'
   await assert.rejects(() => assertConfinedPath(root, 'escape'), /outside the SqurveBridge project/)
 })
 
+test('a lost event pipe exits the bridge quietly instead of crashing', async () => {
+  const { exitOnLostEventPipe } = await bridgeModule()
+  assert.equal(process.stdout.listeners('error').includes(exitOnLostEventPipe), true)
+
+  const exits = []
+  const realExit = process.exit
+  process.exit = code => { exits.push(code) }
+  try {
+    exitOnLostEventPipe(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }))
+    exitOnLostEventPipe(Object.assign(new Error('destroyed'), { code: 'ERR_STREAM_DESTROYED' }))
+  } finally {
+    process.exit = realExit
+  }
+  assert.deepEqual(exits, [0, 0])
+
+  const unrelated = Object.assign(new Error('boom'), { code: 'EACCES' })
+  assert.throws(() => exitOnLostEventPipe(unrelated), /boom/)
+})
+
 test('the in-memory credential store never persists and follows CredentialStore semantics', async () => {
   const { createInMemoryCredentialStore } = await bridgeModule()
   const store = createInMemoryCredentialStore()

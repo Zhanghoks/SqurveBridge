@@ -1,6 +1,7 @@
 import importlib
 import io
 import json
+import tempfile
 import threading
 import unittest
 from pathlib import Path
@@ -48,6 +49,47 @@ class PiBackendTests(unittest.TestCase):
         )
         self.assertEqual(backend.normalize_pi_prompt("/skill:run smoke"), "/skill:run smoke")
         self.assertEqual(backend.normalize_pi_prompt("Explain this run"), "Explain this run")
+
+    def test_skill_shortcuts_extend_to_any_discovered_skill(self):
+        backend = self.backend()
+        self.assertEqual(
+            backend.normalize_pi_prompt("/schema-adapter check", {"schema-adapter"}),
+            "/skill:schema-adapter check",
+        )
+        self.assertEqual(
+            backend.normalize_pi_prompt("/schema-adapter check", set()),
+            "/schema-adapter check",
+        )
+
+    def test_session_discovers_skill_shortcuts_from_the_project_root(self):
+        backend = self.backend()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            skill = root / "skills" / "custom-skill" / "SKILL.md"
+            skill.parent.mkdir(parents=True)
+            skill.write_text("name: custom-skill\n", encoding="utf-8")
+            settings = backend.PiBackendSettings.from_environment(
+                {"SQURVE_DEPLOYMENT_TARGET": "local"},
+                root,
+            )
+
+            class FakeProcess:
+                def __init__(self, *args, **kwargs):
+                    self.stdin = io.StringIO()
+                    self.stdout = io.StringIO()
+                    self.stderr = io.StringIO()
+
+                def poll(self):
+                    return None
+
+                def wait(self, timeout=None):
+                    return 0
+
+            session = backend.PiAgentSession(settings, process_factory=FakeProcess)
+            session.send_prompt("/custom-skill run it")
+
+        written = json.loads(session.process.stdin.getvalue())
+        self.assertEqual(written["message"], "/skill:custom-skill run it")
 
     def test_protocol_reader_accepts_split_json_lines(self):
         backend = self.backend()

@@ -115,14 +115,14 @@ class PiBackendSettings:
         return command
 
 
-def normalize_pi_prompt(prompt: str) -> str:
+def normalize_pi_prompt(prompt: str, skills: set[str] | None = None) -> str:
     """Translate legacy Squrve skill shortcuts to Pi's Agent Skills syntax."""
     stripped = prompt.strip()
     if not stripped.startswith("/") or stripped.startswith("/skill:"):
         return stripped
     command, separator, arguments = stripped.partition(" ")
     name = command[1:]
-    if name not in PI_SKILLS:
+    if name not in (PI_SKILLS if skills is None else skills):
         return stripped
     suffix = f" {arguments}" if separator else ""
     return f"/skill:{name}{suffix}"
@@ -158,6 +158,7 @@ class PiAgentSession:
     ) -> None:
         self.session_id = uuid.uuid4().hex[:12]
         self.settings = settings
+        self.skill_names = discover_pi_skills(settings.project_root) or set(PI_SKILLS)
         self._condition = threading.Condition(threading.RLock())
         self._events: list[dict] = []
         self._event_base = 0
@@ -230,7 +231,10 @@ class PiAgentSession:
             raise ValueError("Unsupported Pi client command")
         payload = dict(command)
         if command_type == "prompt":
-            message = normalize_pi_prompt(str(payload.get("message", "")))
+            message = normalize_pi_prompt(
+                str(payload.get("message", "")),
+                getattr(self, "skill_names", None),
+            )
             if not message or len(message) > 65536:
                 raise ValueError("Pi prompt must contain between 1 and 65536 characters")
             payload = {"type": "prompt", "message": message}

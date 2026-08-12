@@ -65,6 +65,18 @@ function writeEvent(event) {
   process.stdout.write(`${JSON.stringify(event)}\n`)
 }
 
+// The parent process owns the event pipe; when it goes away there is nobody
+// left to talk to, so exit quietly instead of crashing with an EPIPE stack.
+export function exitOnLostEventPipe(error) {
+  if (error?.code === 'EPIPE' || error?.code === 'ERR_STREAM_DESTROYED') {
+    process.exit(0)
+    return
+  }
+  throw error
+}
+
+process.stdout.on('error', exitOnLostEventPipe)
+
 export function workspaceAgentDir(config) {
   const workspaceRoot = process.env.SQURVE_WORKSPACE_DIR
     ? path.resolve(process.env.SQURVE_WORKSPACE_DIR)
