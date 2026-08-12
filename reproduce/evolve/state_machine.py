@@ -246,28 +246,30 @@ def transition_evolve_dir(
     return state
 
 
+_RESUME_ACTIONS = {
+    EvolvePhase.INITIALIZED: "run_smoke",
+    EvolvePhase.BASELINE_LOADED: "run_smoke",
+    EvolvePhase.WEAKNESS_PROFILED: "run_smoke",
+    EvolvePhase.ACTIONS_GENERATED: "run_smoke",
+    EvolvePhase.CANDIDATES_REVIEWED: "run_smoke",
+    EvolvePhase.SMOKE_PROMOTED: "run_bounded",
+    EvolvePhase.BOUNDED_PROMOTED: "run_full",
+    EvolvePhase.FULL_CONFIRMING: "reconcile_review",
+    EvolvePhase.REPORT_REVIEWED: "await_review",
+    EvolvePhase.REVIEW_PENDING: "await_review",
+}
+
+
 def next_resume_action(
         state: EvolveState,
         journal: Any,
 ) -> Literal["run_smoke", "run_bounded", "run_full", "reconcile_review", "await_review", "stop"]:
-    phase = state.phase
-    if phase in {EvolvePhase.INITIALIZED, EvolvePhase.BASELINE_LOADED, EvolvePhase.WEAKNESS_PROFILED}:
-        return "run_smoke"
-    if phase in {EvolvePhase.ACTIONS_GENERATED, EvolvePhase.CANDIDATES_REVIEWED}:
-        return "run_smoke"
-    if phase == EvolvePhase.SMOKE_RUNNING:
+    # In-flight stages resume mid-stage unless the journal shows the promotion already happened.
+    if state.phase == EvolvePhase.SMOKE_RUNNING:
         return "run_bounded" if _has_smoke_promoted(journal) else "run_smoke"
-    if phase == EvolvePhase.SMOKE_PROMOTED:
-        return "run_bounded"
-    if phase == EvolvePhase.BOUNDED_RUNNING:
+    if state.phase == EvolvePhase.BOUNDED_RUNNING:
         return "run_full" if _has_bounded_promoted(journal) else "run_bounded"
-    if phase == EvolvePhase.BOUNDED_PROMOTED:
-        return "run_full"
-    if phase == EvolvePhase.FULL_CONFIRMING:
-        return "reconcile_review"
-    if phase in {EvolvePhase.REPORT_REVIEWED, EvolvePhase.REVIEW_PENDING}:
-        return "await_review"
-    return "stop"
+    return _RESUME_ACTIONS.get(state.phase, "stop")
 
 
 def next_step(evolve_dir: str | Path) -> dict[str, Any]:
@@ -297,7 +299,13 @@ def next_step(evolve_dir: str | Path) -> dict[str, Any]:
     blockers = candidate_gate_blockers(evolve_dir)
     escalated = [key for key, gate in gates.items() if gate["verdict"] == "escalate"]
 
-    next_command: str
+    def stage_command(stage: str) -> str:
+        return (
+            f"python3 tools/mcts/orchestrator.py --actions {evolve_dir}/action-pool.json "
+            f"--journal {evolve_dir}/journal.json --evolve-dir {evolve_dir} --stage {stage} "
+            f"--policy-config reproduce/configs/evolution/bounded_search_default.json"
+        )
+
     if consistency != "ok":
         action = "reconcile_state"
         next_command = "fail closed: reconcile evolve-state.json / journal.json / manifest before continuing"
@@ -311,17 +319,9 @@ def next_step(evolve_dir: str | Path) -> dict[str, Any]:
             f"{evolve_dir}/nodes/<node_id>/review/review-state.json  # unapproved: {', '.join(blockers)}"
         )
     elif action in {"run_smoke", "run_bounded", "run_full"}:
-        stage = action.removeprefix("run_")
-        next_command = (
-            f"python3 tools/mcts/orchestrator.py --actions {evolve_dir}/action-pool.json "
-            f"--journal {evolve_dir}/journal.json --evolve-dir {evolve_dir} --stage {stage} "
-            f"--policy-config reproduce/configs/evolution/bounded_search_default.json"
-        )
+        next_command = stage_command(action.removeprefix("run_"))
     elif action == "reconcile_review":
-        next_command = (
-            f"python3 tools/mcts/orchestrator.py --actions {evolve_dir}/action-pool.json "
-            f"--journal {evolve_dir}/journal.json --evolve-dir {evolve_dir} --stage full  # resume full confirmation"
-        )
+        next_command = stage_command("full") + "  # resume full confirmation"
     elif action == "await_review":
         next_command = "await the human accept / continue / rollback decision"
     else:

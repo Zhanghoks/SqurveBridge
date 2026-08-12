@@ -24,7 +24,7 @@ Verdict rule (``compute_verdict``):
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any, Literal, get_args
 
@@ -119,45 +119,19 @@ class ReviewState:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ReviewState":
-        rounds = [
-            ReviewRound(
-                round=int(item["round"]),
-                reviewer=str(item.get("reviewer", "agent")),
-                new_finding_ids=list(item.get("new_finding_ids") or []),
-                notes=str(item.get("notes", "")),
-                at=str(item.get("at") or now_iso()),
-            )
-            for item in data.get("rounds", [])
-        ]
-        findings = [
-            Finding(
-                finding_id=str(item["finding_id"]),
-                severity=str(item["severity"]),
-                category=str(item.get("category", "correctness")),
-                location=str(item.get("location", "")),
-                summary=str(item.get("summary", "")),
-                recommendation=str(item.get("recommendation", "")),
-                status=str(item.get("status", "open")),
-                opened_round=int(item.get("opened_round", 1)),
-                closed_round=item.get("closed_round"),
-                resolution=item.get("resolution"),
-                waived_by_human=bool(item.get("waived_by_human", False)),
-            )
-            for item in data.get("findings", [])
-        ]
-        return cls(
-            version=int(data.get("version", 1)),
-            target_kind=str(data["target_kind"]),
-            target_ref=str(data["target_ref"]),
-            status=str(data.get("status", "in_review")),
-            max_rounds=int(data.get("max_rounds", DEFAULT_MAX_ROUNDS)),
-            clean_rounds_required=int(data.get("clean_rounds_required", DEFAULT_CLEAN_ROUNDS_REQUIRED)),
-            rounds=rounds,
-            findings=findings,
-            escalation_reason=data.get("escalation_reason"),
-            created_at=str(data.get("created_at") or now_iso()),
-            updated_at=str(data.get("updated_at") or now_iso()),
-        )
+        state = _from_fields(cls, data)
+        state.rounds = [_from_fields(ReviewRound, item) for item in data.get("rounds", [])]
+        state.findings = [_from_fields(Finding, item) for item in data.get("findings", [])]
+        return state
+
+
+def _from_fields(cls, data: dict[str, Any]):
+    """Build a dataclass from a JSON dict, ignoring unknown/derived keys.
+
+    Nested ``rounds``/``findings`` are rebuilt separately by the caller.
+    """
+    names = {f.name for f in fields(cls)}
+    return cls(**{k: v for k, v in data.items() if k in names and k not in ("rounds", "findings")})
 
 
 # -- lifecycle -------------------------------------------------------------

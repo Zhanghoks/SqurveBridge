@@ -6,16 +6,11 @@ disable-model-invocation: true
 
 # Meta-Evo
 
-Meta-Evo 是 SqurveBridge 自进化 harness 的正式入口。它不是新根目录系统，也不是第二套 runner；它顺着现有结构组织：
+Meta-Evo 是 SqurveBridge 自进化 harness 的正式入口——不是新根目录系统，也不是第二套 runner。
 
-- `skills/`、`tools/`、`templates/`（SSOT）：`SKILL.md` frontmatter 注册命令入口，正文描述流程；`tools/` 放确定性工具；`templates/` 放可复制产物骨架。
-- `.claude/` 与 `.agents/`：symlink 镜像，共享同一套 SSOT 源文件。
-- `reproduce/metrics/`：真实 evolution engine。MCTS、fitness、journal、rollout、delta 等确定性逻辑都放在这里。
-- `artifacts/evolve/`：事实源。每次 evolution run 的 baseline、weakness、candidate nodes、journal、memory、best node 和 comparison report 都落盘。
+一句话：**Meta-Evo 是入口，MCTS orchestrator（`reproduce/evolve/`）是引擎，artifacts/evolve 是事实源，`.claude`/`.agents` 是 symlink 镜像。**
 
-一句话：**Meta-Evo 是入口，MCTS orchestrator 是引擎，evolution_pkg 是工具层，artifacts/evolve 是事实源，.agents 是镜像。**
-
-自进化的节奏是 **review → 提意见 → 修改 → 再 review，直到足够优秀**：所有关键产物（weakness profile、候选 change plan/patch、对比报告）在消耗评估预算或人工注意力之前，都必须通过 `skills/evolve-review/SKILL.md` 的 AI 迭代审核循环（契约见 `shared-references/evolution-review-loop.md`）。
+自进化的节奏是 **review → 提意见 → 修改 → 再 review，直到足够优秀**：weakness profile、候选 change plan/patch、对比报告在消耗评估预算或人工注意力之前，都必须通过 `/evolve-review` 审核循环（契约见 `shared-references/evolution-review-loop.md`）。
 
 ---
 
@@ -82,12 +77,11 @@ artifacts/evolve/<evolve_slug>/
 6. **CANDIDATE REVIEW（循环，硬门控）**：每个 node 跑 `/evolve-review`（target_kind=`change-plan`/`patch`，账本在 `nodes/<id>/review/`）。
    判据：`tools/evolve_status.py` 的 `candidate_gate_blockers` 为空 → 记录 phase `candidates_reviewed`；否则继续修改或将 escalate 的 node 交用户。评估预算不得花在没审过的候选上。
 7. **SMOKE GATE**：跑 `evolve_status` 给出的 orchestrator 命令（`--stage smoke`，默认 50 samples）。目的不是最终排名，而是筛掉跑不通、严重退化、成本爆炸的候选。
-8. **BOUNDED EVAL**：`--stage bounded`（默认 200 samples），比较 EX、EM、VES/CF1/FD、HardSliceScore、cost、latency。
-9. **MCTS LOOP**：搜索循环由 `reproduce/evolve/mcts/orchestrator.py` 执行；run-level phase 和 resume 由 `reproduce/evolve/state_machine.py` 控制。本 skill 只编排，不维护第二套搜索逻辑。
-10. **FULL CONFIRMATION**：`--stage full`，只对 best node 做 full reproduce confirmation。
-11. **REPORT REVIEW（循环）**：comparison report 过 `/evolve-review`（target_kind=`comparison-report`，账本在 `reviews/comparison-report/`）。
+8. **BOUNDED EVAL**：`--stage bounded`（默认 200 samples），比较 EX、EM、VES/CF1/FD、HardSliceScore、cost、latency。搜索循环与 phase 流转全部由引擎执行（见"后端边界"）。
+9. **FULL CONFIRMATION**：`--stage full`，只对 best node 做 full reproduce confirmation。
+10. **REPORT REVIEW（循环）**：comparison report 过 `/evolve-review`（target_kind=`comparison-report`，账本在 `reviews/comparison-report/`）。
     判据：verdict=approve → 记录 phase `report_reviewed`；核对每个分数可回溯、改善/退化成对呈现。
-12. **USER REVIEW**：展示 best node、patch、delta、改善/退化样本；用户选择 accept / continue / rollback；escalate 的 findings 一并呈上。结果经 `artifacts.record_user_review` 写入经验记忆。
+11. **USER REVIEW**：展示 best node、patch、delta、改善/退化样本；用户选择 accept / continue / rollback；escalate 的 findings 一并呈上。结果经 `artifacts.record_user_review` 写入经验记忆。
 
 ---
 
@@ -112,17 +106,9 @@ artifacts/evolve/<evolve_slug>/
 
 ## 后端边界
 
-Meta-Evo 可以编排和审查，但确定性逻辑不得写在 skill 中：
+Meta-Evo 可以编排和审查，但确定性逻辑只住在 `reproduce/evolve/`：MCTS 主循环在 `mcts/orchestrator.py`（`run_search()` 单阶段，`run_bounded_funnel()` 串联漏斗），fitness / node / journal / budget / experience / review / state_machine 各占一个模块（模块地图见 `docs/evolution-harness-design.md`）。
 
-- MCTS 主循环：`reproduce/evolve/mcts/orchestrator.py`（`run_search()` 单阶段搜索，`run_bounded_funnel()` 串联 smoke → bounded → optional full）
-- fitness：`reproduce/evolve/fitness.py`
-- node / journal：`reproduce/evolve/node.py`、`journal.py`
-- artifact IO：`reproduce/evolve/artifacts.py`
-- budget / sampling / experience：`budget.py`、`sampling.py`、`experience.py`
-
-如果这些模块尚不存在，本 skill 只能生成设计和待办，不能在聊天中假装已经完成 rollout。
-
-不得在 `tools/` 或 skill 文档中复制 MCTS selection / rollout / scoring / journal mutation 逻辑，避免双 orchestrator 维护失控。
+不得在 `tools/` 或 skill 文档中复制 MCTS selection / rollout / scoring / journal mutation / review verdict 逻辑，避免双实现维护失控。
 
 稳定契约放在 `shared-references/`：
 

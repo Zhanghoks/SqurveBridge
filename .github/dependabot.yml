@@ -4,11 +4,31 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
   - package-ecosystem: npm
     directory: /demo-app
     schedule:
       interval: monthly
+    groups:
+      demo-app-dependencies:
+        patterns:
+          - "*"
+  - package-ecosystem: npm
+    directory: /demo
+    schedule:
+      interval: monthly
+    groups:
+      pi-sdk-dependencies:
+        patterns:
+          - "*"
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    groups:
+      actions-dependencies:
+        patterns:
+          - "*"
