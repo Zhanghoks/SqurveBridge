@@ -60,11 +60,17 @@ python3 -m venv .venv
 
 ## 页面导览
 
-| 导航 | 作用 |
+主界面为「五步流程 + 右侧常驻 Pi Agent」分栏工作台（深链 `#configure`、`#compose`、`#query`、`#board`、`#evidence`）：
+
+| 步骤 | 作用 |
 |------|------|
-| **01 SQL Studio** | 选择 method/benchmark、配置 Actor 工作流并生成与执行 SQL |
-| **02 Experiment Board** | 同一 dataset 上多方法对比（雷达、Formal tables、错误/特征、成本） |
-| **03 Archive** | 浏览 `workspace/artifacts/` 与 `workspace/sessions/evaluations/` 中的 score bundle 与报告 |
+| **Studio 工作室** | 浏览已集成方法与数据库的 flashcard 目录 |
+| **Compose 编排** | Method × Database 连线矩阵；查看每对连接的 Actor 工作流与配置来源 |
+| **Query 查询** | 交互式 NL→SQL 工作台：Schema 树（表/列/主外键、搜索、SQL 命中高亮）＋「问题 → 管线阶段 → SQL 编辑器 → 结果表」；SQL 可编辑重跑、导出 CSV；查询上下文可发给 Pi 分析，Pi 回答中的 SQL 也可送回工作台 |
+| **Run 运行** | 设置采样参数，启动/暂停/恢复 config 评估任务并监控进度（本地限定） |
+| **History 历史** | 浏览归档 run、展开图表对比（雷达、Formal tables、错误/特征、成本） |
+
+Query 步骤依赖的只读 schema 端点为 `GET /api/databases/<id>/schema`；SQL 执行为只读 SELECT、单语句、5 秒超时、最多 500 行。
 
 ## Hugging Face Space 凭据
 

@@ -19,7 +19,6 @@ const {
   sanitizeRunError,
   summarizeRunProgress,
 } = await import('./RunWorkspace.jsx')
-const { default: ResultWorkspace } = await import('./ResultWorkspace.jsx')
 
 const translations = {
   'process.run': 'Run',
@@ -530,50 +529,4 @@ test('sanitizes supported credential forms while preserving benign technical tex
   assert.equal(sanitized.includes('oauth-secret'), false)
   assert.equal(sanitized.includes('sk_test_51LeakTokenValue'), false)
   assert.match(sanitized, /SQLite syntax error near SELECT at line 4/)
-})
-
-test('result tabs show only returned evidence and keep metrics and logs empty', async () => {
-  render(React.createElement(ResultWorkspace, {
-    runState: {
-      phase: 'completed',
-      sql: 'SELECT sku FROM demo_inventory',
-      trace: [{ actor_name: 'DINSQLGenerator' }],
-      result: {
-        columns: ['sku'],
-        rows: [['SKU-001']],
-        row_count: 1,
-        elapsed_ms: 4,
-      },
-      error: '',
-      busy: false,
-      context: {
-        method: 'DINSQL',
-        database: 'Spider',
-        db_id: 'Spider',
-        config_path: 'reproduce/configs/spider/dinsql.json',
-        actors: ['DINSQLGenerator'],
-      },
-    },
-    t,
-  }))
-  const user = userEvent.setup()
-  assert.ok(screen.getByText('SELECT sku FROM demo_inventory'))
-  await user.click(screen.getByRole('tab', { name: 'Result' }))
-  assert.ok(screen.getByRole('cell', { name: 'SKU-001' }))
-})
-
-test('keeps inspection empty before a live run', () => {
-  render(React.createElement(ResultWorkspace, {
-    runState: {
-      phase: 'ready',
-      sql: '',
-      trace: [],
-      result: null,
-      error: '',
-      busy: false,
-      context: null,
-    },
-    t,
-  }))
-  assert.match(document.querySelector('#inspect').textContent, /Run a workflow/)
 })

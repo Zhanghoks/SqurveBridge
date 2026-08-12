@@ -48,6 +48,44 @@ class ProviderCustomModelTests(unittest.TestCase):
                 self.assertIn("SQURVE_LLM_PROVIDER=qwen", body)
                 self.assertIn("SQURVE_LLM_MODEL=qwen3-custom-latest", body)
 
+    def test_local_query_accepts_the_configured_custom_model(self):
+        from demo import api_server
+
+        api_server.app.config.update(TESTING=True)
+        database = {"id": "demo", "db_path": "/tmp/demo.sqlite", "schema_path": "/tmp/schema.json"}
+        fake_demo = mock.Mock()
+        fake_demo.generate_sql.return_value = {"status": "success", "sql": "SELECT 1"}
+        provider_config = {
+            "id": "deepseek",
+            "default_model": "deepseek-chat",
+            "models": ["deepseek-chat", "deepseek-reasoner"],
+            "configured": True,
+        }
+        requested = []
+
+        def get_demo(provider, model):
+            requested.append((provider, model))
+            return fake_demo
+
+        with mock.patch.dict(os.environ, {"SQURVE_DEPLOYMENT_TARGET": "local"}, clear=False), mock.patch.object(
+            api_server, "_find_database", return_value=database
+        ), mock.patch.object(
+            api_server, "_llm_provider_catalog", return_value=[provider_config]
+        ), mock.patch.object(api_server, "_get_demo", side_effect=get_demo):
+            response = api_server.app.test_client().post(
+                "/api/query",
+                json={
+                    "question": "Count rows",
+                    "db_id": "demo",
+                    "provider": "deepseek",
+                    "model": "deepseek-v4-flash",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(requested, [("deepseek", "deepseek-v4-flash")])
+        self.assertEqual(response.json["run_config"]["llm"]["model"], "deepseek-v4-flash")
+
     def test_llm_provider_catalog_keeps_official_models_only(self):
         from demo import api_server
 

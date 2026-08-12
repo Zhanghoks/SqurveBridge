@@ -20,9 +20,9 @@ test('translates parameters and falls back to English', () => {
 test('keeps staging and accessibility keys shared across both dictionaries', () => {
   for (const key of [
     'process.ariaLabel',
-    'run.stagingEmpty',
-    'diagnose.persistedEmpty',
-    'improve.persistedEmpty',
+    'process.query',
+    'query.title',
+    'query.lockedTitle',
     'boot.loading',
     'boot.error',
   ]) {

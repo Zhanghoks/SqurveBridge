@@ -95,6 +95,7 @@ test('hosted App exposes session SQL configuration instead of local env configur
     [
       'Methods & Databases',
       'Workflow Composition',
+      'Interactive Query Workspace',
       'Experiment Board',
       'Run History',
     ],

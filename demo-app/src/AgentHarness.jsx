@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import PiAuthDialog from './PiAuthDialog.jsx'
 import { appendUserMessage, applyPiEvent, createPiChatState, skillPrompt } from './piChat.js'
 import { applyPiAuthEvent, createPiAuthState } from './piAuth.js'
+import { extractSqlSegments } from './full-flow/queryModel.js'
 
 const DEFAULT_SKILLS = ['candidate-reader', 'integration-pipeline', 'config-adapter', 'run', 'meta-evo']
 
@@ -107,6 +108,10 @@ const FALLBACK = {
   'agent.title': 'Pi Agent',
   'agent.subtitle': 'Chat with the SqurveBridge backend',
   'agent.idleDetail': 'Ask below to get started',
+  'agent.sendToWorkspace': 'Send to Query workspace',
+  'agent.sqlCopy': 'Copy',
+  'agent.sqlCopied': 'Copied',
+  'agent.sqlStreaming': 'Receiving SQL…',
 }
 
 function label(t, key) {
@@ -124,6 +129,49 @@ function greetingKey(date = new Date()) {
   return 'agent.greetingEvening'
 }
 
+export function MessageBody({ message, onAdoptSql, t }) {
+  const [copiedIndex, setCopiedIndex] = useState(-1)
+  const segments = extractSqlSegments(message.content || '')
+  const hasSql = segments.some(segment => segment.type === 'sql')
+  if (!hasSql) return <p>{message.content || (message.streaming ? '…' : '')}</p>
+
+  const copySql = (sql, index) => {
+    navigator.clipboard?.writeText(sql).catch(() => {})
+    setCopiedIndex(index)
+    setTimeout(() => setCopiedIndex(-1), 1500)
+  }
+
+  return (
+    <div className="pi-message-body">
+      {segments.map((segment, index) => segment.type === 'text'
+        ? (segment.text.trim() ? <p key={index}>{segment.text}</p> : null)
+        : (
+          <div key={index} className="pi-sql-block" data-testid="pi-sql-block">
+            <pre><code>{segment.sql}</code></pre>
+            {segment.closed ? (
+              <div className="pi-sql-actions">
+                <button type="button" onClick={() => copySql(segment.sql, index)}>
+                  {label(t, copiedIndex === index ? 'agent.sqlCopied' : 'agent.sqlCopy')}
+                </button>
+                {message.role === 'assistant' && onAdoptSql && (
+                  <button
+                    type="button"
+                    className="pi-sql-adopt"
+                    onClick={() => onAdoptSql(segment.sql)}
+                  >
+                    {label(t, 'agent.sendToWorkspace')}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="pi-sql-actions is-streaming">{label(t, 'agent.sqlStreaming')}</div>
+            )}
+          </div>
+        ))}
+    </div>
+  )
+}
+
 export default function AgentHarness({
   api,
   postJson,
@@ -137,6 +185,7 @@ export default function AgentHarness({
   shell = false,
   autoOpenAuth = false,
   onRequestNewChat,
+  onAdoptSql,
   t,
 }) {
   const socketRef = useRef(null)
@@ -514,7 +563,7 @@ export default function AgentHarness({
         </header>
         <div>
           {message.thinking && <details><summary>{label(t, 'agent.reasoning')}</summary><pre>{message.thinking}</pre></details>}
-          <p>{message.content || (message.streaming ? '…' : '')}</p>
+          <MessageBody message={message} onAdoptSql={onAdoptSql} t={t} />
         </div>
       </article>)}
       {chat.tools.slice(-8).map(tool => <div key={tool.id} className={`pi-tool ${tool.status}`}>

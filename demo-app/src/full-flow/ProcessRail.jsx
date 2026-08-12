@@ -1,4 +1,4 @@
-export const PROCESS_STEPS = ['configure', 'compose', 'board', 'evidence']
+export const PROCESS_STEPS = ['configure', 'compose', 'query', 'board', 'evidence']
 
 const LEGACY_STEP_MAP = {
   run: 'board',

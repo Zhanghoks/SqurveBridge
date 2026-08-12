@@ -4,6 +4,7 @@ import BoardWorkspace from './BoardWorkspace.jsx'
 import ConfigurationStudio from './ConfigurationStudio.jsx'
 import ConnectionComposer from './ConnectionComposer.jsx'
 import EvidenceHub from './EvidenceHub.jsx'
+import QueryWorkspace from './QueryWorkspace.jsx'
 import {
   DATABASES,
   METHODS,
@@ -67,6 +68,7 @@ export default function FullFlowDemo({
   const [harnessTask, setHarnessTask] = useState(null)
   const [shellLayout, setShellLayout] = useState(loadShellLayout)
   const [mobilePane, setMobilePane] = useState('dashboard')
+  const [adoptedSql, setAdoptedSql] = useState(null)
   const splitRef = useRef(null)
   const t = useCallback((key, params) => translate(locale, key, params), [locale])
   const focusedConfig = resolveFocusedConfig(configs, focusedMethod, focusedDatabase)
@@ -151,6 +153,23 @@ export default function FullFlowDemo({
     onToggleConnection,
     onFocusConnection,
   }
+
+  const adoptSqlFromAgent = sql => {
+    setAdoptedSql({ id: Date.now(), sql })
+    navigateToStep('query')
+    setMobilePane('dashboard')
+    setShellLayout(current => (current.dashboardCollapsed
+      ? { ...current, dashboardCollapsed: false }
+      : current))
+  }
+
+  const askPiFromQuery = prompt => {
+    setHarnessTask({ id: `query-analyze-${Date.now()}`, command: prompt })
+    setMobilePane('agent')
+    setShellLayout(current => (current.agentCollapsed
+      ? { ...current, agentCollapsed: false }
+      : current))
+  }
   const sampling = {
     sampleLimit,
     sampleMode,
@@ -172,6 +191,24 @@ export default function FullFlowDemo({
         {...selection}
         configs={configs}
         focusedConfig={focusedConfig}
+        t={t}
+      />
+    ),
+    query: (
+      <QueryWorkspace
+        databases={databases}
+        capabilities={capabilities}
+        focusedConfig={focusedConfig}
+        focusedMethod={focusedMethod}
+        focusedDatabase={focusedDatabase}
+        sqlAuth={sqlAuth}
+        credentialMode={credentialMode}
+        onConfigureSql={onConfigureSql}
+        postJson={postJson}
+        api={api}
+        adoptedSql={adoptedSql}
+        onAdoptedSqlHandled={() => setAdoptedSql(null)}
+        onAskPi={askPiFromQuery}
         t={t}
       />
     ),
@@ -427,6 +464,7 @@ export default function FullFlowDemo({
                   queuedCommand={harnessTask}
                   onQueuedCommandSent={() => setHarnessTask(null)}
                   onRequestNewChat={() => setChatKey(key => key + 1)}
+                  onAdoptSql={adoptSqlFromAgent}
                 />
               </Suspense>
             ) : (

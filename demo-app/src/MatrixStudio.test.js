@@ -68,21 +68,21 @@ test.after(() => {
   closeDom()
 })
 
-test('renders four bilingual modules in process order', () => {
+test('renders five bilingual modules in process order', () => {
   renderDemo('en-US')
   assert.ok(document.querySelector('.flow-demo.agent-shell'))
   assert.equal(document.querySelector('.agent-icon-rail'), null)
   assert.ok(document.querySelector('.agent-chat-column'))
   assert.ok(document.querySelector('.agent-dashboard-pane'))
-  assert.equal(document.querySelectorAll('.flow-module').length, 4)
+  assert.equal(document.querySelectorAll('.flow-module').length, 5)
   assert.equal(screen.getByTestId('flow-stage').getAttribute('data-active-step'), 'configure')
   assert.deepEqual(
     [...document.querySelectorAll('.flow-module')].map(section => section.id),
-    ['configure', 'compose', 'board', 'evidence'],
+    ['configure', 'compose', 'query', 'board', 'evidence'],
   )
   assert.equal(document.querySelector('#configure h2')?.textContent, 'Methods & Databases')
   const tabs = screen.getByRole('navigation', { name: 'Workflow stages' })
-  assert.equal(within(tabs).getAllByRole('button').length, 4)
+  assert.equal(within(tabs).getAllByRole('button').length, 5)
   assert.ok(document.querySelector('.agent-chat-body'))
   assert.ok(screen.getByTestId('pi-backend-badge'))
   assert.match(screen.getByTestId('pi-backend-badge').textContent, /Pi/)

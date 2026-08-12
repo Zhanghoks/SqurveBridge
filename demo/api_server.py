@@ -896,9 +896,12 @@ def query():
         provider_config = next((item for item in _llm_provider_catalog() if item["id"] == provider), None)
         if not provider_config:
             return _json_error(f"Unsupported LLM provider: {provider}")
-        model = str(payload.get("model") or provider_config["default_model"])
-        if model not in provider_config["models"]:
-            return _json_error(f"Unsupported model for {provider}: {model}")
+        # The provider dialog accepts any model ID, so interactive queries must
+        # accept the configured model too; the catalog stays suggestions-only.
+        try:
+            model = _validate_model_id(str(payload.get("model") or provider_config["default_model"]))
+        except ValueError as exc:
+            return _json_error(str(exc))
         if not provider_config["configured"]:
             return _json_error(f"Provider {provider} is not configured in the local .env.")
         demo = _get_demo(provider, model)
