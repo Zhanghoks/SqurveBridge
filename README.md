@@ -14,11 +14,43 @@ Integrate · Reproduce · Diagnose · Improve
 [![License](https://img.shields.io/badge/License-MIT-2ea44f.svg)](LICENSE)
 [![Upstream](https://img.shields.io/badge/Upstream-Squrve-6f42c1.svg)](https://github.com/Satissss/Squrve)
 
-[Architecture](#architecture) · [Features](#features) · [Demo](#demo) · [Quick Start](#quick-start) · [Docs](#documentation)
+[Reproduce in 30 Minutes](#reproduce-in-30-minutes) · [Architecture](#architecture) · [Features](#features) · [Demo](#demo) · [Docs](#documentation)
 
 </div>
 
 ---
+
+## Reproduce in 30 Minutes
+
+SqurveBridge pins one environment and reproduces from source — no package
+install, no version matrix: **Python 3.11**, **Node.js 22.19+** (Demo only),
+**Git LFS**, and an API key for the provider used by your chosen config.
+
+```bash
+git clone https://github.com/Zhanghoks/SqurveBridge.git && cd SqurveBridge
+git lfs install
+git lfs pull --include="benchmarks/packages/*.zip"
+
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+python tools/benchmarks.py verify-archives
+python tools/benchmarks.py install spider
+
+cp .env.example .env   # add provider keys — never commit .env
+python reproduce/run.py spider c3sql
+```
+
+Scores and evidence land under `workspace/artifacts/`. Verify the toolchain
+without any LLM calls:
+
+```bash
+python tools/release_check.py --skip-history
+```
+
+Remote model calls may incur cost. Full walkthrough:
+[Getting Started](docs/GETTING_STARTED.md) · Repository map:
+[Project Structure](#project-structure).
 
 ## Architecture
 
@@ -194,32 +226,6 @@ The **reproduce config** is the main seam: CLI and Demo invoke the same runner w
 ```
 
 Local mode binds to `127.0.0.1` with full coding tools for Pi. The public Space is read-only for agent tools, blocks uploads and live evaluation writes, and keeps visitor credentials in session memory only — never in score bundles or runtime configs on disk.
-
-## Quick Start
-
-**Requirements:** Python 3.11+, Git LFS, Node.js 20+ (for the interactive Demo), and an API key for the provider used by the chosen reproduce config.
-
-```bash
-git lfs install
-git lfs pull --include="benchmarks/packages/*.zip"
-
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-
-python tools/benchmarks.py verify-archives
-python tools/benchmarks.py install spider
-
-cp .env.example .env   # add provider keys — never commit .env
-python reproduce/run.py spider c3sql
-```
-
-Deterministic release gate (no LLM calls):
-
-```bash
-python tools/release_check.py --skip-history
-```
-
-Remote model calls may incur cost. Full walkthrough: [Getting Started](docs/GETTING_STARTED.md).
 
 ## Usage
 
