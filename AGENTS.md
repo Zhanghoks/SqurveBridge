@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-`core/` contains Squrve runtime extensions and native Text-to-SQL Actors. Reproducible experiments live in `reproduce/`; benchmark contracts are in `benchmarks/`, and deterministic utilities in `tools/`. The Flask/Pi backend is in `demo/`, the React/Vite interface in `demo-app/`, and the reviewed Pi upstream source in `pi/`. Deployment overlays live in `deploy/`, examples in `evidence/`, and Python regressions in `tests/`. Agent workflow contracts use `skills/`, `templates/`, and `harness/`. Local runtime data (Demo jobs, reproduce intermediates, uploads, score bundles) lives under `workspace/` and must not be committed except `workspace/README.md`.
+`core/` contains Squrve runtime extensions and native Text-to-SQL Actors. Reproducible experiments live in `reproduce/`; benchmark contracts are in `benchmarks/`, and deterministic utilities in `tools/`. The Flask/Pi backend is in `demo/` (the Pi runtime is the pinned npm SDK `@earendil-works/pi-coding-agent` declared in `demo/package.json`), and the React/Vite interface in `demo-app/`. Deployment overlays live in `deploy/`, examples in `evidence/`, and Python regressions in `tests/`. Agent workflow contracts use `skills/`, `templates/`, and `harness/`. Local runtime data (Demo jobs, reproduce intermediates, uploads, score bundles) lives under `workspace/` and must not be committed except `workspace/README.md`.
 
 This repository is the authoritative source for the real interactive demo
 deployed as a configured Hugging Face Space. The separate
@@ -16,14 +16,14 @@ paper-site repository.
 - `python tools/release_check.py --skip-history` validates anonymity, security, benchmark pointers, reproduce contracts, links, evidence, and tests.
 - `npm ci --prefix demo-app` installs the locked frontend dependencies.
 - `npm test --prefix demo-app` runs the Node test suite; `npm run build --prefix demo-app` creates the production bundle.
-- `bash demo/build_embedded_pi.sh` installs and builds the vendored Pi runtime without regenerating upstream model catalogs.
+- `bash demo/build_embedded_pi.sh` installs the pinned embedded Pi SDK into `demo/node_modules`.
 - `./demo/start.sh` launches the local API and UI; `./demo/stop.sh` stops both.
 
 Python 3.11+ and Node.js 22.19+ are required for the embedded Pi backend.
 
 ## Coding Style & Naming Conventions
 
-Use four-space Python indentation, type hints for public interfaces, `snake_case` functions/modules, and `PascalCase` classes. React components use `PascalCase`; JavaScript and TypeScript helpers use `camelCase`. Treat `pi/` as vendored upstream: place SqurveBridge integration outside it, except for provenance. Match adjacent code and run `git diff --check`.
+Use four-space Python indentation, type hints for public interfaces, `snake_case` functions/modules, and `PascalCase` classes. React components use `PascalCase`; JavaScript and TypeScript helpers use `camelCase`. Never patch the installed Pi SDK in `demo/node_modules`; adapt behavior inside `demo/pi_agent_bridge.mjs` or upgrade the pinned version instead. Match adjacent code and run `git diff --check`.
 
 ## Testing Guidelines
 

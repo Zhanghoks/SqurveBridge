@@ -50,16 +50,13 @@ class AnonymityScanTests(unittest.TestCase):
 
         self.assertEqual(categories, {"absolute user path", "personal email"})
 
-    def test_vendored_pi_authorship_is_not_treated_as_project_identity(self) -> None:
+    def test_every_public_path_is_scanned_without_vendored_exemptions(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            upstream = root / "pi" / "README.md"
-            upstream.parent.mkdir()
-            upstream_email = "maintainer" + "@" + "upstream.invalid"
-            upstream.write_text(
-                f"Upstream author: {upstream_email}\n",
-                encoding="utf-8",
-            )
+            nested = root / "demo" / "README.md"
+            nested.parent.mkdir()
+            nested_email = "maintainer" + "@" + "nested.invalid"
+            nested.write_text(f"Author: {nested_email}\n", encoding="utf-8")
             project = root / "notes.txt"
             project_email = "maintainer" + "@" + "project.invalid"
             project.write_text(
@@ -67,10 +64,9 @@ class AnonymityScanTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            findings = anonymity_scan.scan_paths([upstream, project], root)
+            findings = anonymity_scan.scan_paths([nested, project], root)
 
-        self.assertEqual(len(findings), 1)
-        self.assertEqual(findings[0].path, project)
+        self.assertEqual({finding.path for finding in findings}, {nested, project})
 
     def test_public_document_manuscript_language_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

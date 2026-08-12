@@ -14,7 +14,6 @@ RUNTIME_DIRECTORIES = (
     "core",
     "demo",
     "demo-app",
-    "pi",
     "skills",
     "templates",
     "reproduce",
@@ -66,22 +65,32 @@ class HuggingFaceBundleContractTests(unittest.TestCase):
             with self.assertRaisesRegex(unittest.SkipTest, "Spider benchmark"):
                 _require_full_runtime(Path(directory))
 
-    def test_space_builds_and_runs_the_embedded_pi_source(self) -> None:
+    def test_space_installs_and_runs_the_embedded_pi_sdk(self) -> None:
         root = Path(__file__).resolve().parents[1]
         dockerfile = (root / "deploy/huggingface/Dockerfile").read_text(encoding="utf-8")
         build_script = (root / "demo/build_embedded_pi.sh").read_text(encoding="utf-8")
-        self.assertIn("FROM node:22-bookworm-slim AS pi-builder", dockerfile)
-        self.assertIn("bash demo/build_embedded_pi.sh", dockerfile)
-        self.assertIn("COPY --from=pi-builder /build/pi /app/pi", dockerfile)
+        self.assertIn("FROM node:22-bookworm-slim AS pi-sdk", dockerfile)
+        self.assertIn("COPY demo/package.json demo/package-lock.json ./", dockerfile)
+        self.assertIn(
+            "COPY --from=pi-sdk /build/demo/node_modules /app/demo/node_modules",
+            dockerfile,
+        )
         self.assertIn("git lfs pull --include=\"benchmarks/packages/*.zip\"", dockerfile)
         self.assertIn("tools/extract_space_assets.py", dockerfile)
         self.assertIn("node --version", dockerfile)
         self.assertIn("python demo/runtime_check.py", dockerfile)
         self.assertNotIn("SQURVE_LLM_PROVIDER=", dockerfile)
         self.assertNotIn("SQURVE_LLM_MODEL=", dockerfile)
-        self.assertIn("npm ci --ignore-scripts", build_script)
+        self.assertIn("npm ci", build_script)
+        self.assertIn("--ignore-scripts", build_script)
+        self.assertIn("@earendil-works/pi-coding-agent", build_script)
         self.assertNotIn("npm run build", build_script)
-        self.assertIn("packages/coding-agent/tsconfig.build.json", build_script)
+
+    def test_demo_backend_pins_the_pi_sdk_exactly(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        package = (root / "demo/package.json").read_text(encoding="utf-8")
+        self.assertIn('"@earendil-works/pi-coding-agent": "0.84.1"', package)
+        self.assertTrue((root / "demo/package-lock.json").is_file())
 
     def test_space_dependency_range_keeps_transformers_hub_compatible(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -180,8 +189,8 @@ class HuggingFaceBundleTests(unittest.TestCase):
             "demo-app/src/main.jsx",
             "demo-app/src/SqlAuthDialog.jsx",
             "demo-app/src/PiAuthDialog.jsx",
-            "pi/packages/coding-agent/package.json",
-            "pi/packages/ai/src/auth/credential-store.ts",
+            "demo/package.json",
+            "demo/package-lock.json",
             "skills/run/SKILL.md",
             "reproduce/run.py",
             "config/sys_config.json",
@@ -226,7 +235,6 @@ class HuggingFaceBundleTests(unittest.TestCase):
                 "demo-app",
                 "deploy",
                 "evidence",
-                "pi",
                 "pyproject.toml",
                 "reproduce",
                 "requirements.txt",
@@ -300,8 +308,7 @@ class HuggingFaceBundleTests(unittest.TestCase):
             with self.subTest(path=relative):
                 self.assertNotIn(path.name.lower(), sensitive_basenames)
                 self.assertNotIn(path.suffix.lower(), sensitive_suffixes)
-                if relative != "pi/packages/ai/src/auth/credential-store.ts":
-                    self.assertNotIn("credential", path.name.lower())
+                self.assertNotIn("credential", path.name.lower())
 
     def test_bundle_contains_no_shared_provider_configuration_or_test_secret(self) -> None:
         sentinel = "release-boundary-sentinel-secret"

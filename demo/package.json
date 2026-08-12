@@ -1,0 +1,13 @@
+{
+  "name": "squrvebridge-demo-backend",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Node dependencies for the SqurveBridge embedded Pi backend bridge",
+  "type": "module",
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.84.1"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}

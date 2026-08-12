@@ -14,8 +14,13 @@ The original Squrve copyright line remains in `LICENSE`. Spider, BIRD, and every
 other benchmark remain governed by their upstream distribution terms; see
 [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
-The embedded Pi Agent runtime under `pi/` was acquired from the
-[`earendil-works/pi`](https://github.com/earendil-works/pi) distribution at the
-revision recorded in `pi/SQURVEBRIDGE_UPSTREAM.md`; that distribution derives
-from the open-source Pi project. Pi is distributed under its upstream MIT
-license in `pi/LICENSE`; those notices remain authoritative for vendored files.
+The embedded Pi Agent runtime is consumed as the npm package
+[`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi),
+pinned to an exact version in `demo/package.json` and installed into
+`demo/node_modules` at build time. Pi is distributed under its upstream MIT
+license; the package's own license and notices remain authoritative.
+SqurveBridge previously vendored the Pi source tree under `pi/` at commit
+`dcfe36c79702ec240b146c45f167ab75ecddd205` (packages `0.80.7`); that history
+remains in Git. SqurveBridge integration code does not modify Pi internals and
+lives in `demo/pi_agent_bridge.mjs`, `demo/pi_backend.py`, `demo/pi_api.py`,
+`config/pi_models.json`, and `demo-app/src/AgentHarness.jsx`.

@@ -109,12 +109,7 @@ def _is_placeholder(value: bytes) -> bool:
     return any(marker in lowered for marker in PLACEHOLDER_MARKERS)
 
 
-def _scan_bytes(
-    data: bytes,
-    display_path: str,
-    *,
-    generic_assignments: bool = True,
-) -> list[Finding]:
+def _scan_bytes(data: bytes, display_path: str) -> list[Finding]:
     findings: list[Finding] = []
     if len(data) > MAX_TEXT_BYTES or b"\x00" in data:
         return findings
@@ -130,12 +125,11 @@ def _scan_bytes(
                 continue
             findings.append(Finding(display_path, line, category))
 
-    if generic_assignments:
-        for match in GENERIC_ASSIGNMENT.finditer(data):
-            if _is_placeholder(match.group(2)):
-                continue
-            line = data.count(b"\n", 0, match.start()) + 1
-            findings.append(Finding(display_path, line, "literal-credential-assignment"))
+    for match in GENERIC_ASSIGNMENT.finditer(data):
+        if _is_placeholder(match.group(2)):
+            continue
+        line = data.count(b"\n", 0, match.start()) + 1
+        findings.append(Finding(display_path, line, "literal-credential-assignment"))
 
     return findings
 
@@ -222,7 +216,6 @@ def scan_zip_path(path: Path, root: Path) -> list[Finding]:
 
 def scan_path(path: Path, root: Path) -> list[Finding]:
     relative = path.relative_to(root).as_posix()
-    vendored_pi = relative == "pi" or relative.startswith("pi/")
     lowered_name = path.name.lower()
     findings: list[Finding] = []
 
@@ -230,11 +223,7 @@ def scan_path(path: Path, root: Path) -> list[Finding]:
         findings.append(Finding(relative, 0, "credential-file"))
     if path.suffix.lower() in SENSITIVE_SUFFIXES:
         findings.append(Finding(relative, 0, "private-credential-file"))
-    if (
-        not vendored_pi
-        and "credential" in lowered_name
-        and lowered_name != ".env.example"
-    ):
+    if "credential" in lowered_name and lowered_name != ".env.example":
         findings.append(Finding(relative, 0, "credential-named-file"))
 
     if path.suffix.lower() == ".zip":
@@ -243,11 +232,7 @@ def scan_path(path: Path, root: Path) -> list[Finding]:
 
     if path.stat().st_size > MAX_TEXT_BYTES:
         return findings
-    return findings + _scan_bytes(
-        path.read_bytes(),
-        relative,
-        generic_assignments=not vendored_pi,
-    )
+    return findings + _scan_bytes(path.read_bytes(), relative)
 
 
 def scan_paths(paths: list[Path], root: Path) -> list[Finding]:

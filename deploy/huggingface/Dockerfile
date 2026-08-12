@@ -7,11 +7,10 @@ COPY config/ /build/config/
 COPY reproduce/configs/ /build/reproduce/configs/
 RUN npm test && npm run build
 
-FROM node:22-bookworm-slim AS pi-builder
-WORKDIR /build
-COPY pi/ ./pi/
-COPY demo/build_embedded_pi.sh ./demo/build_embedded_pi.sh
-RUN bash demo/build_embedded_pi.sh
+FROM node:22-bookworm-slim AS pi-sdk
+WORKDIR /build/demo
+COPY demo/package.json demo/package-lock.json ./
+RUN npm ci --ignore-scripts
 
 FROM node:22-bookworm-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -27,7 +26,7 @@ RUN apt-get update \
     && python3 -m venv /opt/venv
 COPY . /app
 COPY --from=frontend /build/demo-app/dist /app/demo-app/dist
-COPY --from=pi-builder /build/pi /app/pi
+COPY --from=pi-sdk /build/demo/node_modules /app/demo/node_modules
 RUN GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 https://github.com/Zhanghoks/SqurveBridge.git /tmp/squrvebridge-assets \
     && cd /tmp/squrvebridge-assets \
     && git lfs pull --include="benchmarks/packages/*.zip" \

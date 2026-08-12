@@ -55,4 +55,4 @@ can be reviewed independently of an agent session.
 
 ## Pi Skill Loading
 
-The embedded Pi backend loads `skills/` directly through Pi's `DefaultResourceLoader`; no Claude Code or Codex installation is required. In the Demo chat, invoke a contract with Pi syntax such as `/skill:candidate-reader` or `/skill:run`. The legacy symlink installer remains only for compatibility with older local checkouts and is not part of the Live Demo runtime.
+The embedded Pi backend (the pinned npm SDK `@earendil-works/pi-coding-agent`, installed via `bash demo/build_embedded_pi.sh`) loads `skills/` directly through Pi's `DefaultResourceLoader`; no Claude Code or Codex installation is required. In the Demo chat, invoke a contract with Pi syntax such as `/skill:candidate-reader` or `/skill:run`. The legacy symlink installer remains only for compatibility with older local checkouts and is not part of the Live Demo runtime.

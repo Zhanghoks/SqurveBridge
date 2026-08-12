@@ -65,13 +65,17 @@ function writeEvent(event) {
   process.stdout.write(`${JSON.stringify(event)}\n`)
 }
 
-export function resourceLoaderOptions(config) {
+export function workspaceAgentDir(config) {
   const workspaceRoot = process.env.SQURVE_WORKSPACE_DIR
     ? path.resolve(process.env.SQURVE_WORKSPACE_DIR)
     : path.join(config.cwd, 'workspace')
+  return path.join(workspaceRoot, 'sessions', 'pi-agent')
+}
+
+export function resourceLoaderOptions(config) {
   return {
     cwd: config.cwd,
-    agentDir: path.join(workspaceRoot, 'sessions', 'pi-agent'),
+    agentDir: workspaceAgentDir(config),
     additionalSkillPaths: [path.join(config.cwd, 'skills')],
     noSkills: true,
     noExtensions: true,
@@ -108,10 +112,10 @@ export async function assertConfinedPath(root, requested = '.') {
 
 export function createHostedTools(sdk, config) {
   const factories = {
-    read: sdk.createReadTool,
-    grep: sdk.createGrepTool,
-    find: sdk.createFindTool,
-    ls: sdk.createLsTool,
+    read: sdk.createReadToolDefinition,
+    grep: sdk.createGrepToolDefinition,
+    find: sdk.createFindToolDefinition,
+    ls: sdk.createLsToolDefinition,
   }
   return config.tools.map(name => {
     const factory = factories[name]
@@ -127,47 +131,75 @@ export function createHostedTools(sdk, config) {
   })
 }
 
-export function createBridgeStores(sdk, config) {
+export function createInMemoryCredentialStore() {
+  const data = new Map()
+  return {
+    async read(providerId) {
+      return data.get(providerId)
+    },
+    async list() {
+      return [...data.entries()].map(([providerId, credential]) => ({ providerId, type: credential.type }))
+    },
+    async modify(providerId, fn) {
+      const next = await fn(data.get(providerId))
+      if (next !== undefined) data.set(providerId, next)
+      return data.get(providerId)
+    },
+    async delete(providerId) {
+      data.delete(providerId)
+    },
+  }
+}
+
+export async function createBridgeRuntime(sdk, config) {
   if (config.profile === 'hosted-readonly') {
-    const authStorage = sdk.AuthStorage.inMemory()
+    const modelRuntime = await sdk.ModelRuntime.create({
+      credentials: createInMemoryCredentialStore(),
+      modelsPath: null,
+      refreshOnCreate: false,
+    })
     return {
-      authStorage,
-      modelRegistry: sdk.ModelRegistry.inMemory(authStorage),
+      modelRuntime,
+      modelRegistry: new sdk.ModelRegistry(modelRuntime),
       settingsManager: sdk.SettingsManager.inMemory(),
     }
   }
-  const authStorage = sdk.AuthStorage.create()
+  const modelRuntime = await sdk.ModelRuntime.create({
+    modelsPath: path.join(config.cwd, 'config', 'pi_models.json'),
+    modelsStorePath: path.join(workspaceAgentDir(config), 'models-store.json'),
+  })
   return {
-    authStorage,
-    modelRegistry: sdk.ModelRegistry.create(authStorage, path.join(config.cwd, 'config', 'pi_models.json')),
+    modelRuntime,
+    modelRegistry: new sdk.ModelRegistry(modelRuntime),
     settingsManager: null,
   }
 }
 
 class AuthCancelledError extends Error {}
 
-export function createPiAuthProtocol({ authStorage, modelRegistry, session, emit, initialModel = null }) {
+export function createPiAuthProtocol({ modelRuntime, modelRegistry, session, emit, initialModel = null }) {
   let activeModel = initialModel
   let pendingPrompt = null
   let promptSequence = 0
   let authAbortController = null
   let authRunning = false
 
-  const oauthProviders = () => new Map(authStorage.getOAuthProviders().map(provider => [provider.id, provider]))
   const providerIds = () => [...new Set(modelRegistry.getAll().map(model => model.provider))]
+  const supportsSubscription = provider => Boolean(modelRuntime.getProvider(provider)?.auth?.oauth)
 
-  function providerCatalog() {
-    const oauth = oauthProviders()
+  async function providerCatalog() {
+    const credentials = new Map(
+      (await modelRuntime.listCredentials()).map(info => [info.providerId, info.type]),
+    )
     return providerIds().sort().map(provider => {
-      const credential = authStorage.get(provider)
       const methods = ['api_key']
-      if (oauth.has(provider)) methods.push('subscription')
+      if (supportsSubscription(provider)) methods.push('subscription')
       return {
         id: provider,
         name: modelRegistry.getProviderDisplayName(provider),
         auth_methods: methods,
         configured: Boolean(modelRegistry.getProviderAuthStatus(provider).configured),
-        credential_type: credential?.type || null,
+        credential_type: credentials.get(provider) || null,
       }
     })
   }
@@ -186,8 +218,8 @@ export function createPiAuthProtocol({ authStorage, modelRegistry, session, emit
     }))
   }
 
-  function emitCatalogs() {
-    const providers = providerCatalog()
+  async function emitCatalogs() {
+    const providers = await providerCatalog()
     emit({ type: 'auth_catalog', providers })
     emit({
       type: 'auth_status',
@@ -212,56 +244,36 @@ export function createPiAuthProtocol({ authStorage, modelRegistry, session, emit
     })
   }
 
-  async function loginWithApiKey(provider) {
-    const name = modelRegistry.getProviderDisplayName(provider)
-    const key = await askBrowser('secret', {
-      message: `Enter API key for ${name}`,
-      placeholder: 'API key',
-    })
-    if (!String(key).trim()) throw new Error('API key is required')
-    authStorage.set(provider, { type: 'api_key', key: String(key).trim() })
-  }
-
-  async function loginWithSubscription(provider) {
-    const oauth = oauthProviders()
-    if (!oauth.has(provider)) throw new Error('Subscription login is unavailable for this provider')
-    authAbortController = new AbortController()
-    await authStorage.login(provider, {
+  function loginInteraction() {
+    return {
       signal: authAbortController.signal,
-      onAuth(info) {
-        emit({
-          type: 'auth_event',
-          event: 'auth_url',
-          url: info.url,
-          instructions: info.instructions || null,
-        })
+      prompt(prompt) {
+        return askBrowser(prompt.type, prompt)
       },
-      onDeviceCode(info) {
-        emit({
-          type: 'auth_event',
-          event: 'device_code',
-          user_code: info.userCode,
-          verification_uri: info.verificationUri,
-          interval_seconds: info.intervalSeconds || null,
-          expires_in_seconds: info.expiresInSeconds || null,
-        })
+      notify(event) {
+        if (event.type === 'auth_url') {
+          emit({
+            type: 'auth_event',
+            event: 'auth_url',
+            url: event.url,
+            instructions: event.instructions || null,
+          })
+          return
+        }
+        if (event.type === 'device_code') {
+          emit({
+            type: 'auth_event',
+            event: 'device_code',
+            user_code: event.userCode,
+            verification_uri: event.verificationUri,
+            interval_seconds: event.intervalSeconds || null,
+            expires_in_seconds: event.expiresInSeconds || null,
+          })
+          return
+        }
+        emit({ type: 'auth_event', event: 'progress', message: event.message })
       },
-      onPrompt(prompt) {
-        return askBrowser('text', prompt)
-      },
-      onProgress(message) {
-        emit({ type: 'auth_event', event: 'progress', message })
-      },
-      onManualCodeInput() {
-        return askBrowser('manual_code', {
-          message: 'Paste the authorization code or callback URL',
-          placeholder: 'Authorization code',
-        })
-      },
-      onSelect(prompt) {
-        return askBrowser('select', prompt)
-      },
-    })
+    }
   }
 
   async function startAuth(command) {
@@ -276,18 +288,22 @@ export function createPiAuthProtocol({ authStorage, modelRegistry, session, emit
       return
     }
     authRunning = true
+    authAbortController = new AbortController()
     try {
-      if (method === 'api_key') await loginWithApiKey(provider)
-      else if (method === 'subscription') await loginWithSubscription(provider)
-      else throw new Error('Unsupported Pi authentication method')
-      modelRegistry.refresh()
-      emitCatalogs()
+      if (method === 'api_key') {
+        await modelRuntime.login(provider, 'api_key', loginInteraction())
+      } else if (method === 'subscription') {
+        if (!supportsSubscription(provider)) throw new Error('Subscription login is unavailable for this provider')
+        await modelRuntime.login(provider, 'oauth', loginInteraction())
+      } else {
+        throw new Error('Unsupported Pi authentication method')
+      }
+      await emitCatalogs()
       emit({ type: 'auth_complete', provider, method, status: 'authenticated' })
     } catch (error) {
       if (error instanceof AuthCancelledError || authAbortController?.signal.aborted) {
-        authStorage.logout(provider)
-        modelRegistry.refresh()
-        emitCatalogs()
+        await modelRuntime.logout(provider).catch(() => {})
+        await emitCatalogs()
         emit({ type: 'auth_complete', provider, method, status: 'cancelled' })
       } else {
         emit({ type: 'auth_error', code: 'authentication_failed', message: 'Pi authentication failed.' })
@@ -345,10 +361,9 @@ export function createPiAuthProtocol({ authStorage, modelRegistry, session, emit
     }
     if (command.type === 'logout') {
       const provider = String(command.provider || '')
-      authStorage.logout(provider)
-      modelRegistry.refresh()
+      await modelRuntime.logout(provider).catch(() => {})
       if (activeModel?.provider === provider) activeModel = null
-      emitCatalogs()
+      await emitCatalogs()
       emit({ type: 'auth_complete', provider, method: 'logout', status: 'logged_out' })
       return
     }
@@ -382,15 +397,14 @@ export function createPiAuthProtocol({ authStorage, modelRegistry, session, emit
 
 export async function runBridge(argv = process.argv.slice(2)) {
   const config = parseBridgeArgs(argv)
-  const sdkPath = path.join(config.cwd, 'pi', 'packages', 'coding-agent', 'dist', 'index.js')
   let sdk
   try {
-    sdk = await import(pathToFileURL(sdkPath).href)
+    sdk = await import('@earendil-works/pi-coding-agent')
   } catch (error) {
-    throw new Error(`Embedded Pi is not built. Run npm ci --ignore-scripts && npm run build in ${path.join(config.cwd, 'pi')}: ${error.message}`)
+    throw new Error(`The embedded Pi SDK is not installed. Run npm ci --prefix ${path.join(config.cwd, 'demo')}: ${error.message}`)
   }
 
-  const { authStorage, modelRegistry, settingsManager } = createBridgeStores(sdk, config)
+  const { modelRuntime, modelRegistry, settingsManager } = await createBridgeRuntime(sdk, config)
   const resourceLoader = new sdk.DefaultResourceLoader(resourceLoaderOptions(config))
   await resourceLoader.reload()
 
@@ -408,8 +422,7 @@ export async function runBridge(argv = process.argv.slice(2)) {
     noTools: hostedTools ? 'builtin' : undefined,
     customTools: hostedTools || undefined,
     resourceLoader,
-    authStorage,
-    modelRegistry,
+    modelRuntime,
     settingsManager: settingsManager || undefined,
     sessionManager: sdk.SessionManager.inMemory(config.cwd),
   })
@@ -428,13 +441,13 @@ export async function runBridge(argv = process.argv.slice(2)) {
     diagnostics: diagnostics.map(item => item.message),
   })
   const protocol = createPiAuthProtocol({
-    authStorage,
+    modelRuntime,
     modelRegistry,
     session,
     emit: writeEvent,
     initialModel: model,
   })
-  protocol.emitCatalogs()
+  await protocol.emitCatalogs()
 
   let buffer = ''
   process.stdin.setEncoding('utf8')

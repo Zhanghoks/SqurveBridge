@@ -12,7 +12,6 @@ RUNTIME_DIRECTORIES = (
     "core",
     "demo",
     "demo-app",
-    "pi",
     "skills",
     "templates",
     "reproduce",
@@ -72,7 +71,6 @@ IGNORED_FILE_NAMES = {
     "Thumbs.db",
 }
 IGNORED_FILE_SUFFIXES = {".key", ".p12", ".pem", ".pfx", ".pyc", ".pyo"}
-VENDORED_RUNTIME_CREDENTIAL_SOURCE = "pi/packages/ai/src/auth/credential-store.ts"
 
 
 def _ignore_non_runtime_files(directory: str, names: list[str]) -> set[str]:
@@ -80,9 +78,6 @@ def _ignore_non_runtime_files(directory: str, names: list[str]) -> set[str]:
     ignored: set[str] = set()
     for name in names:
         candidate = base / name
-        is_vendored_runtime_source = candidate.as_posix().endswith(
-            VENDORED_RUNTIME_CREDENTIAL_SOURCE
-        )
         lowered = name.lower()
         if candidate.is_symlink():
             ignored.add(name)
@@ -90,9 +85,7 @@ def _ignore_non_runtime_files(directory: str, names: list[str]) -> set[str]:
             ignored.add(name)
         elif lowered == "thumbs.db" or name.startswith("._"):
             ignored.add(name)
-        elif lowered.startswith(".env.") or (
-            "credential" in lowered and not is_vendored_runtime_source
-        ):
+        elif lowered.startswith(".env.") or "credential" in lowered:
             ignored.add(name)
         elif candidate.is_file() and candidate.suffix.lower() in IGNORED_FILE_SUFFIXES:
             ignored.add(name)

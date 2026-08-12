@@ -126,7 +126,7 @@ Two planes share one set of project contracts; credentials and auth stay separat
   USER SURFACES
   +------------------+   +-------------------+   +------------------+
   | Reproduce CLI    |   | React Demo App    |   | Pi Agent chat    |
-  | reproduce/run.py |   | demo-app/         |   | skills/ + pi/    |
+  | reproduce/run.py |   | demo-app/         |   | skills/ + Pi SDK |
   +--------+---------+   +---------+---------+   +--------+---------+
            |                       | REST/WS               |
            |                       v                       v
@@ -255,9 +255,8 @@ reproduce/      Configs, CLI/batch runners, checkpoints
 reproduce/eval/    Registry-driven evaluation: six metric layers, bundles, views
 reproduce/evolve/  Meta-Evo engine: bounded MCTS search, fitness, journal
 benchmarks/     Git LFS packages and installed benchmark layouts
-demo/           Flask API, job manager, Pi bridge, deployment policy
+demo/           Flask API, job manager, Pi bridge (pinned Pi SDK), deployment policy
 demo-app/       React/Vite interactive workspace
-pi/             Vendored Pi Agent kernel (reviewed upstream snapshot)
 skills/         Capability contracts (integration, run, Meta-Evo, …)
 templates/      Schemas and skeletons for manifests, configs, reports
 tools/          Deterministic validation, benchmarks, evidence, release gates
@@ -329,4 +328,4 @@ Code of conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 MIT — see [LICENSE](LICENSE).
 
-Upstream Squrve and integrated methods retain their own attribution; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Pi is a reviewed vendored snapshot; provenance is recorded in `pi/SQURVEBRIDGE_UPSTREAM.md`.
+Upstream Squrve and integrated methods retain their own attribution; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The Pi Agent runtime is consumed as the pinned npm package `@earendil-works/pi-coding-agent` declared in `demo/package.json`.

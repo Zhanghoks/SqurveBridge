@@ -1,6 +1,6 @@
 # SqurveBridge Interactive Demo
 
-本地交互工作台：React 前端（`demo-app/`）+ Flask API（`demo/api_server.py`）+ 内嵌 Pi Agent（`pi/`）。
+本地交互工作台：React 前端（`demo-app/`）+ Flask API（`demo/api_server.py`）+ 内嵌 Pi Agent（npm SDK `@earendil-works/pi-coding-agent`，版本锁定在 `demo/package.json`）。
 它用于运行 Text-to-SQL 工作流、查看实验结果和检查持久化证据。
 
 ## 一键启动 / 关闭
@@ -49,7 +49,7 @@ SQURVE_DEMO_WEB_PORT=5174 ./demo/start.sh
 
 1. 仓库根目录已有可用的 Python 虚拟环境 `.venv/`（含 demo API 依赖）
 2. 已安装 Node.js 22.19+ / npm
-3. 首次启动会按需构建 `pi/`，并在缺少 `demo-app/node_modules` 时执行 `npm ci`
+3. 首次启动会按需安装内嵌 Pi SDK（`npm ci --prefix demo`），并在缺少 `demo-app/node_modules` 时执行 `npm ci`
 4. 本地 LLM 凭据：复制 `.env.example` → `.env`，或在页面中配置 provider
 
 ```bash

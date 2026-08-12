@@ -123,11 +123,11 @@ jobs:
         with:
           node-version: "22.19"
 
+      - name: Install the embedded Pi SDK
+        run: bash demo/build_embedded_pi.sh
+
       - name: Test the Pi bridge security contract
         run: node --test tests/pi_agent_bridge.test.mjs
-
-      - name: Build the vendored Pi runtime
-        run: bash demo/build_embedded_pi.sh
 
   hosted-space-image:
     name: Hugging Face Space image

@@ -17,7 +17,6 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MAX_TEXT_BYTES = 2_000_000
-VENDORED_IDENTITY_PREFIXES = {"pi"}
 
 SENSITIVE_PATH_PARTS = {
     "camera-ready",
@@ -204,9 +203,6 @@ def scan_paths(
 ) -> list[Finding]:
     findings: list[Finding] = []
     for path in paths:
-        relative = path.relative_to(root)
-        if relative.parts and relative.parts[0] in VENDORED_IDENTITY_PREFIXES:
-            continue
         findings.extend(scan_path(path, root, deny_terms))
     return sorted(
         set(findings),

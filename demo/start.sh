@@ -131,8 +131,8 @@ command -v curl >/dev/null 2>&1 || die "curl not found."
 node_major="$(node -p 'process.versions.node.split(".")[0]')"
 [[ "${node_major}" -ge 22 ]] || die "Embedded Pi requires Node.js 22.19 or newer."
 
-if [[ ! -f "${ROOT}/pi/packages/coding-agent/dist/index.js" ]]; then
-  log "Building embedded Pi Agent runtime…"
+if [[ ! -d "${ROOT}/demo/node_modules/@earendil-works/pi-coding-agent/dist" ]]; then
+  log "Installing embedded Pi SDK…"
   bash "${ROOT}/demo/build_embedded_pi.sh"
 fi
 

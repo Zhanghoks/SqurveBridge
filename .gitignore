@@ -26,6 +26,7 @@ __pycache__/
 .ruff_cache/
 
 # Node / demo frontend
+node_modules/
 demo-app/node_modules/
 demo-app/dist/
 **/.build/

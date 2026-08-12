@@ -74,60 +74,134 @@ test('hosted paths cannot escape the project through absolute paths or symlinks'
   await assert.rejects(() => assertConfinedPath(root, 'escape'), /outside the SqurveBridge project/)
 })
 
-test('hosted bridge stores use only Pi native in-memory implementations', async () => {
-  const { createBridgeStores } = await bridgeModule()
+test('the in-memory credential store never persists and follows CredentialStore semantics', async () => {
+  const { createInMemoryCredentialStore } = await bridgeModule()
+  const store = createInMemoryCredentialStore()
+
+  assert.equal(await store.read('anthropic'), undefined)
+  await store.modify('anthropic', async () => ({ type: 'api_key', key: 'secret' }))
+  assert.deepEqual(await store.read('anthropic'), { type: 'api_key', key: 'secret' })
+  assert.deepEqual(await store.list(), [{ providerId: 'anthropic', type: 'api_key' }])
+
+  const unchanged = await store.modify('anthropic', async () => undefined)
+  assert.deepEqual(unchanged, { type: 'api_key', key: 'secret' })
+
+  await store.delete('anthropic')
+  assert.equal(await store.read('anthropic'), undefined)
+  assert.deepEqual(await store.list(), [])
+})
+
+test('hosted bridge runtime keeps credentials, models, and settings in memory', async () => {
+  const { createBridgeRuntime } = await bridgeModule()
   const calls = []
-  const authStorage = { kind: 'memory-auth' }
-  const modelRegistry = { kind: 'memory-models' }
+  const runtime = { kind: 'runtime' }
   const settingsManager = { kind: 'memory-settings' }
   const sdk = {
-    AuthStorage: {
-      inMemory() { calls.push('auth-memory'); return authStorage },
-      create() { calls.push('auth-file'); return {} },
+    ModelRuntime: {
+      async create(options) {
+        calls.push(['runtime-create', options])
+        return runtime
+      },
     },
-    ModelRegistry: {
-      inMemory(value) { calls.push(['models-memory', value]); return modelRegistry },
-      create() { calls.push('models-file'); return {} },
+    ModelRegistry: class {
+      constructor(value) {
+        calls.push(['registry', value])
+        this.runtime = value
+      }
     },
     SettingsManager: {
-      inMemory() { calls.push('settings-memory'); return settingsManager },
+      inMemory() {
+        calls.push('settings-memory')
+        return settingsManager
+      },
     },
   }
 
-  assert.deepEqual(
-    createBridgeStores(sdk, { cwd: '/workspace', profile: 'hosted-readonly' }),
-    { authStorage, modelRegistry, settingsManager },
-  )
-  assert.deepEqual(calls, [
-    'auth-memory',
-    ['models-memory', authStorage],
-    'settings-memory',
-  ])
+  const hosted = await createBridgeRuntime(sdk, { cwd: '/workspace', profile: 'hosted-readonly' })
+  assert.equal(hosted.modelRuntime, runtime)
+  assert.equal(hosted.settingsManager, settingsManager)
+  assert.equal(hosted.modelRegistry.runtime, runtime)
+
+  const [, hostedOptions] = calls.find(entry => entry[0] === 'runtime-create')
+  assert.equal(hostedOptions.modelsPath, null)
+  assert.equal(hostedOptions.refreshOnCreate, false)
+  assert.equal(typeof hostedOptions.credentials.read, 'function')
+  assert.equal(calls.includes('settings-memory'), true)
 })
 
-function fakePiAuth() {
+test('local bridge runtime reads the project model catalog from config/pi_models.json', async () => {
+  const { createBridgeRuntime } = await bridgeModule()
+  const calls = []
+  const runtime = { kind: 'runtime' }
+  const sdk = {
+    ModelRuntime: {
+      async create(options) {
+        calls.push(options)
+        return runtime
+      },
+    },
+    ModelRegistry: class {
+      constructor(value) {
+        this.runtime = value
+      }
+    },
+    SettingsManager: {
+      inMemory() {
+        assert.fail('local profile must not force in-memory settings')
+      },
+    },
+  }
+
+  const local = await createBridgeRuntime(sdk, { cwd: '/workspace', profile: 'local-full' })
+  assert.equal(local.modelRuntime, runtime)
+  assert.equal(local.settingsManager, null)
+  assert.equal(calls[0].modelsPath, path.join('/workspace', 'config', 'pi_models.json'))
+  assert.equal(
+    calls[0].modelsStorePath,
+    path.join('/workspace', 'workspace', 'sessions', 'pi-agent', 'models-store.json'),
+  )
+  assert.equal(calls[0].credentials, undefined)
+})
+
+function fakePi() {
   const credentials = new Map()
   const models = [
     { provider: 'anthropic', id: 'claude-sonnet', name: 'Claude Sonnet' },
     { provider: 'openai-codex', id: 'gpt-5-codex', name: 'GPT-5 Codex' },
   ]
-  const oauthProviders = [{ id: 'openai-codex', name: 'OpenAI Codex' }]
-  const authStorage = {
-    getOAuthProviders: () => oauthProviders,
-    get: provider => credentials.get(provider),
-    set: (provider, credential) => credentials.set(provider, credential),
-    logout: provider => credentials.delete(provider),
-    async login(provider, callbacks) {
-      callbacks.onAuth({ url: 'https://auth.example/login', instructions: 'Open this URL.' })
-      callbacks.onDeviceCode({ userCode: 'ABCD-EFGH', verificationUri: 'https://auth.example/device' })
-      callbacks.onProgress('Waiting for authorization')
-      const account = await callbacks.onPrompt({ message: 'Account label', placeholder: 'work' })
-      const tenant = await callbacks.onSelect({
+  const providers = {
+    anthropic: { id: 'anthropic', auth: { apiKey: { name: 'Anthropic API key' } } },
+    'openai-codex': { id: 'openai-codex', auth: { apiKey: { name: 'OpenAI API key' }, oauth: { name: 'OpenAI Codex' } } },
+  }
+  const modelRuntime = {
+    getProvider: provider => providers[provider],
+    async listCredentials() {
+      return [...credentials.entries()].map(([providerId, credential]) => ({ providerId, type: credential.type }))
+    },
+    async login(provider, type, interaction) {
+      if (type === 'api_key') {
+        const key = await interaction.prompt({ type: 'secret', message: `Enter API key for ${provider}`, placeholder: 'API key' })
+        if (!String(key).trim()) throw new Error('API key is required')
+        const credential = { type: 'api_key', key: String(key).trim() }
+        credentials.set(provider, credential)
+        return credential
+      }
+      interaction.notify({ type: 'auth_url', url: 'https://auth.example/login', instructions: 'Open this URL.' })
+      interaction.notify({ type: 'device_code', userCode: 'ABCD-EFGH', verificationUri: 'https://auth.example/device' })
+      interaction.notify({ type: 'progress', message: 'Waiting for authorization' })
+      const account = await interaction.prompt({ type: 'text', message: 'Account label', placeholder: 'work' })
+      const tenant = await interaction.prompt({
+        type: 'select',
         message: 'Choose tenant',
         options: [{ id: 'team-a', label: 'Team A' }],
       })
-      const code = await callbacks.onManualCodeInput()
-      credentials.set(provider, { type: 'oauth', access: `${account}:${tenant}:${code}`, refresh: 'refresh', expires: 1 })
+      const code = await interaction.prompt({ type: 'manual_code', message: 'Paste the authorization code' })
+      const credential = { type: 'oauth', access: `${account}:${tenant}:${code}`, refresh: 'refresh', expires: 1 }
+      credentials.set(provider, credential)
+      return credential
+    },
+    async logout(provider) {
+      credentials.delete(provider)
     },
   }
   const modelRegistry = {
@@ -136,7 +210,6 @@ function fakePiAuth() {
     getProviderAuthStatus: provider => ({ configured: credentials.has(provider), source: credentials.has(provider) ? 'stored' : undefined }),
     find: (provider, model) => models.find(item => item.provider === provider && item.id === model),
     hasConfiguredAuth: model => credentials.has(model.provider),
-    refresh() {},
   }
   const session = {
     selected: null,
@@ -145,7 +218,7 @@ function fakePiAuth() {
     async prompt(message) { this.prompts.push(message) },
     async abort() {},
   }
-  return { authStorage, modelRegistry, session, credentials }
+  return { modelRuntime, modelRegistry, session, credentials }
 }
 
 const nextTurn = () => new Promise(resolve => setImmediate(resolve))
@@ -153,10 +226,10 @@ const nextTurn = () => new Promise(resolve => setImmediate(resolve))
 test('Pi auth protocol accepts an API key without emitting the secret', async () => {
   const { createPiAuthProtocol } = await bridgeModule()
   const events = []
-  const pi = fakePiAuth()
+  const pi = fakePi()
   const protocol = createPiAuthProtocol({ ...pi, emit: event => events.push(event) })
 
-  protocol.emitCatalogs()
+  await protocol.emitCatalogs()
   const login = protocol.handle({ type: 'auth_start', provider: 'anthropic', method: 'api_key' })
   await nextTurn()
   const prompt = events.find(event => event.type === 'auth_prompt')
@@ -174,10 +247,24 @@ test('Pi auth protocol accepts an API key without emitting the secret', async ()
   assert.deepEqual(pi.session.prompts, ['hello'])
 })
 
+test('Pi auth protocol reports subscription support from the provider catalog', async () => {
+  const { createPiAuthProtocol } = await bridgeModule()
+  const events = []
+  const pi = fakePi()
+  const protocol = createPiAuthProtocol({ ...pi, emit: event => events.push(event) })
+
+  await protocol.emitCatalogs()
+  const catalog = events.find(event => event.type === 'auth_catalog')
+  const anthropic = catalog.providers.find(provider => provider.id === 'anthropic')
+  const codex = catalog.providers.find(provider => provider.id === 'openai-codex')
+  assert.deepEqual(anthropic.auth_methods, ['api_key'])
+  assert.deepEqual(codex.auth_methods, ['api_key', 'subscription'])
+})
+
 test('Pi auth protocol selects a custom model id for an authenticated provider', async () => {
   const { createPiAuthProtocol } = await bridgeModule()
   const events = []
-  const pi = fakePiAuth()
+  const pi = fakePi()
   pi.credentials.set('anthropic', { type: 'api_key', key: 'secret' })
   const protocol = createPiAuthProtocol({ ...pi, emit: event => events.push(event) })
 
@@ -198,7 +285,7 @@ test('Pi auth protocol selects a custom model id for an authenticated provider',
 test('Pi auth protocol relays native OAuth events and prompt types', async () => {
   const { createPiAuthProtocol } = await bridgeModule()
   const events = []
-  const pi = fakePiAuth()
+  const pi = fakePi()
   const protocol = createPiAuthProtocol({ ...pi, emit: event => events.push(event) })
 
   const login = protocol.handle({ type: 'auth_start', provider: 'openai-codex', method: 'subscription' })
@@ -224,7 +311,7 @@ test('Pi auth protocol relays native OAuth events and prompt types', async () =>
 test('Pi auth protocol logs out and rejects prompts without an authenticated model', async () => {
   const { createPiAuthProtocol } = await bridgeModule()
   const events = []
-  const pi = fakePiAuth()
+  const pi = fakePi()
   pi.credentials.set('anthropic', { type: 'api_key', key: 'secret' })
   const protocol = createPiAuthProtocol({ ...pi, emit: event => events.push(event) })
 

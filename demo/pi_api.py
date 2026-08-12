@@ -84,11 +84,19 @@ def register_pi_routes(
     def start_pi_agent_session():
         current = settings()
         if session_factory is PiAgentSession:
-            built_entry = root / "pi" / "packages" / "coding-agent" / "dist" / "index.js"
+            sdk_entry = (
+                root
+                / "demo"
+                / "node_modules"
+                / "@earendil-works"
+                / "pi-coding-agent"
+                / "dist"
+                / "index.js"
+            )
             if not shutil.which(current.node_binary):
                 return jsonify({"status": "error", "message": "Node.js is required for the Pi backend"}), 503
-            if not built_entry.is_file():
-                return jsonify({"status": "error", "message": "Embedded Pi is not built"}), 503
+            if not sdk_entry.is_file():
+                return jsonify({"status": "error", "message": "The embedded Pi SDK is not installed"}), 503
         try:
             session = registry.create(current, session_factory)
         except RuntimeError as exc:
