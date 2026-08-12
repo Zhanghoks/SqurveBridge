@@ -2,7 +2,8 @@
 
 Evolution uses a three-stage funnel:
 
-1. Smoke gate: 50 samples, all initial candidates, promote top 2 passing candidates by fitness.
+0. Review gate (precondition): only candidates whose `review/review-state.json` verdict is `approve` may enter the funnel (`evolution-review-loop.md`); `tools/evolve_status.py` reports `run_candidate_review` until this holds.
+1. Smoke gate: 50 samples, all review-approved candidates, promote top 2 passing candidates by fitness.
 2. Bounded evaluation: 200 samples, only smoke-promoted candidates, promote top 1 by fitness.
 3. Full confirmation: full reproduce run, best node only.
 

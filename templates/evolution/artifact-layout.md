@@ -16,12 +16,21 @@ artifacts/evolve/<evolve_slug>/
 ├── best-node.md
 ├── comparison-report.json
 ├── comparison-report.md
+├── reviews/
+│   └── <target>/                    # run-level review loops (weakness-profile, comparison-report, ...)
+│       ├── review-state.json
+│       ├── round-<n>-findings.json
+│       └── round-<n>-notes.md
 └── nodes/
     └── <node_id>/
         ├── node.json
         ├── change-plan.md
         ├── patch.diff
         ├── run-command.sh
+        ├── review/                  # candidate review loop; smoke may run only after verdict=approve
+        │   ├── review-state.json
+        │   ├── round-<n>-findings.json
+        │   └── round-<n>-notes.md
         ├── attempts/
         │   └── <stage>-<ordinal>/
         │       ├── command.json
@@ -37,6 +46,6 @@ artifacts/evolve/<evolve_slug>/
         └── status.json
 ```
 
-`evolve-state.json` is the current run-control state. `journal.json` is the node/search evidence ledger. `artifact-manifest.json` indexes durable files and fingerprints. `process-events.jsonl` is append-only process history. `progress.md` is a human-readable summary derived from those machine artifacts and is not a fact source.
+`evolve-state.json` is the current run-control state. `journal.json` is the node/search evidence ledger. `artifact-manifest.json` indexes durable files and fingerprints. `process-events.jsonl` is append-only process history. `progress.md` is a human-readable summary derived from those machine artifacts and is not a fact source. `review-state.json` files are the fact source for the AI review loop (`skills/shared-references/evolution-review-loop.md`); skeleton in `templates/evolution/review-state.json`.
 
 Missing optional files must be explained in `status.json`.

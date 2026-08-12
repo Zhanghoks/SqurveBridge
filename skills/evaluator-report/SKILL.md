@@ -28,7 +28,8 @@ disable-model-invocation: true
 3. 调用 `tools/profile_weakness.py` 生成 `weakness_profile.md`。
 4. 写 `report-spec-draft.md`，包含 EX/EM/CF1/FD/stage/workflow attribution/SQL feature/QVT/token/error_root 摘要。
 5. SPEC_REVIEW → approve → 写 `report.md`。
-6. 阈值判断 → 询问是否进入 `/meta-evo`。
+6. 对 `report.md` 跑 `/evolve-review`（target_kind=`evaluator-report`）：核对每个数字可回溯到 `scores.json`；verdict=approve 后报告才算定稿。
+7. 阈值判断 → 询问是否进入 `/meta-evo`。
 
 ## Meta-Evo Gate
 

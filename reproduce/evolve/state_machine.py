@@ -24,11 +24,13 @@ class EvolvePhase(str, Enum):
     BASELINE_LOADED = "baseline_loaded"
     WEAKNESS_PROFILED = "weakness_profiled"
     ACTIONS_GENERATED = "actions_generated"
+    CANDIDATES_REVIEWED = "candidates_reviewed"
     SMOKE_RUNNING = "smoke_running"
     SMOKE_PROMOTED = "smoke_promoted"
     BOUNDED_RUNNING = "bounded_running"
     BOUNDED_PROMOTED = "bounded_promoted"
     FULL_CONFIRMING = "full_confirming"
+    REPORT_REVIEWED = "report_reviewed"
     REVIEW_PENDING = "review_pending"
     ACCEPTED = "accepted"
     CONTINUED = "continued"
@@ -49,12 +51,23 @@ VALID_TRANSITIONS = {
     EvolvePhase.INITIALIZED: {EvolvePhase.BASELINE_LOADED, EvolvePhase.ACTIONS_GENERATED, EvolvePhase.FAILED},
     EvolvePhase.BASELINE_LOADED: {EvolvePhase.WEAKNESS_PROFILED, EvolvePhase.FAILED},
     EvolvePhase.WEAKNESS_PROFILED: {EvolvePhase.ACTIONS_GENERATED, EvolvePhase.FAILED},
-    EvolvePhase.ACTIONS_GENERATED: {EvolvePhase.SMOKE_RUNNING, EvolvePhase.STOPPED, EvolvePhase.FAILED},
+    # ACTIONS_GENERATED -> SMOKE_RUNNING stays valid for legacy runs; the
+    # review-gated path goes through CANDIDATES_REVIEWED.
+    EvolvePhase.ACTIONS_GENERATED: {
+        EvolvePhase.CANDIDATES_REVIEWED,
+        EvolvePhase.SMOKE_RUNNING,
+        EvolvePhase.STOPPED,
+        EvolvePhase.FAILED,
+    },
+    EvolvePhase.CANDIDATES_REVIEWED: {EvolvePhase.SMOKE_RUNNING, EvolvePhase.STOPPED, EvolvePhase.FAILED},
     EvolvePhase.SMOKE_RUNNING: {EvolvePhase.SMOKE_PROMOTED, EvolvePhase.STOPPED, EvolvePhase.FAILED},
     EvolvePhase.SMOKE_PROMOTED: {EvolvePhase.BOUNDED_RUNNING, EvolvePhase.STOPPED, EvolvePhase.FAILED},
     EvolvePhase.BOUNDED_RUNNING: {EvolvePhase.BOUNDED_PROMOTED, EvolvePhase.STOPPED, EvolvePhase.FAILED},
     EvolvePhase.BOUNDED_PROMOTED: {EvolvePhase.FULL_CONFIRMING, EvolvePhase.REVIEW_PENDING, EvolvePhase.FAILED},
-    EvolvePhase.FULL_CONFIRMING: {EvolvePhase.REVIEW_PENDING, EvolvePhase.FAILED},
+    # FULL_CONFIRMING -> REVIEW_PENDING stays valid for legacy runs; the
+    # review-gated path records REPORT_REVIEWED first.
+    EvolvePhase.FULL_CONFIRMING: {EvolvePhase.REPORT_REVIEWED, EvolvePhase.REVIEW_PENDING, EvolvePhase.FAILED},
+    EvolvePhase.REPORT_REVIEWED: {EvolvePhase.REVIEW_PENDING, EvolvePhase.FAILED},
     EvolvePhase.REVIEW_PENDING: {
         EvolvePhase.ACCEPTED,
         EvolvePhase.CONTINUED,
@@ -240,7 +253,7 @@ def next_resume_action(
     phase = state.phase
     if phase in {EvolvePhase.INITIALIZED, EvolvePhase.BASELINE_LOADED, EvolvePhase.WEAKNESS_PROFILED}:
         return "run_smoke"
-    if phase == EvolvePhase.ACTIONS_GENERATED:
+    if phase in {EvolvePhase.ACTIONS_GENERATED, EvolvePhase.CANDIDATES_REVIEWED}:
         return "run_smoke"
     if phase == EvolvePhase.SMOKE_RUNNING:
         return "run_bounded" if _has_smoke_promoted(journal) else "run_smoke"
@@ -252,9 +265,79 @@ def next_resume_action(
         return "run_full"
     if phase == EvolvePhase.FULL_CONFIRMING:
         return "reconcile_review"
-    if phase == EvolvePhase.REVIEW_PENDING:
+    if phase in {EvolvePhase.REPORT_REVIEWED, EvolvePhase.REVIEW_PENDING}:
         return "await_review"
     return "stop"
+
+
+def next_step(evolve_dir: str | Path) -> dict[str, Any]:
+    """Single AI-facing status entry: where the run is and what to do next.
+
+    Combines phase, resume action, review gates, and consistency into one
+    machine-readable dict with a ready-to-run ``next_command``. This is the
+    function behind ``tools/evolve_status.py``.
+    """
+    from reproduce.evolve.journal import EvolutionJournal
+    from reproduce.evolve.review import candidate_gate_blockers, collect_review_gates
+
+    evolve_dir = Path(evolve_dir)
+    state = read_state(evolve_dir / "evolve-state.json")
+    journal_path = evolve_dir / "journal.json"
+    journal = EvolutionJournal.read(journal_path) if journal_path.exists() else None
+
+    consistency = "ok"
+    if journal is not None:
+        try:
+            assert_resume_consistency(state, journal)
+        except ValueError as exc:
+            consistency = f"inconsistent: {exc}"
+
+    action = next_resume_action(state, journal) if journal is not None else "run_smoke"
+    gates = collect_review_gates(evolve_dir)
+    blockers = candidate_gate_blockers(evolve_dir)
+    escalated = [key for key, gate in gates.items() if gate["verdict"] == "escalate"]
+
+    next_command: str
+    if consistency != "ok":
+        action = "reconcile_state"
+        next_command = "fail closed: reconcile evolve-state.json / journal.json / manifest before continuing"
+    elif escalated:
+        action = "await_review"
+        next_command = f"present escalated review gates to the user: {', '.join(escalated)}"
+    elif action == "run_smoke" and blockers:
+        action = "run_candidate_review"
+        next_command = (
+            "python3 tools/evolve_review.py verdict --state "
+            f"{evolve_dir}/nodes/<node_id>/review/review-state.json  # unapproved: {', '.join(blockers)}"
+        )
+    elif action in {"run_smoke", "run_bounded", "run_full"}:
+        stage = action.removeprefix("run_")
+        next_command = (
+            f"python3 tools/mcts/orchestrator.py --actions {evolve_dir}/action-pool.json "
+            f"--journal {evolve_dir}/journal.json --evolve-dir {evolve_dir} --stage {stage} "
+            f"--policy-config reproduce/configs/evolution/bounded_search_default.json"
+        )
+    elif action == "reconcile_review":
+        next_command = (
+            f"python3 tools/mcts/orchestrator.py --actions {evolve_dir}/action-pool.json "
+            f"--journal {evolve_dir}/journal.json --evolve-dir {evolve_dir} --stage full  # resume full confirmation"
+        )
+    elif action == "await_review":
+        next_command = "await the human accept / continue / rollback decision"
+    else:
+        next_command = "run is terminal; open a new evolve slug for further work"
+
+    return {
+        "slug": state.slug,
+        "phase": state.phase.value,
+        "round": state.round,
+        "consistency": consistency,
+        "resume_action": action,
+        "review_gates": gates,
+        "candidate_gate_blockers": blockers,
+        "best_node": journal.best_node if journal is not None else None,
+        "next_command": next_command,
+    }
 
 
 def assert_resume_consistency(state: EvolveState, journal: Any) -> None:

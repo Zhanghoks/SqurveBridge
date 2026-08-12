@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "target_kind": "change-plan",
+  "target_ref": "nodes/n001_<short_name>/change-plan.md",
+  "status": "in_review",
+  "verdict": "revise",
+  "max_rounds": 5,
+  "clean_rounds_required": 1,
+  "rounds": [
+    {
+      "round": 1,
+      "reviewer": "subagent:critic",
+      "new_finding_ids": ["F001"],
+      "notes": "",
+      "at": "<iso8601>"
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "F001",
+      "severity": "major",
+      "category": "regression-risk",
+      "location": "change-plan.md#scope",
+      "summary": "<问题描述>",
+      "recommendation": "<具体修改建议>",
+      "status": "open",
+      "opened_round": 1,
+      "closed_round": null,
+      "resolution": null,
+      "waived_by_human": false
+    }
+  ],
+  "escalation_reason": null,
+  "created_at": "<iso8601>",
+  "updated_at": "<iso8601>"
+}

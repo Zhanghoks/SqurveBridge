@@ -10,13 +10,15 @@ passes a human review gate.
 ## Loop Overview
 
 ```text
-baseline scores -> weakness profile -> candidate nodes -> smoke50 -> bounded200 -> full best only -> user review
+baseline scores -> weakness profile -> [review loop] -> candidate nodes -> [review loop]
+    -> smoke50 -> bounded200 -> full best only -> [review loop] -> user review
 ```
 
 | Stage | Input | Owner | Output |
 |---|---|---|---|
 | Diagnose | `scores.json` | `reproduce/metrics/profile.py`, `evolution.py` | `weakness_profile.md`, `meta-evo-input.json` |
 | Candidates | weakness profile | Meta-Evo agent (`skills/Meta-Evo/SKILL.md`) | `action-pool.json` with concrete patches |
+| Review loop | profile / candidate / report | `skills/evolve-review/SKILL.md` + `reproduce/evolve/review.py` | `review-state.json` with verdict `approve`/`revise`/`escalate` |
 | Smoke search | action pool, baseline scores | `reproduce/evolve/mcts/orchestrator.py` | journal nodes, `mcts-tree.smoke.json` |
 | Bounded search | smoke-promoted actions | same orchestrator | `mcts-tree.bounded.json`, best node |
 | Full confirmation | best node only | same orchestrator | `scores.full.json`, `comparison-report.md` |
@@ -27,6 +29,26 @@ The stage budgets (50-sample smoke slices, 200-sample bounded slices, full
 confirmation for the single best node) are defined in
 `skills/shared-references/bounded-search-policy.md`; search-strategy
 parameters live in `reproduce/configs/evolution/bounded_search_default.json`.
+
+## Iterative Review Loop
+
+Before any evaluation budget is spent — and before anything reaches a human —
+the relevant artifact passes an iterative AI review loop
+(`skills/evolve-review/SKILL.md`, contract in
+`skills/shared-references/evolution-review-loop.md`):
+
+- A critic pass (fresh subagent, or an adversarial re-read from disk)
+  raises structured findings (`blocker`/`major`/`minor`/`nit`) against a
+  per-artifact rubric; the author revises and resolves them; the loop
+  repeats.
+- The verdict is deterministic (`reproduce/evolve/review.py`): `approve`
+  requires zero open blocking findings plus a clean re-review round;
+  `escalate` fires when `max_rounds` (default 5) is exhausted, handing the
+  target and its open findings to the human gate. The loop is bounded by
+  construction.
+- `review-state.json` is the only fact source for a review; "reviewed in
+  chat" does not count. Smoke rollouts may only start for candidates whose
+  verdict is `approve`.
 
 ## Reward: Improvement over Baseline
 

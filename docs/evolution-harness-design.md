@@ -17,6 +17,7 @@ Python with no LLM dependency, so the harness is unit-testable end to end
 | `reproduce/evolve/fitness.py` | Multi-objective fitness and baseline-centered improvement |
 | `reproduce/evolve/budget.py` | Promotion gates between smoke, bounded, and full stages |
 | `reproduce/evolve/journal.py` | Evidence ledger, best-node tracking, stagnation detection |
+| `reproduce/evolve/review.py` | Review-loop ledger and deterministic verdict (`tools/evolve_review.py` CLI) |
 | `reproduce/evolve/state_machine.py` | Run phases, resume logic, Scope C gating |
 | `reproduce/evolve/experience.py` | Markdown memory read/write, prior extraction from journals |
 | `reproduce/evolve/artifacts.py` | `artifacts/evolve/` layout, review recording, reports |
@@ -102,9 +103,16 @@ always removed, pass or fail.
 ## State Machine
 
 `evolution_pkg/state_machine.py` owns run phases
-(`initialized -> ... -> smoke_running -> smoke_promoted -> bounded_running ->
-bounded_promoted -> full_confirming -> review_pending -> accepted/continued/rolled_back`),
-resume actions after interruption, and Scope C classification.
+(`initialized -> ... -> actions_generated -> candidates_reviewed ->
+smoke_running -> smoke_promoted -> bounded_running -> bounded_promoted ->
+full_confirming -> report_reviewed -> review_pending ->
+accepted/continued/rolled_back`), resume actions after interruption, and
+Scope C classification. `candidates_reviewed` and `report_reviewed` record
+the AI review gates (`docs/meta-evo-loop.md`); the ungated legacy transitions
+remain valid for old runs. `next_step(evolve_dir)` — exposed as
+`tools/evolve_status.py` — combines phase, review gates, consistency, and a
+ready-to-run next command into one status object, and withholds search stages
+while any candidate lacks an approved review.
 `run_bounded_funnel` delegates every phase transition to it; a phase is valid
 only when `evolve-state.json`, `journal.json`, and the artifact manifest
 agree (see `skills/shared-references/evolution-controller-contract.md`).

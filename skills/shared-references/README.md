@@ -50,6 +50,7 @@ Public overviews:
 | [reproduce-config-schema.md](reproduce-config-schema.md) | reproduce config 字段与多阶段 Task；实例骨架见 `templates/reproduce/` |
 | [git-experiment-isolation.md](git-experiment-isolation.md) | Branch + Worktree 混合模式、Agent Git 合同 |
 | [evolution-controller-contract.md](evolution-controller-contract.md) | Meta-Evo / MCTS / human review 的分层边界 |
+| [evolution-review-loop.md](evolution-review-loop.md) | AI 迭代审核循环（review → 修改 → 再 review）的账本、verdict 与门控位置 |
 | [evolution-node-schema.md](evolution-node-schema.md) | node 语义合同；文件骨架见 `templates/evolution/node.json` |
 | [evolution-journal-schema.md](evolution-journal-schema.md) | journal 事实源、best node、stagnation 语义；文件骨架见 `templates/evolution/journal.json` |
 | [bounded-search-policy.md](bounded-search-policy.md) | smoke(50) → bounded(200) → full(best only) 晋级规则 |
