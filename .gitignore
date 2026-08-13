@@ -39,8 +39,10 @@ test-results/
 npm-debug.log*
 yarn-error.log*
 
-# Runtime outputs
-files/
+# Runtime outputs. The directory itself is a declared path root
+# (reproduce/eval/paths.py), so keep it tracked and ignore only its contents.
+files/*
+!files/.gitkeep
 artifacts/
 tmp/
 workspace/*
