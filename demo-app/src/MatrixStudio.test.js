@@ -12,7 +12,7 @@ Object.defineProperty(globalThis, 'localStorage', {
   configurable: true,
   value: window.localStorage,
 })
-const { cleanup, render, screen, within } = await import('@testing-library/react')
+const { act, cleanup, fireEvent, render, screen, within } = await import('@testing-library/react')
 const userEvent = (await import('@testing-library/user-event')).default
 registerLoader('./cssTestLoader.mjs', import.meta.url)
 const unregister = register()
@@ -278,6 +278,23 @@ test('opens method and database flashcards with what, origin, and intro', async 
   await user.click(screen.getByRole('button', { name: 'Open flashcard for database BIRD' }))
   assert.ok(screen.getByRole('link', { name: 'https://bird-bench.github.io/' }))
   assert.match(screen.getByTestId('flashcard-dialog').textContent, /bird-bench\.github\.io/)
+})
+
+test('keeps both pairs when connection clicks land in one batch', async () => {
+  renderDemo()
+  const user = userEvent.setup()
+
+  await goToStep(user, 'Compose')
+  // Two clicks inside one act batch. The second used to derive its next list
+  // from the render that had not committed yet, dropping the first pair.
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle connection DINSQL to BIRD' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle connection DINSQL to Spider' }))
+  })
+
+  assert.equal(screen.getAllByRole('button', { name: /^Focus connection / }).length, 3)
+  assert.ok(screen.getByRole('button', { name: 'Focus connection DINSQL to BIRD' }))
+  assert.ok(screen.getByRole('button', { name: 'Focus connection DINSQL to Spider' }))
 })
 
 test('supports arbitrary graph connections without cartesian expansion', async () => {

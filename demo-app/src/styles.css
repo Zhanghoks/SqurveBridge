@@ -1355,17 +1355,10 @@ td em { color: #6b6152; }
 .harness-shortcuts:not(.pi-skills-list) button:disabled { color: #9a8d78; opacity: .65; }
 .harness-shortcuts:not(.pi-skills-list) button.needs-input { border-color: #d4a574; color: #8f6114; background: #f6ead2; }
 .agent-harness:not(.agent-harness-shell) .pi-skills-list { display: grid; gap: 12px; border-bottom: 1px solid #e0d5c1; padding: 10px 12px 12px; background: #f1eadb; }
-.agent-harness:not(.agent-harness-shell) .pi-skills-group { display: grid; gap: 4px; }
-.agent-harness:not(.agent-harness-shell) .pi-skills-group-head h3 { margin: 0; color: #cfcfcf; font: 700 9px/1.2 ui-sans-serif, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
-.agent-harness:not(.agent-harness-shell) .pi-skills-group-head span { color: #7a7a7a; font-size: 9px; }
-.agent-harness:not(.agent-harness-shell) .pi-skills-group-items { display: grid; gap: 4px; }
-.agent-harness:not(.agent-harness-shell) .pi-skills-item { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 8px; align-items: start; border: 1px solid #3c3c3c; border-radius: 6px; padding: 8px; color: #d9d9d9; background: #1d1d1d; text-align: left; }
+.agent-harness:not(.agent-harness-shell) .pi-skills-item { display: grid; gap: 2px; border: 1px solid #e0d5c1; border-radius: 6px; padding: 8px; color: #2e2618; background: #fbf8f1; text-align: left; }
 .agent-harness:not(.agent-harness-shell) .pi-skills-item:hover { border-color: #d3c6ad; background: #efe7d6; }
-.agent-harness:not(.agent-harness-shell) .pi-skills-step { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 999px; color: #a6c9a6; background: #262626; font: 700 10px/1 ui-sans-serif, system-ui, sans-serif; }
-.agent-harness:not(.agent-harness-shell) .pi-skills-copy { display: grid; gap: 2px; }
-.agent-harness:not(.agent-harness-shell) .pi-skills-copy strong { font: 700 11px/1.2 ui-sans-serif, system-ui, sans-serif; }
-.agent-harness:not(.agent-harness-shell) .pi-skills-copy > span { color: #929292; font-size: 9px; line-height: 1.4; }
-.agent-harness:not(.agent-harness-shell) .pi-skills-copy code { color: #757575; font: 8px ui-monospace, monospace; }
+.agent-harness:not(.agent-harness-shell) .pi-skills-item strong { font: 700 11px/1.2 ui-sans-serif, system-ui, sans-serif; }
+.agent-harness:not(.agent-harness-shell) .pi-skills-item > span { color: #6b6152; font-size: 9px; line-height: 1.4; }
 
 .pi-chat-log { display: grid; align-content: start; gap: 10px; min-height: 360px; max-height: 560px; overflow-y: auto; padding: 14px; background: #f1eadb; scrollbar-color: #d3c6ad #f1eadb; }
 .pi-chat-empty { display: grid; place-content: center; gap: 10px; min-height: 300px; color: #6b6152; text-align: center; }
