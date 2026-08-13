@@ -25,6 +25,7 @@ _project_root = Path(__file__).resolve().parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
+from demo import model_catalog
 from demo.deployment import deployment_features, deployment_target, hosted_route_allowed
 from demo.file_to_db import process_uploaded_files, sqlite_to_schema
 from demo.gradio_demo import (
@@ -103,14 +104,12 @@ _runtime_llm: dict[str, str | None] = {"provider": None, "model": None}
 _sql_credentials = SessionCredentialRegistry(max_sessions=128, idle_timeout=1800)
 _session_cookie_name = "squrve_session"
 _sample_limits = {3, 10, 20, 50, 100, 200}
-_provider_models = {
-    "qwen": ["qwen-plus", "qwen-max", "qwen-turbo", "deepseek-v4-flash"],
-    "deepseek": ["deepseek-chat", "deepseek-reasoner"],
-    "zhipu": ["glm-4-plus", "glm-4-flash"],
-    "openai": ["gpt-4o-mini", "gpt-4.1-mini"],
-    "claude": ["claude-3-5-sonnet-latest"],
-    "gemini": ["gemini-2.0-flash"],
-}
+_supported_providers = frozenset(model_catalog.PROVIDER_ORDER)
+
+
+def _provider_model_ids() -> dict[str, list[str]]:
+    """Provider → model IDs, sourced from the embedded Pi SDK where possible."""
+    return model_catalog.provider_models(_project_root)
 _QWEN_ENDPOINTS = {
     "china": "https://dashscope.aliyuncs.com/compatible-mode/v1",
     "international": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
@@ -225,7 +224,7 @@ def _same_origin_error():
 
 def _sql_provider_catalog() -> list[dict[str, object]]:
     catalog = []
-    for provider, models in _provider_models.items():
+    for provider, models in _provider_model_ids().items():
         item = {
             "id": provider,
             "models": list(models),
@@ -249,7 +248,7 @@ def _credential_from_payload(payload: dict) -> SqlCredential:
     provider = str(payload.get("provider") or "").strip()
     model = str(payload.get("model") or "").strip()
     api_key = payload.get("api_key")
-    if provider not in _provider_models:
+    if provider not in _supported_providers:
         raise SqlAuthError("unsupported_provider")
     if not model or len(model) > 200 or any(ord(character) < 32 for character in model):
         raise SqlAuthError("unsupported_model")
@@ -610,7 +609,7 @@ def _validate_model_id(model: str) -> str:
 
 
 def _apply_provider_config(provider: str, model: str, api_key: str | None = None, persist: bool = True) -> dict:
-    if provider not in _provider_models:
+    if provider not in _supported_providers:
         raise ValueError(f"Unsupported LLM provider: {provider}")
     model = _validate_model_id(model)
 
@@ -683,7 +682,7 @@ def _llm_provider_catalog() -> list[dict]:
     load_dotenv(_project_root / ".env")
     default = _provider_status()
     catalog = []
-    for provider, catalog_models in _provider_models.items():
+    for provider, catalog_models in _provider_model_ids().items():
         models = list(catalog_models)
         active_model = default["model"] if provider == default["provider"] else None
         catalog.append({
@@ -786,7 +785,7 @@ def update_provider():
         return _json_error("provider is required")
     if not model:
         catalog = next((item for item in _llm_provider_catalog() if item["id"] == provider), None)
-        model = (catalog or {}).get("default_model") or (_provider_models.get(provider) or [""])[0]
+        model = (catalog or {}).get("default_model") or (_provider_model_ids().get(provider) or [""])[0]
     if api_key is not None and not isinstance(api_key, str):
         return _json_error("api_key must be a string")
     try:

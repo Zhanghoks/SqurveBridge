@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { officialModelsFor } from './llmCatalog.js'
+import { modelsForProvider } from './llmCatalog.js'
 
 const jsonOptions = (method, body) => ({
   method,
@@ -103,7 +103,7 @@ export default function SqlAuthDialog({ open, api, status, onStatusChange, onClo
     onClose()
   }
 
-  const catalogModels = officialModelsFor(provider)
+  const catalogModels = modelsForProvider(selectedProvider, provider)
   const selectedEndpoint = selectedProvider?.endpoints?.find(item => item.id === endpointId)
 
   return <div className="flow-provider-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) close() }}>
@@ -122,7 +122,8 @@ export default function SqlAuthDialog({ open, api, status, onStatusChange, onClo
           <div className="field model-id-field">
             <span>Model</span>
             {catalogModels.length > 0 && <ul className="model-suggestion-list" aria-label="Suggested models">{catalogModels.map(item => <li key={item}><button type="button" className={model === item ? 'active' : ''} aria-pressed={model === item} onClick={() => setModel(item)}>{item}</button></li>)}</ul>}
-            <input aria-label="Model" value={model} onChange={event => setModel(event.target.value)} placeholder="Enter a model ID" autoComplete="off" spellCheck="false" />
+            <input aria-label="Model" list="session-model-catalog" value={model} onChange={event => setModel(event.target.value)} placeholder="Enter a model ID" autoComplete="off" spellCheck="false" />
+            <datalist id="session-model-catalog">{catalogModels.map(item => <option key={item} value={item} />)}</datalist>
             <small>Pick a catalog model above, or type any model ID this provider supports.</small>
           </div>
           {selectedProvider?.endpoints?.length > 0 && <label className="field"><span>API region</span><select aria-label="API region" value={endpointId} onChange={event => setEndpointId(event.target.value)}>{selectedProvider.endpoints.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select><small>Choose the region where this API key was created.</small></label>}

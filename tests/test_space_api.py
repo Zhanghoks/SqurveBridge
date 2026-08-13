@@ -186,7 +186,7 @@ class SpaceApiTests(unittest.TestCase):
             response = self.client.get("/api/capabilities")
         self.assertEqual(response.status_code, 200)
         providers = {item["id"]: item for item in response.json["llm_providers"]}
-        self.assertEqual(set(providers), set(self.api_server._provider_models))
+        self.assertEqual(set(providers), set(self.api_server._provider_model_ids()))
         self.assertIn("qwen-plus", providers["qwen"]["models"])
         self.assertNotIn("env_var", providers["qwen"])
 
