@@ -143,23 +143,13 @@
   z-index: 1;
 }
 
+/* No ::before/::after sheen here: both pseudo-elements are already the node's
+   status dot, and a full-bleed overlay on the same element would paint over
+   the label. Hover emphasis stays on border/shadow. */
 .flow-graph-nodes button {
   position: relative;
   overflow: hidden;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.flow-graph-nodes button::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(212, 165, 116, 0.1), transparent);
-  opacity: 0;
-  transition: opacity 0.25s ease;
-}
-
-.flow-graph-nodes button:hover::after {
-  opacity: 1;
 }
 
 .flow-graph-nodes button:hover {

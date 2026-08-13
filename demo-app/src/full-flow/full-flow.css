@@ -1625,24 +1625,16 @@
   font: 500 11px/1.4 var(--flow-font-ui, inherit);
 }
 
-.flow-demo .flow-module.connection-composer {
-  container-type: inline-size;
-}
-
+/* Matrix on top, inspect panel below: the connection graph needs the full
+   module width for its curves, and the workflow readout follows the click. */
 .flow-demo .flow-compose-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(300px, .85fr);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
   gap: 22px;
   align-items: stretch;
+  align-content: start;
   min-height: 0;
-}
-
-/* The dashboard pane is user-resizable, so react to the module's own
-   width (not the viewport) and stack the inspect panel when narrow. */
-@container (max-width: 680px) {
-  .flow-demo .flow-compose-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .flow-demo .connection-matrix,
@@ -1760,9 +1752,13 @@
   min-width: 0;
 }
 
+/* Absolute fill so the SVG user space matches the measured canvas box exactly,
+   which is what the curve endpoints are computed against. */
 .flow-demo .flow-connection-graph svg {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: 440px;
+  height: 100%;
   overflow: visible;
 }
 
@@ -1806,15 +1802,6 @@
   /* Only opacity is transitioned: animating stroke/stroke-width/filter on
      dozens of SVG paths forces continuous full-canvas repaints. */
   transition: opacity 140ms ease;
-}
-
-.flow-demo .flow-connection-graph[data-has-selection="true"] path:not(.selected):not(.node-hover):not(.flow-connection-hitarea) {
-  opacity: .04;
-}
-
-/* While a node is hovered, mute everything except that node's fan. */
-.flow-demo .flow-connection-graph[data-node-hover="true"] path:not(.selected):not(.node-hover):not(.focused):not(.flow-connection-hitarea) {
-  opacity: .02;
 }
 
 .flow-demo .flow-connection-graph path.flow-connection-hitarea {
@@ -1970,14 +1957,16 @@
   margin-right: 10px;
 }
 
-.flow-demo .flow-graph-nodes button.selected::before,
-.flow-demo .flow-graph-nodes button.selected::after {
+/* Scoped to the side that actually owns the dot, so the rule can never
+   repaint the other pseudo-element of the same node. */
+.flow-demo .flow-method-nodes button.selected::after,
+.flow-demo .flow-database-nodes button.selected::before {
   border-color: rgb(212 165 116 / 75%);
   background: rgb(212 165 116 / 60%);
 }
 
-.flow-demo .flow-graph-nodes button.focused::before,
-.flow-demo .flow-graph-nodes button.focused::after {
+.flow-demo .flow-method-nodes button.focused::after,
+.flow-demo .flow-database-nodes button.focused::before {
   border-color: var(--flow-blue-strong);
   background: var(--flow-blue-strong);
   box-shadow: 0 0 7px rgb(212 165 116 / 65%);
@@ -4664,7 +4653,6 @@
   .flow-demo .flow-configuration-layout,
   .flow-demo .catalog-workspaces,
   .flow-demo .studio-guide-inline,
-  .flow-demo .flow-compose-grid,
   .flow-demo .run-workspace-layout,
   .flow-demo .run-batch-monitor,
   .flow-demo .run-param-summary,
