@@ -60,6 +60,23 @@ stop_port_listeners() {
   done
 }
 
+# Reclaim listeners owned by this repository on nearby ports. Covers instances
+# started on a shifted port whose runtime state file is already gone.
+stop_repo_listeners() {
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 0
+  fi
+  local port pid cmd
+  for port in "$@"; do
+    for pid in $(lsof -nP -iTCP:"${port}" -sTCP:LISTEN -t 2>/dev/null || true); do
+      [[ "${pid}" =~ ^[0-9]+$ ]] || continue
+      cmd="$(ps -o command= -p "${pid}" 2>/dev/null || true)"
+      [[ "${cmd}" == *"${ROOT}/"* ]] || continue
+      stop_pid "orphan@:${port}" "${pid}"
+    done
+  done
+}
+
 # Prefer recorded PIDs from start.sh
 if [[ -f "${RUNTIME_DIR}/demo.env" ]]; then
   # shellcheck disable=SC1091
@@ -88,6 +105,9 @@ stop_pid "API" "${api_pid}"
 # Fallback: clear listeners on known ports (covers orphaned children).
 stop_port_listeners "${API_PORT}" "API"
 stop_port_listeners "${WEB_PORT}" "Frontend"
+
+# shellcheck disable=SC2046
+stop_repo_listeners $(seq 5173 5180) $(seq 7861 7864)
 
 rm -f "${RUNTIME_DIR}/api.pid" "${RUNTIME_DIR}/web.pid" "${RUNTIME_DIR}/demo.env"
 
