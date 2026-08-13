@@ -589,10 +589,6 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   background: transparent;
 }
 
-.agent-shell-backend {
-  display: none;
-}
-
 .agent-shell-toolbar .flow-status {
   margin-right: auto;
   color: var(--shell-muted);
@@ -604,22 +600,11 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   display: none;
 }
 
-/* Empty state: pin the composer to the bottom of the pane (matching its
-   position once messages exist) and let the greeting fill the space above.
-   margin:auto on the log (not justify-content:center) keeps the greeting
-   scrollable instead of clipped when the pane is short. */
+/* Empty state: the composer keeps its bottom-of-pane position and the intro
+   sits directly above it. Bottom alignment rather than vertical centering
+   avoids a tall band of dead space at the top of a full-height pane. */
 .agent-harness-shell.is-empty {
   overflow-y: auto;
-}
-
-.agent-harness-shell.is-empty .agent-shell-scroll {
-  flex: 1;
-  padding-top: 24px;
-  /* A faint warm glow behind the greeting keeps the empty pane from reading
-     as dead black. Plain background gradients cost nothing to composite. */
-  background:
-    radial-gradient(ellipse 110% 46% at 50% 30%, rgba(212, 165, 116, 0.05), transparent 68%),
-    radial-gradient(ellipse 80% 34% at 50% 24%, rgba(255, 255, 255, 0.02), transparent 70%);
 }
 
 .agent-harness-shell.is-empty .agent-shell-scroll-spacer {
@@ -632,7 +617,7 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   min-height: 0;
   max-height: none;
   margin: 0 auto;
-  padding: 28px clamp(18px, 5vw, 48px) 200px;
+  padding: 28px clamp(18px, 5vw, 48px) 160px;
   flex-direction: column;
   gap: 22px;
   background: transparent;
@@ -640,9 +625,9 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
 
 .agent-harness-shell.is-empty .pi-chat-log {
   flex: 0 0 auto;
-  width: min(100%, 640px);
-  margin: auto;
-  padding: 0 clamp(18px, 5vw, 40px);
+  width: 100%;
+  margin: auto 0 0;
+  padding: 0 clamp(18px, 5vw, 40px) 18px;
   gap: 0;
 }
 
@@ -657,134 +642,57 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   letter-spacing: 0.04em;
 }
 
+/* Welcome area: one line of orientation and a row of prompt starters. No
+   greeting, avatar or entrance animation — none of it told the user anything
+   they could act on. The base .pi-chat-empty is centred for the standalone
+   panel, so the shell has to undo both axes to line up with the composer. */
 .agent-harness-shell .pi-chat-empty {
   display: grid;
+  width: 100%;
   max-width: 560px;
   min-height: 0;
   margin: 0 auto;
   gap: 12px;
-  padding: 0 0 4px;
-  text-align: center;
-  justify-items: center;
-  /* One-shot entrance, transform/opacity only; the global reduced-motion
-     block at the bottom of this file collapses it to a single frame. */
-  animation: pi-empty-in 460ms cubic-bezier(0.22, 0.7, 0.3, 1) both;
-}
-
-@keyframes pi-empty-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.agent-harness-shell .pi-chat-empty::before {
-  display: grid;
-  width: 48px;
-  height: 48px;
-  margin-bottom: 8px;
-  place-items: center;
-  color: #17110a;
-  border: 1px solid rgba(224, 182, 138, 0.55);
-  border-radius: 999px;
-  background: linear-gradient(160deg, #f7efe4, #e2c69f);
-  box-shadow:
-    0 0 0 1px rgba(212, 165, 116, 0.16),
-    0 0 0 7px rgba(212, 165, 116, 0.05),
-    0 0 34px rgba(212, 165, 116, 0.16);
-  font-family: var(--shell-serif);
-  font-size: 21px;
-  font-weight: 500;
-  content: "π";
-}
-
-.agent-harness-shell .pi-chat-greeting {
-  display: block;
-  margin: 0;
-  color: var(--shell-text);
-  font-family: var(--shell-serif);
-  font-size: clamp(28px, 3.4vw, 40px);
-  font-weight: 450;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
+  padding: 0;
+  place-content: start stretch;
+  justify-items: stretch;
+  text-align: left;
 }
 
 .agent-harness-shell .pi-chat-empty > span {
-  max-width: 42ch;
-  margin: 0 auto;
+  max-width: none;
   color: #6b6152;
   font-size: 13px;
   line-height: 1.55;
+  justify-self: stretch;
 }
 
-/* Capability cards inside the welcome area. These prefill the composer
-   draft when clicked — distinct from the removed composer suggestion row. */
+/* Prompt starters. Clicking one only prefills the composer draft. A fixed two
+   column grid keeps the four starters from breaking 3 + 1 in a narrow pane. */
 .pi-chat-hero-cards {
   display: grid;
   width: 100%;
-  margin-top: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
 .pi-chat-hero-card {
-  display: grid;
-  gap: 5px;
-  padding: 13px 14px 12px;
-  justify-items: start;
+  padding: 10px 12px;
   color: var(--shell-text);
   border: 1px solid var(--shell-border);
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0)) #181818;
+  border-radius: 11px;
+  background: #fbf8f1;
   font: inherit;
+  font-size: 12px;
   text-align: left;
   cursor: pointer;
-  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+  transition: border-color 150ms ease, background-color 150ms ease;
 }
 
 .pi-chat-hero-card:hover,
 .pi-chat-hero-card:focus-visible {
   border-color: rgba(212, 165, 116, 0.38);
   background-color: #f6ead2;
-  transform: translateY(-1px);
-}
-
-.pi-chat-hero-card:active {
-  transform: none;
-}
-
-.pi-chat-hero-card-icon {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  margin-bottom: 3px;
-  place-items: center;
-  color: var(--shell-accent);
-  border: 1px solid rgba(212, 165, 116, 0.26);
-  border-radius: 8px;
-  background: rgba(212, 165, 116, 0.07);
-}
-
-.pi-chat-hero-card-icon svg {
-  width: 14px;
-  height: 14px;
-}
-
-.pi-chat-hero-card strong {
-  font-size: 12.5px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.pi-chat-hero-card > span:last-child {
-  color: var(--shell-muted);
-  font-size: 11px;
-  line-height: 1.45;
 }
 
 .agent-harness-shell .pi-chat-suggestions {
@@ -918,12 +826,16 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   grid-column: 2 / -1;
 }
 
+/* One column: the legacy composer in styles.css keeps a second track for its
+   side-by-side send button, and its column gap would otherwise hold 9px of the
+   width back from the field's right edge. */
 .agent-harness-shell .pi-chat-composer {
   position: absolute;
   z-index: 12;
   right: 16px;
   bottom: 14px;
   left: 16px;
+  grid-template-columns: minmax(0, 1fr);
   margin: 0;
   padding: 0;
   border: 0;
@@ -931,14 +843,18 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   backdrop-filter: none;
 }
 
+/* Docked footer band: without messages there is no scroll shadow to separate
+   the log from the composer, so a hairline and a deeper tint carry the layer. */
 .agent-harness-shell.is-empty .pi-chat-composer {
   position: relative;
   right: auto;
   bottom: auto;
   left: auto;
-  width: min(100%, 640px);
-  margin: 22px auto 0;
-  padding: 0 clamp(18px, 5vw, 40px) 24px;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 16px clamp(18px, 5vw, 40px) 18px;
+  border-top: 1px solid var(--shell-border);
+  background: #ece3d0;
 }
 
 .pi-chat-composer-inner {
@@ -948,17 +864,23 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   margin: 0 auto;
 }
 
+/* 640px log width less its own horizontal padding, so the field and the
+   starters share one left edge at every pane width. */
 .agent-harness-shell.is-empty .pi-chat-composer-inner {
-  max-width: none;
+  max-width: 560px;
 }
 
+/* Two rows rather than one: at the 423px pane width a Chinese placeholder plus a
+   full model name cannot share a line with both round controls without clipping,
+   so the input keeps its own row and the controls collapse into one 30px strip:
+   10 + 21 + 6 + 30 + 8 padding and rows plus 2 hairlines is 77px. */
 .pi-chat-composer-field {
   position: relative;
-  display: flex;
-  min-height: 108px;
-  padding: 16px 52px 44px 16px;
+  display: grid;
+  gap: 6px;
+  padding: 10px 10px 8px 14px;
   border: 1px solid var(--shell-border-strong);
-  border-radius: 18px;
+  border-radius: 20px;
   background: #fbf8f1;
   box-shadow: 0 12px 32px rgba(120, 96, 60, 0.12);
   backdrop-filter: none;
@@ -970,13 +892,21 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   box-shadow: 0 0 0 3px rgba(212, 165, 116, 0.08), 0 12px 32px rgba(120, 96, 60, 0.13);
 }
 
-.pi-chat-composer-field textarea {
+/* Scoped past `.pi-chat-composer textarea` in styles.css, which is equally
+   specific and would otherwise reimpose its 62px min-height and monospace face.
+   The row height is measured in AgentHarness; 132px is where growth stops and
+   the prompt starts scrolling, roughly six lines. */
+.agent-harness-shell .pi-chat-composer-field textarea {
   width: 100%;
-  min-height: 48px;
+  min-width: 0;
+  min-height: 0;
+  max-height: 132px;
   padding: 0;
+  overflow-y: auto;
   resize: none;
   color: var(--shell-text);
   border: 0;
+  border-radius: 0;
   outline: 0;
   background: transparent;
   font: inherit;
@@ -994,16 +924,49 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   cursor: not-allowed;
 }
 
-.pi-chat-composer-actions {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
+.pi-chat-composer-bar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.pi-chat-skill-chip {
+  display: inline-flex;
+  height: 24px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px 0 8px;
+  color: var(--shell-muted);
+  border: 1px solid var(--shell-border);
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.pi-chat-skill-chip:hover,
+.pi-chat-skill-chip[aria-expanded="true"] {
+  color: var(--shell-text);
+  border-color: var(--shell-border-strong);
+  background: rgba(92, 72, 48, 0.06);
+}
+
+.pi-chat-skill-chip svg {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 auto;
 }
 
 .pi-chat-send {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
   padding: 0;
   place-items: center;
   color: #fdf8ee;
@@ -1026,70 +989,32 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
 }
 
 .pi-chat-send svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
-.pi-chat-composer-tools {
-  position: absolute;
-  right: 56px;
-  bottom: 14px;
-  left: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  color: var(--shell-muted);
-  font-size: 11px;
-}
-
-.pi-chat-composer-tools button {
-  padding: 4px 9px;
-  color: var(--shell-muted);
-  border: 1px solid var(--shell-border);
-  border-radius: 999px;
-  background: transparent;
-  font: inherit;
-  font-size: 10.5px;
-  cursor: pointer;
-  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
-}
-
-.pi-chat-composer-tools button:hover,
-.pi-chat-composer-tools button[aria-expanded="true"] {
-  color: var(--shell-text);
-  background: rgba(255, 255, 255, 0.05);
-}
-
+/* Plain text, and deliberately without a max width or ellipsis: a truncated
+   model name is unreadable, so an unusually long model id wraps onto a second
+   line and grows the strip instead. */
 .pi-chat-model-pill {
-  display: inline-flex;
-  max-width: 46%;
-  align-items: center;
-  gap: 4px;
-  overflow: hidden;
-  padding: 4px 8px;
+  min-width: 0;
+  flex: 0 1 auto;
+  margin-left: auto;
+  padding: 0 2px;
   color: var(--shell-muted);
-  border: 1px solid var(--shell-border);
-  border-radius: 999px;
+  border: 0;
   background: transparent;
   font: inherit;
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: right;
+  overflow-wrap: anywhere;
   cursor: pointer;
+  transition: color 140ms ease;
 }
 
 .pi-chat-model-pill:hover {
   color: var(--shell-text);
-  border-color: var(--shell-border-strong);
-}
-
-.pi-chat-footnote {
-  margin-top: 14px;
-  color: #6a6a6a;
-  font-size: 10px;
-  line-height: 1.5;
-  text-align: center;
 }
 
 /* Fade chat content out behind the floating composer so overlapping
@@ -1124,18 +1049,12 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
 
 .pi-composer-skills-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
-  padding-bottom: 12px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--shell-border);
-}
-
-.pi-composer-skills-head > div {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
 }
 
 .pi-composer-skills-head b {
@@ -1143,12 +1062,6 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   font-size: 13px;
   font-weight: 650;
   letter-spacing: -0.02em;
-}
-
-.pi-composer-skills-head span {
-  color: var(--shell-muted);
-  font-size: 11px;
-  line-height: 1.45;
 }
 
 .pi-composer-skills-head > button {
@@ -1168,53 +1081,21 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   background: rgba(92, 72, 48, 0.06);
 }
 
+/* Flat, step-ordered skill rows: name plus what it does, nothing else. */
 .agent-harness-shell .pi-composer-skills .harness-shortcuts,
 .agent-harness-shell .pi-skills-list {
   display: grid;
-  gap: 14px;
-}
-
-.pi-skills-group {
-  display: grid;
-  gap: 6px;
-}
-
-.pi-skills-group-head {
-  display: grid;
   gap: 2px;
-  padding: 0 2px;
-}
-
-.pi-skills-group-head h3 {
-  margin: 0;
-  color: var(--shell-text);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.pi-skills-group-head span {
-  color: var(--shell-muted);
-  font-size: 10px;
-  line-height: 1.4;
-}
-
-.pi-skills-group-items {
-  display: grid;
-  gap: 4px;
 }
 
 .pi-skills-item {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  gap: 10px;
-  align-items: start;
+  gap: 2px;
   width: 100%;
-  padding: 10px 10px 10px 8px;
+  padding: 8px 10px;
   color: var(--shell-text);
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: 10px;
   background: transparent;
   text-align: left;
   cursor: pointer;
@@ -1231,45 +1112,17 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   border-color: rgba(212, 165, 116, 0.28);
 }
 
-.pi-skills-step {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  color: var(--shell-muted);
-  border: 1px solid var(--shell-border);
-  border-radius: 999px;
-  background: #1c1c1c;
-  font: 650 11px/1 var(--shell-sans);
-}
-
-.pi-skills-item:hover .pi-skills-step {
+.pi-skills-item strong {
   color: var(--shell-text);
-  border-color: var(--shell-border-strong);
-}
-
-.pi-skills-copy {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.pi-skills-copy strong {
-  color: var(--shell-text);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 650;
   letter-spacing: -0.01em;
 }
 
-.pi-skills-copy > span {
+.pi-skills-item > span {
   color: #6b6152;
   font-size: 11px;
   line-height: 1.45;
-}
-
-.pi-skills-copy code {
-  color: #6e6e6e;
-  font: 500 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .agent-dashboard-restore,
@@ -1445,7 +1298,7 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   }
 
   .agent-harness-shell .pi-chat-log {
-    padding: 24px clamp(14px, 6vw, 36px) 190px;
+    padding: 24px clamp(14px, 6vw, 36px) 150px;
   }
 
   .agent-harness-shell .pi-chat-composer {
