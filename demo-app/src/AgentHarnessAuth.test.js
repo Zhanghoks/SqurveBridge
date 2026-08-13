@@ -89,7 +89,7 @@ test('Agent Harness automatically opens authentication and selects a model befor
     socket.emit({ type: 'model_catalog', models: [{ provider: 'anthropic', id: 'claude-sonnet', name: 'Claude Sonnet', configured: false, selected: false }] })
   })
 
-  assert.ok(await screen.findByText('/skill:run'))
+  assert.ok(await screen.findByText('Run evaluation'))
   assert.ok(await screen.findByRole('dialog', { name: 'Connect a model' }))
   await user.click(screen.getByRole('button', { name: 'API key' }))
   assert.deepEqual(socket.sent.at(-1), { type: 'auth_start', provider: 'anthropic', method: 'api_key' })

@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import PiAuthDialog from './PiAuthDialog.jsx'
 import { appendUserMessage, applyPiEvent, createPiChatState, skillPrompt } from './piChat.js'
 import { applyPiAuthEvent, createPiAuthState } from './piAuth.js'
@@ -6,39 +6,28 @@ import { extractSqlSegments } from './full-flow/queryModel.js'
 
 const DEFAULT_SKILLS = ['candidate-reader', 'integration-pipeline', 'config-adapter', 'run', 'meta-evo']
 
-const SKILL_GROUPS = [
-  { id: 'integrate', labelKey: 'agent.skillGroup.integrate', detailKey: 'agent.skillGroup.integrateDetail' },
-  { id: 'evaluate', labelKey: 'agent.skillGroup.evaluate', detailKey: 'agent.skillGroup.evaluateDetail' },
-  { id: 'improve', labelKey: 'agent.skillGroup.improve', detailKey: 'agent.skillGroup.improveDetail' },
-]
-
 const SKILL_META = {
   'candidate-reader': {
-    group: 'integrate',
     step: 1,
     titleKey: 'agent.skill.candidateReader',
     detailKey: 'configure.agentSkillCandidate',
   },
   'integration-pipeline': {
-    group: 'integrate',
     step: 2,
     titleKey: 'agent.skill.integrationPipeline',
     detailKey: 'configure.agentSkillPipeline',
   },
   'config-adapter': {
-    group: 'integrate',
     step: 3,
     titleKey: 'agent.skill.configAdapter',
     detailKey: 'configure.agentSkillConfig',
   },
   run: {
-    group: 'evaluate',
     step: 4,
     titleKey: 'agent.skill.run',
     detailKey: 'agent.skill.runDetail',
   },
   'meta-evo': {
-    group: 'improve',
     step: 5,
     titleKey: 'agent.skill.metaEvo',
     detailKey: 'agent.skill.metaEvoDetail',
@@ -57,26 +46,19 @@ const LOCAL_SUGGESTIONS = [
   { id: 'config', labelKey: 'agent.suggest.writeConfig', skill: 'config-adapter' },
 ]
 
-// Welcome-screen capability cards. Unlike the removed composer suggestion row,
-// these only prefill the composer draft — nothing is sent automatically.
-const EMPTY_CARD_ICONS = {
-  inspect: <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="6.5" /><path d="m15.8 15.8 4.2 4.2" /></svg>,
-  integrate: <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 5v14M5 12h14" /></svg>,
-  reproduce: <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4.5 12a7.5 7.5 0 1 1 2.2 5.3" /><path d="M4.5 12V7.5M4.5 12H9" /></svg>,
-  evaluate: <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 19V10M12 19V5M19 19v-6" /></svg>,
-}
-
+// Prompt starters for the welcome screen. They only prefill the composer draft
+// so the user can edit before sending; nothing is dispatched on click.
 const LOCAL_EMPTY_CARDS = [
-  { id: 'inspect', titleKey: 'agent.card.inspect', descKey: 'agent.card.inspectDesc', prompt: 'Inspect the current SqurveBridge integration and point out anything that needs attention.' },
-  { id: 'integrate', titleKey: 'agent.card.integrate', descKey: 'agent.card.integrateDesc', prompt: 'Help me integrate a new Text-to-SQL method from a public GitHub repository.' },
-  { id: 'reproduce', titleKey: 'agent.card.reproduce', descKey: 'agent.card.reproduceDesc', prompt: 'Reproduce one experiment from the reproduce catalog and walk me through the run.' },
-  { id: 'evaluate', titleKey: 'agent.card.evaluate', descKey: 'agent.card.evaluateDesc', prompt: 'Run an evaluation, compare two methods, and summarize the differences.' },
+  { id: 'inspect', titleKey: 'agent.card.inspect', prompt: 'Inspect the current SqurveBridge integration and point out anything that needs attention.' },
+  { id: 'integrate', titleKey: 'agent.card.integrate', prompt: 'Help me integrate a new Text-to-SQL method from a public GitHub repository.' },
+  { id: 'reproduce', titleKey: 'agent.card.reproduce', prompt: 'Reproduce one experiment from the reproduce catalog and walk me through the run.' },
+  { id: 'evaluate', titleKey: 'agent.card.evaluate', prompt: 'Run an evaluation, compare two methods, and summarize the differences.' },
 ]
 
 const HOSTED_EMPTY_CARDS = [
-  { id: 'inspect', titleKey: 'agent.card.hostedExplain', descKey: 'agent.card.hostedExplainDesc', prompt: HOSTED_SUGGESTIONS[0].prompt },
-  { id: 'reproduce', titleKey: 'agent.card.hostedConfig', descKey: 'agent.card.hostedConfigDesc', prompt: HOSTED_SUGGESTIONS[1].prompt },
-  { id: 'evaluate', titleKey: 'agent.card.hostedEvidence', descKey: 'agent.card.hostedEvidenceDesc', prompt: HOSTED_SUGGESTIONS[2].prompt },
+  { id: 'inspect', titleKey: 'agent.card.hostedExplain', prompt: HOSTED_SUGGESTIONS[0].prompt },
+  { id: 'reproduce', titleKey: 'agent.card.hostedConfig', prompt: HOSTED_SUGGESTIONS[1].prompt },
+  { id: 'evaluate', titleKey: 'agent.card.hostedEvidence', prompt: HOSTED_SUGGESTIONS[2].prompt },
 ]
 
 const FALLBACK = {
@@ -98,22 +80,12 @@ const FALLBACK = {
   'agent.emptyLocalDetail': 'Pi works inside this workspace — pick a direction below, or just describe your task.',
   'agent.emptyHostedDetail': 'Ask about the published bundle, reproduce configs, or public evidence.',
   'agent.card.inspect': 'Inspect integration',
-  'agent.card.inspectDesc': 'Review the current setup and spot issues',
   'agent.card.integrate': 'Integrate a method',
-  'agent.card.integrateDesc': 'Bring a public Text-to-SQL method in',
   'agent.card.reproduce': 'Reproduce a run',
-  'agent.card.reproduceDesc': 'Re-run an experiment from the catalog',
   'agent.card.evaluate': 'Evaluate & compare',
-  'agent.card.evaluateDesc': 'Score methods and compare results',
   'agent.card.hostedExplain': 'Explain the bundle',
-  'agent.card.hostedExplainDesc': 'See what this published bundle contains',
   'agent.card.hostedConfig': 'Walk through a config',
-  'agent.card.hostedConfigDesc': 'Understand one reproduce config in depth',
   'agent.card.hostedEvidence': 'Find evidence',
-  'agent.card.hostedEvidenceDesc': 'Locate published evaluation artifacts',
-  'agent.greetingMorning': 'Good morning',
-  'agent.greetingAfternoon': 'Good afternoon',
-  'agent.greetingEvening': 'Good evening',
   'agent.you': 'You',
   'agent.pi': 'Pi',
   'agent.reasoning': 'Reasoning',
@@ -126,13 +98,6 @@ const FALLBACK = {
   'agent.suggest.writeConfig': 'Write a reproduce config',
   'agent.skills': 'Skills',
   'agent.closeSkills': 'Close',
-  'agent.skillsHint': 'Run a project Skill. Steps follow integrate → evaluate → improve.',
-  'agent.skillGroup.integrate': 'Integrate',
-  'agent.skillGroup.integrateDetail': 'Bring an external method into SqurveBridge',
-  'agent.skillGroup.evaluate': 'Evaluate',
-  'agent.skillGroup.evaluateDetail': 'Run or inspect a reproduce evaluation',
-  'agent.skillGroup.improve': 'Improve',
-  'agent.skillGroup.improveDetail': 'Diagnose bottlenecks and propose safe changes',
   'agent.skill.candidateReader': 'Read candidate',
   'agent.skill.integrationPipeline': 'Rebuild Actors',
   'agent.skill.configAdapter': 'Write config',
@@ -158,13 +123,6 @@ function label(t, key) {
     if (value && value !== key) return value
   }
   return FALLBACK[key] || key
-}
-
-function greetingKey(date = new Date()) {
-  const hour = date.getHours()
-  if (hour < 12) return 'agent.greetingMorning'
-  if (hour < 18) return 'agent.greetingAfternoon'
-  return 'agent.greetingEvening'
 }
 
 export function MessageBody({ message, onAdoptSql, t }) {
@@ -412,6 +370,36 @@ function AgentHarness({
     composerInputRef.current?.focus()
   }
 
+  // Grows the prompt row with the draft. The CSS `field-sizing: content` would do
+  // this without script, but Firefox and older Safari still lack it and a public
+  // demo cannot assume the visitor's engine, so one measured height serves every
+  // browser. The stylesheet's max-height is what stops the growth.
+  const fitComposerInput = () => {
+    const input = composerInputRef.current
+    if (!input) return
+    input.style.height = 'auto'
+    if (input.scrollHeight > 0) input.style.height = `${input.scrollHeight}px`
+  }
+
+  useLayoutEffect(fitComposerInput, [draft])
+
+  // Rewrapping the same draft into a narrower pane changes the line count, and
+  // dragging the shell divider fires no window resize. Without ResizeObserver
+  // (jsdom) the row keeps whatever height the last keystroke measured.
+  useEffect(() => {
+    const input = composerInputRef.current
+    if (!input || typeof ResizeObserver === 'undefined') return undefined
+    let width = input.clientWidth
+    const observer = new ResizeObserver(() => {
+      // Reacting to the height this writes back would loop, so only width counts.
+      if (input.clientWidth === width) return
+      width = input.clientWidth
+      fitComposerInput()
+    })
+    observer.observe(input)
+    return () => observer.disconnect()
+  }, [])
+
   useEffect(() => {
     let active = true
     api('/api/agent').then(data => {
@@ -547,62 +535,41 @@ function AgentHarness({
     shell && isEmpty ? 'is-empty' : '',
   ].filter(Boolean).join(' ')
 
+  // New chat already stops the running session, so the shell offers it alone
+  // rather than two adjacent teardown buttons.
   const toolbar = shell && !isEmpty ? (
     <div className="agent-shell-toolbar">
-      <span className="agent-shell-backend" data-testid="agent-pi-status">
-        {label(t, 'shell.piBackend')}
-        {catalog?.available === false ? ` · ${label(t, 'agent.unavailable')}` : ''}
-        {authenticated ? ` · ${modelLabel}` : ''}
-      </span>
       <Status tone={statusTone}>{statusLabel}</Status>
       {busy && <button type="button" onClick={abort}>{label(t, 'agent.stopResponse')}</button>}
       <button type="button" onClick={() => { resetChat().catch(() => {}) }}>{label(t, 'shell.newChat')}</button>
-      {running && <button type="button" onClick={stop}>{label(t, 'agent.endSession')}</button>}
     </div>
   ) : null
 
-  const skillEntries = skills.map(name => ({
-    name,
-    meta: SKILL_META[name] || { group: 'integrate', step: 0, titleKey: name, detailKey: name },
-  }))
-  const skillGroups = SKILL_GROUPS.map(group => ({
-    ...group,
-    items: skillEntries.filter(item => item.meta.group === group.id),
-  })).filter(group => group.items.length > 0)
+  // A flat, step-ordered list: five skills did not need three group headers,
+  // numbered badges and a command echo on top of the name and what it does.
+  const skillEntries = skills
+    .map(name => ({ name, meta: SKILL_META[name] || { step: 99, titleKey: name, detailKey: name } }))
+    .sort((left, right) => left.meta.step - right.meta.step)
 
-  const shortcuts = skills.length > 0 ? (
+  const shortcuts = skillEntries.length > 0 ? (
     <div className="harness-shortcuts pi-skills-list" role="list">
-      {skillGroups.map(group => (
-        <section key={group.id} className="pi-skills-group" aria-labelledby={`pi-skills-${group.id}`}>
-          <header className="pi-skills-group-head">
-            <h3 id={`pi-skills-${group.id}`}>{label(t, group.labelKey)}</h3>
-            <span>{label(t, group.detailKey)}</span>
-          </header>
-          <div className="pi-skills-group-items">
-            {group.items.map(({ name, meta }) => (
-              <button
-                key={name}
-                type="button"
-                role="listitem"
-                className={[
-                  'pi-skills-item',
-                  name === 'candidate-reader' && candidateUrl === '' && onCandidateUrlRequired ? 'needs-input' : '',
-                ].filter(Boolean).join(' ')}
-                onClick={() => {
-                  setSkillsOpen(false)
-                  useSkill(name)
-                }}
-              >
-                <span className="pi-skills-step" aria-hidden="true">{meta.step || '·'}</span>
-                <span className="pi-skills-copy">
-                  <strong>{meta.titleKey === name ? name : label(t, meta.titleKey)}</strong>
-                  <span>{meta.detailKey === name ? `/skill:${name}` : label(t, meta.detailKey)}</span>
-                  <code>{`/skill:${name}`}</code>
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
+      {skillEntries.map(({ name, meta }) => (
+        <button
+          key={name}
+          type="button"
+          role="listitem"
+          className={[
+            'pi-skills-item',
+            name === 'candidate-reader' && candidateUrl === '' && onCandidateUrlRequired ? 'needs-input' : '',
+          ].filter(Boolean).join(' ')}
+          onClick={() => {
+            setSkillsOpen(false)
+            useSkill(name)
+          }}
+        >
+          <strong>{meta.titleKey === name ? name : label(t, meta.titleKey)}</strong>
+          <span>{meta.detailKey === name ? `/skill:${name}` : label(t, meta.detailKey)}</span>
+        </button>
       ))}
     </div>
   ) : null
@@ -613,9 +580,6 @@ function AgentHarness({
       {!chat.messages.length && <div className="pi-chat-empty">
         {shell ? (
           <>
-            <h2 className="pi-chat-greeting">
-              {label(t, greetingKey())}
-            </h2>
             <span>{hosted ? label(t, 'agent.emptyHostedDetail') : label(t, 'agent.emptyLocalDetail')}</span>
             <div className="pi-chat-hero-cards" data-testid="agent-empty-cards">
               {(hosted ? HOSTED_EMPTY_CARDS : LOCAL_EMPTY_CARDS).map(card => (
@@ -625,9 +589,7 @@ function AgentHarness({
                   className="pi-chat-hero-card"
                   onClick={() => prefillDraft(card.prompt)}
                 >
-                  <span className="pi-chat-hero-card-icon" aria-hidden="true">{EMPTY_CARD_ICONS[card.id]}</span>
-                  <strong>{label(t, card.titleKey)}</strong>
-                  <span>{label(t, card.descKey)}</span>
+                  {label(t, card.titleKey)}
                 </button>
               ))}
             </div>
@@ -665,10 +627,7 @@ function AgentHarness({
         {skillsOpen && skills.length > 0 && (
           <div className="pi-composer-skills" data-testid="agent-skills-menu" role="dialog" aria-label={label(t, 'agent.skills')}>
             <div className="pi-composer-skills-head">
-              <div>
-                <b>{label(t, 'agent.skills')}</b>
-                <span>{label(t, 'agent.skillsHint')}</span>
-              </div>
+              <b>{label(t, 'agent.skills')}</b>
               <button type="button" onClick={() => setSkillsOpen(false)}>{label(t, 'agent.closeSkills')}</button>
             </div>
             {shortcuts}
@@ -697,33 +656,40 @@ function AgentHarness({
               }
             }}
             placeholder={label(t, authenticated ? 'agent.placeholder' : 'agent.placeholderNeedModel')}
-            rows="2"
+            rows="1"
             aria-label={label(t, 'agent.placeholder')}
           />
-          <div className="pi-chat-composer-actions">
+          <div className="pi-chat-composer-bar">
+            {skills.length > 0 && (
+              <button
+                type="button"
+                className="pi-chat-skill-chip"
+                aria-expanded={skillsOpen}
+                aria-label={label(t, 'agent.skills')}
+                onClick={() => setSkillsOpen(value => !value)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="M14.6 4.8 9.4 19.2" />
+                </svg>
+                {label(t, 'agent.skills')}
+              </button>
+            )}
+            <button
+              type="button"
+              className="pi-chat-model-pill"
+              disabled={catalog?.available === false}
+              title={authenticated ? modelLabel : undefined}
+              onClick={openAuth}
+            >
+              {authenticated ? auth.selectedModel.id : label(t, 'agent.connectModel')}
+            </button>
             <button className="pi-chat-send" disabled={sendDisabled} type="submit" aria-label={label(t, 'agent.send')}>
               <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2">
                 <path d="M12 19V5M6.5 10.5 12 5l5.5 5.5" />
               </svg>
             </button>
           </div>
-          <div className="pi-chat-composer-tools">
-            {skills.length > 0 ? (
-              <button type="button" aria-expanded={skillsOpen} onClick={() => setSkillsOpen(value => !value)}>
-                / {label(t, 'agent.skills')}
-              </button>
-            ) : <span />}
-            <button
-              type="button"
-              className="pi-chat-model-pill"
-              disabled={catalog?.available === false}
-              onClick={openAuth}
-            >
-              {authenticated ? modelLabel : label(t, 'agent.connectModel')}
-            </button>
-          </div>
         </div>
-        <div className="pi-chat-footnote">{label(t, 'shell.chatFootnote')}</div>
       </div> : <>
         <textarea
           value={draft}
