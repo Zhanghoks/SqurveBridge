@@ -16,48 +16,48 @@ import { tags } from '@lezer/highlight'
 const warmTheme = EditorView.theme({
   '&': {
     backgroundColor: 'transparent',
-    color: 'var(--flow-text, #ececec)',
+    color: 'var(--flow-text, #2e2618)',
     fontSize: '13px',
   },
   '.cm-content': {
     fontFamily: '"SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
-    caretColor: 'var(--flow-claude, #d4a574)',
+    caretColor: 'var(--flow-claude, #8a5c22)',
     padding: '10px 0',
   },
   '&.cm-focused': { outline: 'none' },
   '.cm-gutters': {
     backgroundColor: 'transparent',
-    color: 'var(--flow-inactive, #5c5c5c)',
+    color: 'var(--flow-inactive, #9a8d78)',
     border: 'none',
   },
-  '.cm-activeLine': { backgroundColor: 'rgb(255 255 255 / 4%)' },
-  '.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'var(--flow-muted, #8a8a8a)' },
+  '.cm-activeLine': { backgroundColor: 'rgb(92 72 48 / 6%)' },
+  '.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'var(--flow-muted, #6b6152)' },
   '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
-    backgroundColor: 'rgb(212 165 116 / 22%)',
+    backgroundColor: 'rgb(212 165 116 / 30%)',
   },
-  '.cm-cursor': { borderLeftColor: 'var(--flow-claude, #d4a574)' },
+  '.cm-cursor': { borderLeftColor: 'var(--flow-claude, #8a5c22)' },
   '.cm-tooltip': {
-    backgroundColor: 'var(--flow-glass-strong, #1e1e1e)',
-    color: 'var(--flow-text, #ececec)',
-    border: '1px solid rgb(255 255 255 / 14%)',
+    backgroundColor: 'var(--flow-glass-strong, #ffffff)',
+    color: 'var(--flow-text, #2e2618)',
+    border: '1px solid rgb(92 72 48 / 20%)',
     borderRadius: '8px',
   },
   '.cm-tooltip-autocomplete ul li[aria-selected]': {
-    backgroundColor: 'rgb(212 165 116 / 20%)',
-    color: 'var(--flow-text, #ececec)',
+    backgroundColor: 'rgb(212 165 116 / 26%)',
+    color: 'var(--flow-text, #2e2618)',
   },
-}, { dark: true })
+}, { dark: false })
 
 const sqlLanguage = schema => sql({ dialect: SQLite, schema: schema || {}, upperCaseKeywords: true })
 
 const warmHighlight = HighlightStyle.define([
-  { tag: tags.keyword, color: 'var(--flow-claude, #d4a574)', fontWeight: '600' },
-  { tag: tags.string, color: 'var(--flow-green, #8fbc8f)' },
-  { tag: tags.number, color: 'var(--flow-amber, #d4a35c)' },
-  { tag: tags.comment, color: 'var(--flow-inactive, #5c5c5c)', fontStyle: 'italic' },
-  { tag: tags.operator, color: 'var(--flow-muted, #8a8a8a)' },
-  { tag: tags.typeName, color: 'var(--flow-claude-strong, #e0b68a)' },
-  { tag: tags.propertyName, color: 'var(--flow-text, #ececec)' },
+  { tag: tags.keyword, color: 'var(--flow-claude, #8a5c22)', fontWeight: '600' },
+  { tag: tags.string, color: 'var(--flow-green, #3f7a44)' },
+  { tag: tags.number, color: 'var(--flow-amber, #8f6114)' },
+  { tag: tags.comment, color: 'var(--flow-inactive, #9a8d78)', fontStyle: 'italic' },
+  { tag: tags.operator, color: 'var(--flow-muted, #6b6152)' },
+  { tag: tags.typeName, color: 'var(--flow-claude-strong, #6f4a1b)' },
+  { tag: tags.propertyName, color: 'var(--flow-text, #2e2618)' },
 ])
 
 /**

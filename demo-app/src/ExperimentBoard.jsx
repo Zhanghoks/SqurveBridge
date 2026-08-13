@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-const METHOD_COLORS = ['#8ee1ae', '#68b9db', '#e0aa5b', '#df675e', '#9b8cff', '#78a6a3']
+const METHOD_COLORS = ['#3f9e68', '#2e7fa3', '#b07a1f', '#c04a40', '#6a55d0', '#3f7d7a']
 const QUALITY_METRICS = [
   { id: 'ex', label: 'EX' },
   { id: 'em', label: 'EM' },

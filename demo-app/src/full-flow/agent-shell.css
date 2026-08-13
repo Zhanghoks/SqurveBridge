@@ -9,35 +9,35 @@ html:has(.agent-shell) #root {
 }
 
 .flow-demo.agent-shell {
-  --shell-bg: #0e0e0e;
-  --shell-panel: #161616;
-  --shell-panel-raised: #1c1c1c;
-  --shell-border: rgba(255, 255, 255, 0.08);
-  --shell-border-strong: rgba(255, 255, 255, 0.14);
-  --shell-text: #ececec;
-  --shell-muted: #9a9a9a;
-  --shell-accent: #d4a574;
-  --shell-accent-strong: #e0b68a;
-  --shell-good: #8fbc8f;
-  --shell-danger: #d98989;
+  --shell-bg: #f6f1e8;
+  --shell-panel: #fbf8f1;
+  --shell-panel-raised: #ffffff;
+  --shell-border: rgba(92, 72, 48, 0.14);
+  --shell-border-strong: rgba(92, 72, 48, 0.26);
+  --shell-text: #2e2618;
+  --shell-muted: #6b6152;
+  --shell-accent: #8a5c22;
+  --shell-accent-strong: #6f4a1b;
+  --shell-good: #3f7a44;
+  --shell-danger: #b0453f;
   --shell-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
   --shell-sans: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --flow-canvas: #0e0e0e;
-  --flow-canvas-soft: #141414;
-  --flow-glass: #1a1a1a;
-  --flow-glass-strong: #1e1e1e;
-  --flow-panel: #1a1a1a;
-  --flow-panel-soft: #1f1f1f;
-  --flow-border: rgba(255, 255, 255, 0.08);
-  --flow-border-strong: rgba(255, 255, 255, 0.14);
-  --flow-text: #ececec;
-  --flow-muted: #9a9a9a;
-  --flow-inactive: #666;
-  --flow-claude: #d4a574;
-  --flow-claude-strong: #e0b68a;
-  --flow-blue: #d4a574;
-  --flow-blue-strong: #e0b68a;
-  --flow-green: #8fbc8f;
+  --flow-canvas: #f6f1e8;
+  --flow-canvas-soft: #f1eadb;
+  --flow-glass: #fbf8f1;
+  --flow-glass-strong: #fbf8f1;
+  --flow-panel: #fbf8f1;
+  --flow-panel-soft: #fbf8f1;
+  --flow-border: rgba(92, 72, 48, 0.14);
+  --flow-border-strong: rgba(92, 72, 48, 0.26);
+  --flow-text: #2e2618;
+  --flow-muted: #6b6152;
+  --flow-inactive: #9a8d78;
+  --flow-claude: #8a5c22;
+  --flow-claude-strong: #6f4a1b;
+  --flow-blue: #8a5c22;
+  --flow-blue-strong: #6f4a1b;
+  --flow-green: #3f7a44;
   --flow-shadow: none;
   --flow-shadow-soft: none;
   --flow-radius: 14px;
@@ -107,7 +107,7 @@ html:has(.agent-shell) #root {
 .agent-chat-column {
   flex-direction: column;
   border-radius: 12px 16px 16px 12px;
-  background: #121212;
+  background: #f1eadb;
 }
 
 .agent-dashboard-surface {
@@ -206,19 +206,19 @@ html:has(.agent-shell) #root {
 .agent-chat-header button:hover,
 .agent-shell-toolbar button:hover {
   border-color: var(--shell-border-strong);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(92, 72, 48, 0.05);
 }
 
 .agent-dashboard-actions button:first-child {
-  color: #111;
-  border-color: #f2f2f2;
-  background: #f2f2f2;
+  color: #f6f1e8;
+  border-color: #2e2618;
+  background: #2e2618;
 }
 
 .agent-dashboard-actions button:first-child:hover {
-  color: #111;
-  border-color: #fff;
-  background: #fff;
+  color: #f6f1e8;
+  border-color: #443a28;
+  background: #443a28;
 }
 
 .agent-pane-toggle {
@@ -296,7 +296,7 @@ html:has(.agent-shell) #root {
   min-height: 0;
   padding: 14px;
   overflow: auto;
-  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  scrollbar-color: rgba(92, 72, 48, 0.28) transparent;
 }
 
 .agent-live-workspace-body > .flow-stage-page {
@@ -383,12 +383,12 @@ html:has(.agent-shell) #root {
 }
 
 .agent-live-workspace-body .configure-chip-row button[aria-pressed="true"] {
-  color: #111;
-  background: #f0f0f0;
+  color: #f6f1e8;
+  background: #2e2618;
 }
 
 .agent-live-workspace-body .configure-chip-row button.focused {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(92, 72, 48, 0.34);
 }
 
 .agent-live-workspace-foot {
@@ -487,19 +487,19 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   width: 3px;
   height: 40px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(92, 72, 48, 0.18);
   box-shadow: none;
   transition: background 140ms ease;
 }
 
 .agent-shell-divider:hover::before,
 .agent-shell-resizing .agent-shell-divider::before {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(92, 72, 48, 0.05);
 }
 
 .agent-shell-divider:hover span,
 .agent-shell-resizing .agent-shell-divider span {
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(46, 38, 24, 0.55);
   box-shadow: none;
 }
 
@@ -516,10 +516,10 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   width: 32px;
   height: 32px;
   place-items: center;
-  color: #111;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  color: #2a1d0e;
+  border: 1px solid rgba(212, 165, 116, 0.55);
   border-radius: 999px;
-  background: #f2f2f2;
+  background: #f6ead2;
   box-shadow: none;
   font-family: var(--shell-serif);
   font-size: 15px;
@@ -575,7 +575,7 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+  scrollbar-color: rgba(92, 72, 48, 0.26) transparent;
 }
 
 .agent-shell-toolbar {
@@ -717,7 +717,7 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
 .agent-harness-shell .pi-chat-empty > span {
   max-width: 42ch;
   margin: 0 auto;
-  color: #9a9a9a;
+  color: #6b6152;
   font-size: 13px;
   line-height: 1.55;
 }
@@ -750,7 +750,7 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
 .pi-chat-hero-card:hover,
 .pi-chat-hero-card:focus-visible {
   border-color: rgba(212, 165, 116, 0.38);
-  background-color: #1d1c1a;
+  background-color: #f6ead2;
   transform: translateY(-1px);
 }
 
@@ -808,7 +808,7 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   color: var(--shell-text);
   border: 1px solid var(--shell-border);
   border-radius: 16px;
-  background: #1f1f1f;
+  background: #fbf8f1;
   box-shadow: none;
 }
 
@@ -830,10 +830,10 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   width: 32px;
   height: 32px;
   place-items: center;
-  color: #111;
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  color: #2a1d0e;
+  border: 1px solid rgba(212, 165, 116, 0.55);
   border-radius: 999px;
-  background: #f0f0f0;
+  background: #f6ead2;
   box-shadow: none;
   font-family: var(--shell-serif);
   font-size: 14px;
@@ -854,7 +854,7 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
 
 .agent-harness-shell .pi-message p {
   margin: 0;
-  color: #c8c8c8;
+  color: #4d4436;
   font-size: 14px;
   line-height: 1.65;
 }
@@ -877,7 +877,7 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   gap: 10px;
   border: 1px solid var(--shell-border);
   border-radius: 12px;
-  background: #181818;
+  background: #fbf8f1;
   box-shadow: none;
 }
 
@@ -959,15 +959,15 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   padding: 16px 52px 44px 16px;
   border: 1px solid var(--shell-border-strong);
   border-radius: 18px;
-  background: #1c1c1c;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  background: #fbf8f1;
+  box-shadow: 0 12px 32px rgba(120, 96, 60, 0.12);
   backdrop-filter: none;
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .pi-chat-composer-field:focus-within {
   border-color: rgba(212, 165, 116, 0.45);
-  box-shadow: 0 0 0 3px rgba(212, 165, 116, 0.08), 0 12px 32px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 0 0 3px rgba(212, 165, 116, 0.08), 0 12px 32px rgba(120, 96, 60, 0.13);
 }
 
 .pi-chat-composer-field textarea {
@@ -985,11 +985,11 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
 }
 
 .pi-chat-composer-field textarea::placeholder {
-  color: #6a6a6a;
+  color: #9a8d78;
 }
 
 .agent-harness-shell .pi-chat-composer-field textarea:disabled {
-  color: #7a7a7a;
+  color: #6b6152;
   background: transparent;
   cursor: not-allowed;
 }
@@ -1006,7 +1006,7 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   height: 36px;
   padding: 0;
   place-items: center;
-  color: #1a120a;
+  color: #fdf8ee;
   border: 0;
   border-radius: 999px;
   background: var(--shell-accent);
@@ -1020,8 +1020,8 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
 }
 
 .pi-chat-send:disabled {
-  color: #6a6a6a;
-  background: #2a2a2a;
+  color: #9a8d78;
+  background: #efe7d6;
   cursor: not-allowed;
 }
 
@@ -1101,7 +1101,7 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   bottom: -14px;
   left: -16px;
   height: calc(100% + 46px);
-  background: linear-gradient(to top, #121212 62%, rgba(18, 18, 18, 0));
+  background: linear-gradient(to top, #f1eadb 62%, rgba(241, 234, 219, 0));
   content: "";
   pointer-events: none;
 }
@@ -1117,9 +1117,9 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   padding: 14px 14px 12px;
   border: 1px solid var(--shell-border);
   border-radius: 16px;
-  background: #161616;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
-  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+  background: #ffffff;
+  box-shadow: 0 18px 48px rgba(120, 96, 60, 0.16);
+  scrollbar-color: rgba(92, 72, 48, 0.26) transparent;
 }
 
 .pi-composer-skills-head {
@@ -1165,7 +1165,7 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
 
 .pi-composer-skills-head > button:hover {
   color: var(--shell-text);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(92, 72, 48, 0.06);
 }
 
 .agent-harness-shell .pi-composer-skills .harness-shortcuts,
@@ -1224,7 +1224,7 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
 .pi-skills-item:hover,
 .pi-skills-item:focus-visible {
   border-color: var(--shell-border);
-  background: rgba(255, 255, 255, 0.035);
+  background: rgba(92, 72, 48, 0.05);
 }
 
 .pi-skills-item.needs-input {
@@ -1262,7 +1262,7 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
 }
 
 .pi-skills-copy > span {
-  color: #9a9a9a;
+  color: #6b6152;
   font-size: 11px;
   line-height: 1.45;
 }
@@ -1308,9 +1308,9 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   width: 34px;
   height: 34px;
   place-items: center;
-  color: #111;
+  color: #2a1d0e;
   border-radius: 999px;
-  background: #f2f2f2;
+  background: #f6ead2;
   font-family: var(--shell-serif);
   font-weight: 600;
 }
@@ -1412,8 +1412,8 @@ body.agent-shell-resizing .agent-shell-divider-ghost {
   }
 
   .agent-mobile-switcher button[aria-selected="true"] {
-    color: #111;
-    background: #f2f2f2;
+    color: #f6f1e8;
+    background: #2e2618;
   }
 
   .agent-shell-panes,

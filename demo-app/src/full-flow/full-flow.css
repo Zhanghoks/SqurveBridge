@@ -1,23 +1,23 @@
 .flow-demo {
   /* Warm charcoal workspace aligned with agent-shell */
-  --flow-canvas: #0e0e0e;
-  --flow-canvas-soft: #141414;
-  --flow-glass: #1a1a1a;
-  --flow-glass-strong: #1e1e1e;
-  --flow-panel: #1a1a1a;
-  --flow-panel-soft: #1f1f1f;
-  --flow-border: rgb(255 255 255 / 8%);
-  --flow-border-strong: rgb(255 255 255 / 14%);
-  --flow-text: #ececec;
-  --flow-muted: #9a9a9a;
-  --flow-inactive: #666;
-  --flow-claude: #d4a574;
-  --flow-claude-strong: #e0b68a;
-  --flow-blue: #d4a574;
-  --flow-blue-strong: #e0b68a;
-  --flow-green: #8fbc8f;
-  --flow-amber: #d4a35c;
-  --flow-red: #d98989;
+  --flow-canvas: #f6f1e8;
+  --flow-canvas-soft: #f1eadb;
+  --flow-glass: #fbf8f1;
+  --flow-glass-strong: #ffffff;
+  --flow-panel: #fbf8f1;
+  --flow-panel-soft: #f4eddf;
+  --flow-border: rgb(92 72 48 / 14%);
+  --flow-border-strong: rgb(92 72 48 / 26%);
+  --flow-text: #2e2618;
+  --flow-muted: #6b6152;
+  --flow-inactive: #9a8d78;
+  --flow-claude: #8a5c22;
+  --flow-claude-strong: #6f4a1b;
+  --flow-blue: #8a5c22;
+  --flow-blue-strong: #6f4a1b;
+  --flow-green: #3f7a44;
+  --flow-amber: #8f6114;
+  --flow-red: #b0453f;
   --flow-radius: 14px;
   --flow-type-control: 12px;
   --flow-type-meta: 11px;
@@ -212,7 +212,7 @@
 
 .flow-demo .flow-header-actions button:first-child {
   border-color: rgb(212 165 116 / 52%);
-  color: #fff;
+  color: #2a1d0e;
   background: linear-gradient(180deg, #e08a6c, #b9825a);
 }
 
@@ -224,7 +224,7 @@
 }
 
 .flow-demo .flow-header-actions button:first-child:hover {
-  color: #fff;
+  color: #2a1d0e;
   background: linear-gradient(180deg, #e0b68a, #b9825a);
 }
 
@@ -461,8 +461,8 @@
   gap: 16px 24px;
   margin-bottom: 28px;
   padding: 14px 18px;
-  border-color: rgb(255 255 255 / 8%);
-  background: rgb(255 255 255 / 2%);
+  border-color: rgb(92 72 48 / 14%);
+  background: rgb(92 72 48 / 4%);
   box-shadow: none;
 }
 
@@ -572,7 +572,7 @@
 }
 
 .flow-demo .flashcard-tile-open:hover {
-  background: rgb(255 255 255 / 3%);
+  background: rgb(92 72 48 / 4%);
 }
 
 .flow-demo .flashcard-tile-open strong {
@@ -640,7 +640,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgb(8 8 10 / 72%);
+  background: rgb(60 45 30 / 30%);
   backdrop-filter: blur(8px);
 }
 
@@ -654,10 +654,10 @@
   border: 1px solid rgb(212 165 116 / 28%);
   border-radius: 18px;
   background:
-    linear-gradient(165deg, rgb(42 38 36 / 96%), rgb(28 28 32 / 98%) 42%, rgb(22 22 26 / 98%));
+    linear-gradient(165deg, rgb(255 255 255 / 96%), rgb(255 253 247 / 96%) 42%, rgb(251 248 241 / 96%));
   box-shadow:
-    0 0 0 1px rgb(255 255 255 / 4%) inset,
-    0 28px 80px rgb(0 0 0 / 55%),
+    0 0 0 1px rgb(92 72 48 / 6%) inset,
+    0 28px 80px rgb(120 96 60 / 18%),
     0 0 48px rgb(212 165 116 / 8%);
   animation: flashcard-in 180ms ease-out;
 }
@@ -721,7 +721,7 @@
   padding: 14px 16px;
   border: 1px solid var(--flow-border);
   border-radius: 14px;
-  background: rgb(255 255 255 / 3%);
+  background: rgb(92 72 48 / 4%);
 }
 
 .flow-demo .flashcard-face section h4 {
@@ -1017,7 +1017,7 @@
   border: 0;
   border-radius: 10px;
   padding: 10px 14px;
-  color: #fff8f4;
+  color: #2a1d0e;
   background: linear-gradient(135deg, #d4a574, #b9825a);
   font: 700 12px/1.2 var(--flow-font-ui, inherit);
   cursor: pointer;
@@ -1031,7 +1031,7 @@
 .flow-demo .flow-agent-open {
   width: 100%;
   margin-top: 4px;
-  background: linear-gradient(135deg, #2f6f9f, #1f5a82);
+  background: linear-gradient(135deg, #e8f2f6, #cfe3ee);
 }
 
 .flow-demo .flow-agent-skill-list {
@@ -1103,7 +1103,7 @@
   border: 0;
   border-radius: 10px;
   padding: 8px 12px;
-  color: #fff8f4;
+  color: #2a1d0e;
   background: linear-gradient(135deg, #d4a574, #b9825a);
   font: 700 12px/1.2 var(--flow-font-ui, inherit);
 }
@@ -1164,7 +1164,7 @@
   gap: 12px;
   padding: 16px;
   background: transparent;
-  scrollbar-color: rgb(255 255 255 / 18%) transparent;
+  scrollbar-color: rgb(92 72 48 / 30%) transparent;
 }
 
 .flow-demo .flow-agent-panel .pi-chat-empty {
@@ -1281,7 +1281,7 @@
 
 .flow-auth-dialog {
   padding: 28px;
-  background: rgb(10 10 12 / 72%);
+  background: rgb(60 45 30 / 30%);
   backdrop-filter: blur(12px) saturate(115%);
   -webkit-backdrop-filter: blur(12px) saturate(115%);
 }
@@ -1342,7 +1342,7 @@
 .flow-demo .pi-auth-providers {
   border-right: 1px solid var(--flow-border);
   padding: 16px;
-  background: rgb(255 255 255 / 2%);
+  background: rgb(92 72 48 / 4%);
 }
 
 .flow-demo .pi-auth-providers .field {
@@ -1375,7 +1375,7 @@
   gap: 6px;
   max-height: 356px;
   padding-right: 3px;
-  scrollbar-color: rgb(255 255 255 / 18%) transparent;
+  scrollbar-color: rgb(92 72 48 / 30%) transparent;
 }
 
 .flow-demo .pi-auth-provider-list > button {
@@ -1621,7 +1621,7 @@
   border-top: 1px solid var(--flow-border);
   padding: 12px 20px;
   color: var(--flow-muted);
-  background: rgb(255 255 255 / 2%);
+  background: rgb(92 72 48 / 4%);
   font: 500 11px/1.4 var(--flow-font-ui, inherit);
 }
 
@@ -1679,7 +1679,7 @@
   background:
     radial-gradient(120% 80% at 12% 0%, rgb(212 165 116 / 6%), transparent 55%),
     radial-gradient(110% 90% at 88% 100%, rgb(96 138 186 / 7%), transparent 60%),
-    linear-gradient(180deg, rgb(255 255 255 / 3%), transparent 42%),
+    linear-gradient(180deg, rgb(92 72 48 / 4%), transparent 42%),
     var(--flow-panel);
 }
 
@@ -1779,8 +1779,8 @@
   border-radius: 999px;
   padding: 6px 12px;
   color: var(--flow-text);
-  background: rgb(28 28 32 / 92%);
-  box-shadow: 0 10px 28px rgb(0 0 0 / 35%);
+  background: rgb(255 253 247 / 94%);
+  box-shadow: 0 10px 28px rgb(120 96 60 / 14%);
   transform: translateX(-50%);
   pointer-events: none;
   font-size: var(--flow-type-meta);
@@ -1799,7 +1799,7 @@
    the focused pair is the brightest anchor. */
 .flow-demo .flow-connection-graph path {
   fill: none;
-  stroke: #8aa0b8;
+  stroke: #5c4830;
   stroke-width: 1;
   opacity: .05;
   vector-effect: non-scaling-stroke;
@@ -1846,7 +1846,7 @@
 }
 
 .flow-demo .flow-connection-graph path.node-hover {
-  stroke: #a8b6c8;
+  stroke: #7a6248;
   stroke-width: 1.6;
   opacity: .4;
 }
@@ -1870,7 +1870,7 @@
 }
 
 .flow-demo .flow-connection-graph path.unavailable.selected {
-  stroke: #93a5ba;
+  stroke: #6e829a;
   stroke-dasharray: .045 .03;
   opacity: .7;
 }
@@ -1932,14 +1932,14 @@
   align-items: center;
   overflow: hidden;
   white-space: nowrap;
-  border: 1px solid rgb(255 255 255 / 10%);
+  border: 1px solid rgb(92 72 48 / 16%);
   color: var(--flow-text);
   background:
-    linear-gradient(165deg, rgb(255 255 255 / 6%), rgb(255 255 255 / 1%) 60%),
-    rgb(31 31 34 / 74%);
+    linear-gradient(165deg, rgb(255 255 255 / 60%), rgb(255 255 255 / 10%) 60%),
+    rgb(255 253 247 / 90%);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 8%),
-    inset 0 -1px 0 rgb(0 0 0 / 20%);
+    inset 0 1px 0 rgb(255 255 255 / 80%),
+    inset 0 -1px 0 rgb(120 96 60 / 12%);
   font: inherit;
   font-size: var(--flow-type-control);
   font-weight: 720;
@@ -1955,7 +1955,7 @@
   flex: none;
   width: 6px;
   height: 6px;
-  border: 1px solid rgb(255 255 255 / 24%);
+  border: 1px solid rgb(92 72 48 / 32%);
   border-radius: 50%;
   background: transparent;
   transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
@@ -1996,7 +1996,7 @@
   color: var(--flow-blue-strong);
   background:
     linear-gradient(165deg, rgb(212 165 116 / 14%), rgb(212 165 116 / 4%) 65%),
-    rgb(33 30 26 / 78%);
+    rgb(255 253 247 / 92%);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 10%),
     0 4px 14px rgb(212 165 116 / 8%);
@@ -2007,7 +2007,7 @@
   color: var(--flow-blue-strong);
   background:
     linear-gradient(165deg, rgb(212 165 116 / 20%), rgb(212 165 116 / 6%) 65%),
-    rgb(36 32 27 / 82%);
+    rgb(255 253 247 / 94%);
   box-shadow:
     inset 0 0 0 1px rgb(212 165 116 / 25%),
     0 0 0 3px rgb(212 165 116 / 12%),
@@ -2043,10 +2043,10 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  border: 1px solid rgb(255 255 255 / 8%);
+  border: 1px solid rgb(92 72 48 / 14%);
   border-radius: 999px;
   padding: 3px 10px;
-  background: rgb(255 255 255 / 3%);
+  background: rgb(92 72 48 / 4%);
   white-space: nowrap;
 }
 
@@ -2066,7 +2066,7 @@
 
 .flow-demo .connection-graph-legend .legend-item.is-browsable::before {
   background:
-    repeating-linear-gradient(90deg, #93a5ba 0 4px, transparent 4px 7px);
+    repeating-linear-gradient(90deg, #6e829a 0 4px, transparent 4px 7px);
   box-shadow: none;
 }
 
@@ -2285,7 +2285,7 @@
   border-radius: 12px;
   padding: 10px 12px;
   color: var(--flow-text);
-  background: #161616;
+  background: #f1eadb;
   cursor: pointer;
   text-align: left;
   font: inherit;
@@ -2293,7 +2293,7 @@
 
 .flow-demo .integration-provenance-toggle:hover {
   border-color: rgb(212 165 116 / 35%);
-  background: #1a1a1a;
+  background: #efe7d6;
 }
 
 .flow-demo .integration-provenance-toggle > span {
@@ -2364,7 +2364,7 @@
   border: 1px solid var(--flow-border);
   border-radius: 10px;
   padding: 9px 10px;
-  background: #151515;
+  background: #f1eadb;
 }
 
 .flow-demo .integration-provenance-pipeline > ol > li > span {
@@ -2373,7 +2373,7 @@
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  color: #fff;
+  color: #2a1d0e;
   background: linear-gradient(145deg, #e0b68a, #d4a574);
   font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
@@ -2414,7 +2414,7 @@
   border: 1px solid var(--flow-border);
   border-radius: 10px;
   padding: 10px 12px;
-  background: #151515;
+  background: #f1eadb;
 }
 
 .flow-demo .integration-provenance-facts dt {
@@ -2489,7 +2489,7 @@
   flex: 0 0 44px;
   place-items: center;
   border-radius: 10px;
-  color: #fff;
+  color: #2a1d0e;
   background: linear-gradient(145deg, #e0b68a, #d4a574);
   box-shadow: 0 4px 12px rgb(212 165 116 / 18%);
   font: 760 var(--flow-type-meta)/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -2683,7 +2683,7 @@
 }
 
 .flow-demo .run-mode-switch button.active {
-  color: #fff8f4;
+  color: #2a1d0e;
   background: linear-gradient(135deg, #d4a574, #b9825a);
 }
 
@@ -2820,7 +2820,7 @@
   border: 1px solid rgb(212 165 116 / 56%);
   border-radius: 10px;
   padding: 0 16px;
-  color: #fff;
+  color: #2a1d0e;
   background: linear-gradient(180deg, #e08a6c, #b9825a);
   font-size: var(--flow-type-control);
   font-weight: 780;
@@ -2859,7 +2859,7 @@
 }
 
 .flow-demo .run-batch-jobs button em {
-  color: #8fbfa8;
+  color: #3f7a44;
 }
 
 .flow-demo .run-resume-note {
@@ -2911,7 +2911,7 @@
   border-radius: 10px;
   padding: 10px 12px;
   color: var(--flow-text);
-  background: #161616;
+  background: #f1eadb;
   cursor: pointer;
   text-align: left;
 }
@@ -2948,7 +2948,7 @@
 
 .flow-demo .run-batch-jobs button.active {
   border-color: rgb(212 165 116 / 45%);
-  background: #1c1917;
+  background: #f6ead2;
   box-shadow: inset 3px 0 0 #d4a574;
 }
 
@@ -2983,7 +2983,7 @@
   border: 1px solid var(--flow-border);
   border-radius: 14px;
   padding: 18px;
-  background: #171717;
+  background: #f1eadb;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%);
 }
 
@@ -3005,7 +3005,7 @@
 }
 
 .flow-demo .run-progress-heading strong {
-  color: #f5f8ff;
+  color: #2e2618;
   font-size: 30px;
   letter-spacing: -0.04em;
 }
@@ -3022,7 +3022,7 @@
   margin: 18px 0 10px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgb(8 18 35 / 72%);
+  background: rgb(92 72 48 / 12%);
 }
 
 .flow-demo .run-progress-track span {
@@ -3030,7 +3030,7 @@
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, rgb(212 165 116 / 35%), #d4a574);
-  box-shadow: 0 0 18px rgb(101 184 255 / 35%);
+  box-shadow: 0 0 18px rgb(212 165 116 / 35%);
   transition: width 300ms ease;
 }
 
@@ -3190,7 +3190,7 @@
   height: 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgb(255 255 255 / 6%);
+  background: rgb(92 72 48 / 10%);
 }
 
 .flow-demo .run-artifact-bar-track i {
@@ -3471,7 +3471,7 @@
 .flow-demo .inspect-trace li > span {
   grid-row: 1 / 3;
   align-self: center;
-  color: #fff;
+  color: #2a1d0e;
   border-radius: 8px;
   padding: 8px 6px;
   background: linear-gradient(145deg, #e0b68a, #d4a574);
@@ -3723,13 +3723,13 @@
 
 .flow-demo .evidence-hub .archive-run-card {
   border: 1px solid var(--flow-border);
-  background: #161616;
+  background: #f1eadb;
 }
 
 .flow-demo .evidence-hub .archive-run-card.active,
 .flow-demo .evidence-hub .archive-run-card:has(.archive-run-select:focus-visible) {
   border-color: rgb(212 165 116 / 45%);
-  background: #1c1917;
+  background: #f6ead2;
   box-shadow: inset 3px 0 0 #d4a574;
 }
 
@@ -3796,7 +3796,7 @@
 
 .flow-demo .evidence-hub .archive-run-ex {
   flex: 0 0 auto;
-  color: #f0f0f0;
+  color: #2e2618;
   font-size: 15px;
   font-weight: 760;
   font-variant-numeric: tabular-nums;
@@ -3818,7 +3818,7 @@
   height: 6px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgb(255 255 255 / 6%);
+  background: rgb(92 72 48 / 6%);
 }
 
 .flow-demo .evidence-hub .archive-run-score > i {
@@ -3853,7 +3853,7 @@
   padding: 16px 18px;
   background:
     linear-gradient(145deg, rgb(212 165 116 / 10%), transparent 55%),
-    #171717;
+    #f1eadb;
 }
 
 .flow-demo .evidence-hub .archive-metric-hero > div:first-child {
@@ -3870,7 +3870,7 @@
 }
 
 .flow-demo .evidence-hub .archive-metric-hero strong {
-  color: #f5f8ff;
+  color: #2e2618;
   font-size: clamp(28px, 4vw, 36px);
   font-weight: 760;
   letter-spacing: -.04em;
@@ -3888,7 +3888,7 @@
   height: 10px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgb(255 255 255 / 6%);
+  background: rgb(92 72 48 / 6%);
 }
 
 .flow-demo .evidence-hub .archive-metric-hero-track > i,
@@ -3953,7 +3953,7 @@
   border: 1px solid var(--flow-border);
   border-radius: 12px;
   padding: 12px 14px;
-  background: #161616;
+  background: #f1eadb;
 }
 
 .flow-demo .evidence-hub .archive-fact-grid dt {
@@ -3987,7 +3987,7 @@
   border: 1px solid var(--flow-border);
   border-radius: 12px;
   padding: 14px;
-  background: #161616;
+  background: #fbf8f1;
 }
 
 .flow-demo .evidence-hub .archive-actor-pipeline h4 {
@@ -4014,7 +4014,7 @@
   padding: 8px 10px;
   border: 1px solid var(--flow-border);
   border-radius: 10px;
-  background: #121212;
+  background: #f1eadb;
 }
 
 .flow-demo .evidence-hub .archive-actor-pipeline strong {
@@ -4363,7 +4363,7 @@
 
 .flow-demo .evidence-hub .button.primary {
   border-color: rgb(212 165 116 / 50%);
-  color: #fff;
+  color: #2a1d0e;
   background: linear-gradient(180deg, #e08a6c, #b9825a);
 }
 
@@ -4406,7 +4406,7 @@
 
 .flow-demo .evidence-hub .board-tabs button:hover {
   color: var(--flow-text);
-  background: rgb(255 255 255 / 4%);
+  background: rgb(92 72 48 / 4%);
 }
 
 .flow-demo .evidence-hub .board-tabs button.active {
@@ -4542,8 +4542,8 @@
   color: var(--flow-amber);
 }
 
-.flow-demo .evidence-hub .radar-grid { stroke: rgb(255 255 255 / 12%); }
-.flow-demo .evidence-hub .radar-axis { stroke: rgb(255 255 255 / 16%); }
+.flow-demo .evidence-hub .radar-grid { stroke: rgb(92 72 48 / 18%); }
+.flow-demo .evidence-hub .radar-axis { stroke: rgb(92 72 48 / 26%); }
 .flow-demo .evidence-hub .radar-label,
 .flow-demo .evidence-hub .bar-label,
 .flow-demo .evidence-hub .bar-tick,
@@ -4580,8 +4580,8 @@
 
 .flow-demo .evidence-hub .error-banner {
   border-left-color: var(--flow-red);
-  color: #efb0a8;
-  background: rgb(80 40 40 / 35%);
+  color: #b0453f;
+  background: #faeae6;
 }
 
 .flow-demo .evidence-hub .results-tabs {
@@ -5139,7 +5139,7 @@
 }
 
 .flow-demo .query-schema-table:hover {
-  background: rgb(255 255 255 / 4%);
+  background: rgb(92 72 48 / 4%);
 }
 
 .flow-demo .query-schema-table i {
@@ -5201,7 +5201,7 @@
 }
 
 .flow-demo .query-schema-column:hover {
-  background: rgb(255 255 255 / 4%);
+  background: rgb(92 72 48 / 4%);
   color: var(--flow-text);
 }
 
@@ -5312,7 +5312,7 @@
   background:
     linear-gradient(180deg, rgb(212 165 116 / 6%), transparent 46%),
     var(--flow-canvas-soft);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 14%);
+  box-shadow: 0 8px 24px rgb(120 96 60 / 10%);
   padding: 16px;
 }
 
@@ -6115,7 +6115,7 @@
 }
 
 .flow-demo .query-results-scroll tbody tr:nth-child(even) {
-  background: rgb(255 255 255 / 2%);
+  background: rgb(92 72 48 / 4%);
 }
 
 .flow-demo .query-results-scroll tbody tr:hover {
