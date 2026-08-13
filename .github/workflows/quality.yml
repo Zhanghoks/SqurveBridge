@@ -110,6 +110,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Test demo workspace
+        run: npm test
+
       - name: Build demo workspace
         run: npm run build
 
@@ -142,6 +145,11 @@ jobs:
         with:
           lfs: false
 
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
       - name: Download and install the packaged Spider benchmark
         run: |
           python tools/benchmarks.py download spider
@@ -152,6 +160,16 @@ jobs:
 
       - name: Build the deployable Docker image
         run: docker build --tag squrvebridge-space:test build/hf-space
+
+      # Publish exactly the context this job proved buildable, instead of
+      # letting the deploy job regenerate one that was never image-tested.
+      - name: Keep the proven Space context for the deploy job
+        uses: actions/upload-artifact@v4
+        with:
+          name: hf-space-context
+          path: build/hf-space
+          retention-days: 1
+          include-hidden-files: true
 
   deploy-hugging-face:
     name: Deploy Hugging Face Space
@@ -164,16 +182,15 @@ jobs:
       - hosted-space-image
       - history-security
     runs-on: ubuntu-latest
+    # The upload deletes remote files before writing the new ones, so an
+    # interrupted run would leave the Space missing files. Queue instead.
     concurrency:
       group: hugging-face-space-production
-      cancel-in-progress: true
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
     steps:
-      - name: Check out the reviewed revision
-        uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
@@ -182,8 +199,11 @@ jobs:
       - name: Install the Hugging Face CLI
         run: python -m pip install --upgrade "huggingface_hub>=1.19.0"
 
-      - name: Build the allowlisted Space context
-        run: python tools/build_hf_space.py
+      - name: Fetch the Space context the image job proved buildable
+        uses: actions/download-artifact@v4
+        with:
+          name: hf-space-context
+          path: build/hf-space
 
       - name: Publish the Space with a short-lived OIDC token
         env:

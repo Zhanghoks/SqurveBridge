@@ -1,11 +1,14 @@
-FROM node:20-bookworm-slim AS frontend
+# Node 22 across every stage: jsdom pulls an undici that calls
+# webidl.util.markAsUncloneable, which does not exist before Node 22.
+FROM node:22-bookworm-slim AS frontend
 WORKDIR /build/demo-app
 COPY demo-app/package.json demo-app/package-lock.json ./
 RUN npm ci
 COPY demo-app/ ./
 COPY config/ /build/config/
 COPY reproduce/configs/ /build/reproduce/configs/
-RUN npm test && npm run build
+# Tests run in the workflow's own frontend job; the image only produces assets.
+RUN npm run build
 
 FROM node:22-bookworm-slim AS pi-sdk
 WORKDIR /build/demo
