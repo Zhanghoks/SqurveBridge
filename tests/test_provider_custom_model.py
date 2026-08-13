@@ -106,9 +106,10 @@ class ProviderCustomModelTests(unittest.TestCase):
         ), mock.patch.object(api_server, "load_dotenv"):
             catalog = {item["id"]: item for item in api_server._llm_provider_catalog()}
             qwen = catalog["qwen"]
-            self.assertEqual(qwen["models"], list(api_server._provider_models["qwen"]))
+            expected = api_server._provider_model_ids()["qwen"]
+            self.assertEqual(qwen["models"], list(expected))
             self.assertNotIn("qwen3-custom-latest", qwen["models"])
-            self.assertEqual(qwen["default_model"], api_server._provider_models["qwen"][0])
+            self.assertEqual(qwen["default_model"], expected[0])
 
 
 if __name__ == "__main__":

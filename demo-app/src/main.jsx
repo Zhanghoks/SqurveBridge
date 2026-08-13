@@ -6,7 +6,7 @@ import SqlAuthDialog from './SqlAuthDialog.jsx'
 import { deploymentTarget, featureEnabled } from './runtimeMode.js'
 import { detectLocale, translate } from './i18n/index.js'
 import { sanitizeRunError } from './full-flow/RunWorkspace.jsx'
-import { officialModelsFor } from './llmCatalog.js'
+import { modelsForProvider } from './llmCatalog.js'
 
 const api = async (path, options = {}) => {
   const response = await fetch(path, options)
@@ -47,7 +47,7 @@ function ProviderConfig({
   const [error, setError] = useState('')
   const panelRef = useRef(null)
   const selected = providers.find(item => item.id === provider)
-  const catalogModels = officialModelsFor(provider)
+  const catalogModels = modelsForProvider(selected, provider)
 
   useEffect(() => {
     const current = health?.provider?.provider
@@ -127,12 +127,16 @@ function ProviderConfig({
       )}
       <input
         aria-label="Model"
+        list="local-model-catalog"
         value={model}
         onChange={event => setModel(event.target.value)}
         placeholder="Enter a model ID"
         autoComplete="off"
         spellCheck="false"
       />
+      <datalist id="local-model-catalog">
+        {catalogModels.map(item => <option key={item} value={item} />)}
+      </datalist>
       <small>Pick a catalog model above, or type any model ID this provider supports.</small>
     </div>
     <label className="field"><span>API key{selected?.env_var ? ` · ${selected.env_var}` : ''}</span><input type="password" aria-label={selected?.env_var ? `API key · ${selected.env_var}` : 'API key'} autoComplete="off" spellCheck="false" value={apiKey} onChange={event => setApiKey(event.target.value)} placeholder={selected?.configured ? 'Leave blank to keep current key' : 'Paste API key'} /></label>

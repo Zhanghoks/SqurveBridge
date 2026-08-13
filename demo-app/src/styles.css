@@ -162,10 +162,14 @@ main { min-width: 0; }
   background: #1b1b1b;
   font-size: 12px;
 }
+/* Provider catalogs run to dozens of models, so cap the chip area and scroll
+   rather than pushing the API key field off the dialog. */
 .flow-provider-dialog .model-suggestion-list {
   display: flex;
+  max-height: 108px;
   flex-wrap: wrap;
   gap: 8px;
+  overflow-y: auto;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -292,8 +296,10 @@ main { min-width: 0; }
 .model-id-field > small { color: #797979; font: 8px/1.45 ui-monospace, monospace; }
 .model-suggestion-list {
   display: flex;
+  max-height: 96px;
   flex-wrap: wrap;
   gap: 6px;
+  overflow-y: auto;
   margin: 0;
   padding: 0;
   list-style: none;
