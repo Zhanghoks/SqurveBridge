@@ -13,8 +13,6 @@ import {
   selectedDatabasesFromConnections,
   selectedMethodsFromConnections,
   toggleConnection,
-  toggleDatabaseConnections,
-  toggleMethodConnections,
   withConnectionKeys,
 } from './model.js'
 import { PROCESS_STEPS, resolveProcessStep } from './processSteps.js'
@@ -146,22 +144,10 @@ export default function FullFlowDemo({
     applyFocus(target.method, target.database)
   }, [focusedMethod, focusedDatabase, applyFocus])
 
-  const toggleMethod = useCallback(method => {
-    const next = toggleMethodConnections(selectedConnections, method)
-    setSelectedConnections(next)
-    syncFocus(next, method, focusedDatabase)
-  }, [selectedConnections, focusedDatabase, syncFocus])
-
-  const toggleDatabase = useCallback(database => {
-    const next = toggleDatabaseConnections(selectedConnections, database)
-    setSelectedConnections(next)
-    syncFocus(next, focusedMethod, database)
-  }, [selectedConnections, focusedMethod, syncFocus])
-
-  // Connection clicks can arrive faster than React commits the previous one, so
-  // the ref — not the rendered state — is the authoritative list. Deriving the
-  // next list from a stale render dropped the earlier pair, which made a method
-  // look like it could only ever hold a single database.
+  // Wiring clicks can arrive faster than React commits the previous one, so the
+  // ref — not the rendered state — is the authoritative list. Deriving the next
+  // list from a stale render dropped the earlier pair, which made a method look
+  // like it could only ever hold a single database.
   const commitConnections = useCallback(next => {
     connectionsRef.current = next
     setSelectedConnections(next)
@@ -240,8 +226,6 @@ export default function FullFlowDemo({
         selectedConnections={connections}
         focusedMethod={focusedMethod}
         focusedDatabase={focusedDatabase}
-        onToggleMethod={toggleMethod}
-        onToggleDatabase={toggleDatabase}
         onToggleConnection={onToggleConnection}
         onFocusConnection={onFocusConnection}
         configs={configs}
