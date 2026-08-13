@@ -102,6 +102,11 @@ if [[ -f "${RUNTIME_DIR}/api.pid" ]] || [[ -f "${RUNTIME_DIR}/web.pid" ]] || [[ 
   web_pid="$(cat "${RUNTIME_DIR}/web.pid" 2>/dev/null || true)"
   if { pid_alive "${api_pid}" || port_in_use "${API_PORT}"; } && { pid_alive "${web_pid}" || port_in_use "${WEB_PORT}"; }; then
     trap - EXIT
+    # Report the ports the live instance actually bound, not the defaults.
+    if [[ -f "${RUNTIME_DIR}/demo.env" ]]; then
+      # shellcheck disable=SC1091
+      source "${RUNTIME_DIR}/demo.env"
+    fi
     log "Demo already running."
     log "  Workspace: http://${WEB_HOST}:${WEB_PORT}"
     log "  API:       http://${API_HOST}:${API_PORT}"
