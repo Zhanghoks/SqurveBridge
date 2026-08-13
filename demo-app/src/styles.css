@@ -184,20 +184,20 @@ main { min-width: 0; }
   white-space: nowrap;
 }
 .flow-provider-dialog .model-suggestion-list button:hover {
-  border-color: rgb(218 119 86 / 45%);
-  color: #e89274;
+  border-color: rgb(212 165 116 / 45%);
+  color: #e0b68a;
 }
 .flow-provider-dialog .model-suggestion-list button.active {
-  border-color: rgb(218 119 86 / 55%);
+  border-color: rgb(212 165 116 / 55%);
   color: #f0d2c5;
-  background: rgb(218 119 86 / 16%);
+  background: rgb(212 165 116 / 16%);
 }
 .flow-provider-dialog select:focus,
 .flow-provider-dialog .model-id-field input:focus,
 .flow-provider-dialog .workspace-id-field input:focus,
 .flow-provider-dialog input[type="password"]:focus {
-  border-color: rgb(218 119 86 / 55%);
-  box-shadow: 0 0 0 3px rgb(218 119 86 / 14%);
+  border-color: rgb(212 165 116 / 55%);
+  box-shadow: 0 0 0 3px rgb(212 165 116 / 14%);
 }
 .flow-provider-dialog .model-id-field > small {
   color: #616161;
@@ -213,7 +213,7 @@ main { min-width: 0; }
   font-size: 11px;
 }
 .flow-provider-dialog .persist-toggle input {
-  accent-color: #da7756;
+  accent-color: #d4a574;
 }
 .flow-provider-actions {
   display: flex;
@@ -232,12 +232,12 @@ main { min-width: 0; }
   transition: border-color 150ms ease, background 150ms ease, color 150ms ease, transform 150ms ease;
 }
 .flow-provider-primary {
-  border: 1px solid rgb(218 119 86 / 52%);
+  border: 1px solid rgb(212 165 116 / 52%);
   color: #fff;
-  background: linear-gradient(180deg, #e08a6c, #c4613f);
+  background: linear-gradient(180deg, #e08a6c, #b9825a);
 }
 .flow-provider-primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #e89274, #c4613f);
+  background: linear-gradient(180deg, #e0b68a, #b9825a);
   transform: translateY(-1px);
 }
 .flow-provider-secondary {
@@ -246,8 +246,8 @@ main { min-width: 0; }
   background: #282828;
 }
 .flow-provider-secondary:hover {
-  border-color: rgb(218 119 86 / 40%);
-  color: #e89274;
+  border-color: rgb(212 165 116 / 40%);
+  color: #e0b68a;
 }
 .flow-provider-note {
   margin: 12px 0 0;
@@ -1543,7 +1543,7 @@ adapted from the terminal-first provider flow */
   min-height: 100vh;
   color: #e9e9e9;
   background:
-    radial-gradient(ellipse 70% 45% at 12% -8%, rgb(218 119 86 / 10%), transparent 55%),
+    radial-gradient(ellipse 70% 45% at 12% -8%, rgb(212 165 116 / 10%), transparent 55%),
     linear-gradient(180deg, #151515 0, #1b1b1b 100%);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }

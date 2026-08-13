@@ -266,8 +266,17 @@ test('adopts SQL handed over from the Pi panel', async () => {
   assert.equal(handled, 1)
 })
 
-test('shows the first-run guide with example questions from the schema', async () => {
-  renderWorkspace()
+test('shows the first-run guide and example questions fill in and auto-run the pipeline', async () => {
+  const calls = []
+  renderWorkspace({
+    postJson: async (path, body) => {
+      calls.push([path, body])
+      if (path === '/api/query') {
+        return { status: 'success', sql: 'SELECT count(*) FROM stadium', trace: [] }
+      }
+      return { status: 'success', columns: ['n'], rows: [[3]], row_count: 1, truncated: false, elapsed_ms: 2 }
+    },
+  })
   await screen.findByRole('button', { name: 'Insert stadium into the SQL editor' })
   const empty = screen.getByTestId('query-empty')
   assert.match(empty.textContent, /Ask your first question/)
@@ -277,4 +286,31 @@ test('shows the first-run guide with example questions from the schema', async (
     screen.getByLabelText('Natural-language question').value,
     'How many rows does stadium have?',
   )
+  await waitFor(() => assert.ok(calls.some(([path]) => path === '/api/query')))
+  const [, body] = calls.find(([path]) => path === '/api/query')
+  assert.equal(body.question, 'How many rows does stadium have?')
+  await screen.findByTestId('query-results')
+})
+
+test('pressing Enter in the question box runs the pipeline; Shift+Enter adds a newline', async () => {
+  const calls = []
+  renderWorkspace({
+    postJson: async (path, body) => {
+      calls.push([path, body])
+      if (path === '/api/query') return { status: 'success', sql: 'SELECT 1', trace: [] }
+      return { status: 'success', columns: ['1'], rows: [[1]], row_count: 1, truncated: false, elapsed_ms: 1 }
+    },
+  })
+  const user = userEvent.setup()
+  await screen.findByRole('button', { name: 'Insert stadium into the SQL editor' })
+  const textarea = screen.getByLabelText('Natural-language question')
+
+  await user.type(textarea, 'line one{Shift>}{Enter}{/Shift}line two')
+  assert.equal(textarea.value, 'line one\nline two')
+  assert.equal(calls.length, 0)
+
+  await user.type(textarea, '{Enter}')
+  await waitFor(() => assert.ok(calls.some(([path]) => path === '/api/query')))
+  const [, body] = calls.find(([path]) => path === '/api/query')
+  assert.equal(body.question, 'line one\nline two')
 })

@@ -91,7 +91,7 @@ function ResultsTable({ result, onCopyCell, t }) {
     })
   }, [result, sort])
 
-  if (!result) return null
+  if (!result || !Array.isArray(result.columns)) return null
   const cycleSort = index => {
     setSort(current => {
       if (!current || current.index !== index) return { index, direction: 'asc' }
@@ -195,6 +195,9 @@ export default function QueryWorkspace({
   const editorRef = useRef(null)
   const toastTimerRef = useRef(null)
   const flashTimerRef = useRef(null)
+  const questionRef = useRef(null)
+  const stagesRef = useRef(null)
+  const resultsRef = useRef(null)
 
   const actorsByType = capabilities?.actors || {}
   const workflows = capabilities?.workflows || []
@@ -295,6 +298,14 @@ export default function QueryWorkspace({
     return () => window.removeEventListener('keydown', onKey)
   }, [stageDetailId])
 
+  useEffect(() => {
+    if (phase === 'generating') stagesRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+  }, [phase])
+
+  useEffect(() => {
+    if (result || execError) resultsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+  }, [result, execError])
+
   const showToast = text => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
     setToast({ id: Date.now(), text })
@@ -316,9 +327,9 @@ export default function QueryWorkspace({
       : skeleton.map(type => actorSelections[type]).filter(Boolean))
     : []
 
-  const run = async () => {
-    const normalized = question.trim()
-    if (!normalized || !selectedDb || !credentialReady || phase === 'generating') return
+  const run = async (overrideQuestion) => {
+    const normalized = (typeof overrideQuestion === 'string' ? overrideQuestion : question).trim()
+    if (!normalized || !selectedDb || !credentialReady || phase === 'generating' || phase === 'executing') return
     const planned = plannedQueryStages({ mode, generator, actors: requestActors })
     setPhase('generating')
     setGenError('')
@@ -459,7 +470,9 @@ export default function QueryWorkspace({
     ? `${pipelineStages[Math.min(activeStageIndex, pipelineStages.length - 1)]?.actor || ''} ${t('query.stageRunning')}`
     : phase === 'executing' || executing
       ? t('query.executing')
-      : ''
+      : phase === 'done' && result
+        ? t('query.resultsSummary', { count: result.row_count, elapsed: result.elapsed_ms })
+        : ''
 
   const firstTable = schemaTables[0]
   const examples = useMemo(
@@ -469,6 +482,13 @@ export default function QueryWorkspace({
   const focusedPairLabel = focusedMethod && focusedDatabase
     ? t('query.useComposePipeline', { method: focusedMethod, database: focusedDatabase })
     : ''
+  const runBlockedReason = !credentialReady
+    ? t('query.runBlockedCredential')
+    : !selectedDb
+      ? t('query.runBlockedDatabase')
+      : !question.trim()
+        ? t('query.runBlockedQuestion')
+        : ''
 
   return (
     <section id="query" className="flow-module flow-glass query-workspace" data-testid="query-workspace">
@@ -518,17 +538,20 @@ export default function QueryWorkspace({
               <label>
                 <span>{t('query.questionLabel')}</span>
                 <textarea
+                  ref={questionRef}
                   value={question}
-                  rows={2}
+                  rows={3}
                   disabled={!credentialReady}
                   placeholder={t('query.questionPlaceholder')}
                   aria-label={t('query.questionLabel')}
+                  aria-describedby={runBlockedReason ? 'query-run-blocked-reason' : undefined}
                   onChange={event => setQuestion(event.target.value)}
                   onKeyDown={event => {
-                    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-                      event.preventDefault()
-                      run()
-                    }
+                    if (event.key !== 'Enter') return
+                    if (event.shiftKey) return
+                    if (event.nativeEvent?.isComposing || event.isComposing) return
+                    event.preventDefault()
+                    run()
                   }}
                 />
               </label>
@@ -552,22 +575,28 @@ export default function QueryWorkspace({
                   <button
                     type="button"
                     className="query-run"
-                    disabled={!credentialReady || !question.trim() || !selectedDb}
-                    title={t('query.runHint')}
-                    onClick={run}
+                    disabled={Boolean(runBlockedReason) || phase === 'executing' || executing}
+                    aria-busy={phase === 'executing' || executing}
+                    title={runBlockedReason || t('query.runHint')}
+                    onClick={() => run()}
                   >
-                    {t('query.run')}
+                    {phase === 'executing' || executing ? t('query.executing') : t('query.run')}
                   </button>
+                )}
+                {phase !== 'generating' && runBlockedReason && (
+                  <small className="query-run-blocked" id="query-run-blocked-reason">{runBlockedReason}</small>
                 )}
               </div>
             </div>
 
             <div className="query-mode-row">
+              <span className="query-mode-caption">{t('query.modeLabel')}</span>
               <div className="query-mode" role="group" aria-label={t('query.modeLabel')}>
                 <button
                   type="button"
                   className={mode === 'direct' ? 'active' : ''}
                   aria-pressed={mode === 'direct'}
+                  title={t('query.modeDirectHint')}
                   onClick={() => setMode('direct')}
                 >
                   {t('query.modeDirect')}
@@ -576,6 +605,7 @@ export default function QueryWorkspace({
                   type="button"
                   className={mode === 'workflow' ? 'active' : ''}
                   aria-pressed={mode === 'workflow'}
+                  title={t('query.modeWorkflowHint')}
                   onClick={() => setMode('workflow')}
                 >
                   {t('query.modeWorkflow')}
@@ -603,9 +633,10 @@ export default function QueryWorkspace({
               )}
 
               {mode === 'workflow' && (
-                <label className="query-inline-select">
+                <label className="query-inline-select" title={t('query.skeletonHint')}>
                   <span>{t('query.skeleton')}</span>
                   <select
+                    aria-label={t('query.skeleton')}
                     value={workflowSource === 'compose' ? '' : String(skeletonIndex)}
                     onChange={event => {
                       if (event.target.value === '') return
@@ -621,6 +652,10 @@ export default function QueryWorkspace({
                 </label>
               )}
             </div>
+
+            <p className="query-mode-hint">
+              {mode === 'direct' ? t('query.modeDirectHint') : t('query.modeWorkflowHint')}
+            </p>
 
             {mode === 'workflow' && workflowSource === 'compose' && composeActors.length > 0 && (
               <div className="query-actor-chips" data-testid="query-compose-actors">
@@ -652,26 +687,55 @@ export default function QueryWorkspace({
           {!hasRun && (
             <div className="query-empty" data-testid="query-empty">
               <b>{t('query.emptyTitle')}</b>
-              <ol>
-                <li>{t('query.emptyStepDatabase')}</li>
-                <li>{t('query.emptyStepQuestion')}</li>
-                <li>{t('query.emptyStepPipeline')}</li>
+              <ol className="query-steps">
+                <li className={selectedDb ? 'is-done' : 'is-current'}>
+                  <i aria-hidden="true">{selectedDb ? '✓' : '1'}</i>
+                  <div>
+                    <span>{t('query.emptyStepDatabase')}</span>
+                    {selectedDb && <small>{selectedDb}</small>}
+                  </div>
+                </li>
+                <li className={question.trim() ? 'is-done' : selectedDb ? 'is-current' : ''}>
+                  <i aria-hidden="true">{question.trim() ? '✓' : '2'}</i>
+                  <div>
+                    <span>{t('query.emptyStepQuestion')}</span>
+                  </div>
+                </li>
+                <li className={selectedDb && question.trim() && credentialReady ? 'is-current' : ''}>
+                  <i aria-hidden="true">3</i>
+                  <div>
+                    <span>{t('query.emptyStepPipeline')}</span>
+                    {Boolean(selectedDb && question.trim() && credentialReady) && (
+                      <small>{t('query.stepReadyHint')}</small>
+                    )}
+                  </div>
+                </li>
               </ol>
               {credentialReady && examples.length > 0 && (
                 <div className="query-examples">
                   <span>{t('query.examples')}</span>
                   {examples.map(example => (
-                    <button key={example} type="button" onClick={() => setQuestion(example)}>
+                    <button
+                      key={example}
+                      type="button"
+                      title={t('query.exampleHint')}
+                      onClick={() => {
+                        setQuestion(example)
+                        if (selectedDb) run(example)
+                        else questionRef.current?.focus?.()
+                      }}
+                    >
                       {example}
                     </button>
                   ))}
+                  <small className="query-examples-hint">{t('query.exampleHint')}</small>
                 </div>
               )}
             </div>
           )}
 
           {hasRun && displayStages.length > 0 && (
-            <div className="query-stages" data-testid="query-stages">
+            <div className="query-stages" data-testid="query-stages" ref={stagesRef}>
               <header>
                 <span>{t('query.stagesEyebrow')}</span>
               </header>
@@ -756,7 +820,7 @@ export default function QueryWorkspace({
           )}
 
           {hasRun && (result || execError) && (
-            <div className="query-results" data-testid="query-results">
+            <div className="query-results" data-testid="query-results" ref={resultsRef}>
               <header>
                 <span>{t('query.resultsEyebrow')}</span>
                 {result && (

@@ -75,7 +75,7 @@
 .button.primary {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #e08a6c 0%, #c4613f 100%);
+  background: linear-gradient(135deg, #e0b68a 0%, #b9825a 100%);
   box-shadow:
     0 8px 24px rgba(218, 119, 86, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.15);
@@ -282,6 +282,9 @@
 .status-success i,
 .flow-status-success i {
   animation: success-pulse 2s ease-in-out infinite;
+  /* The dot pulses forever (e.g. in the agent chat toolbar); promote it to its
+     own compositor layer so the loop does not repaint surrounding text. */
+  will-change: transform, opacity;
 }
 
 @keyframes success-pulse {
@@ -436,7 +439,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, #e89274, #da7756);
+  background: linear-gradient(90deg, #e0b68a, #d4a574);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);

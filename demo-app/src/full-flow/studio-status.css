@@ -1,0 +1,83 @@
+.flow-demo .studio-status-bar {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border-radius: 14px;
+  padding: 12px 16px;
+  margin: 0 0 4px;
+}
+
+.flow-demo .studio-status-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.flow-demo .studio-status-heading strong {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--flow-green);
+}
+
+.flow-demo .studio-status-heading span {
+  font-size: 11px;
+  color: var(--flow-muted);
+}
+
+.flow-demo .studio-status-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flow-demo .studio-status-item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  border: 1px solid var(--flow-border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: var(--flow-panel-soft);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.flow-demo .studio-status-item:hover,
+.flow-demo .studio-status-item:focus-visible {
+  border-color: rgb(125 186 138 / 45%);
+  background: rgb(125 186 138 / 8%);
+}
+
+.flow-demo .studio-status-label {
+  font-size: 11px;
+  color: var(--flow-muted);
+}
+
+.flow-demo .studio-status-value {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flow-demo .studio-status-value[data-tone='ok'] {
+  color: var(--flow-green);
+}
+
+.flow-demo .studio-status-value[data-tone='warn'] {
+  color: var(--flow-amber);
+}
+
+.flow-demo .studio-status-hint {
+  font-size: 10px;
+  color: var(--flow-inactive);
+}

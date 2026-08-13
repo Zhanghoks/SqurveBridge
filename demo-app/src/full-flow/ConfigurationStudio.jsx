@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import CatalogCard from './CatalogCard.jsx'
 import FlashcardDialog from './FlashcardDialog.jsx'
+import StudioStatusBar from './StudioStatusBar.jsx'
 import { DATABASE_CATALOG, METHOD_CATALOG } from './catalog.js'
 
 export default function ConfigurationStudio({
   hostedReadOnly = true,
+  workspaceStatus = null,
+  onNavigateStep,
   t,
 }) {
   const [flashcard, setFlashcard] = useState(null)
@@ -21,6 +24,19 @@ export default function ConfigurationStudio({
           <p>{t(hostedReadOnly ? 'configure.hostedDescription' : 'configure.description')}</p>
         </div>
       </header>
+
+      {workspaceStatus && (
+        <StudioStatusBar
+          connectionCount={workspaceStatus.connectionCount}
+          focusedMethod={workspaceStatus.focusedMethod}
+          focusedDatabase={workspaceStatus.focusedDatabase}
+          credentialConfigured={workspaceStatus.credentialConfigured}
+          credentialLabel={workspaceStatus.credentialLabel}
+          runPhase={workspaceStatus.runPhase}
+          onNavigate={onNavigateStep}
+          t={t}
+        />
+      )}
 
       <aside className="studio-guide studio-guide-inline" data-testid="studio-guide">
         <div className="studio-guide-copy">

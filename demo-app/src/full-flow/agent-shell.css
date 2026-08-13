@@ -15,7 +15,7 @@ html:has(.agent-shell) #root {
   --shell-border: rgba(255, 255, 255, 0.08);
   --shell-border-strong: rgba(255, 255, 255, 0.14);
   --shell-text: #ececec;
-  --shell-muted: #8a8a8a;
+  --shell-muted: #9a9a9a;
   --shell-accent: #d4a574;
   --shell-accent-strong: #e0b68a;
   --shell-good: #8fbc8f;
@@ -31,8 +31,8 @@ html:has(.agent-shell) #root {
   --flow-border: rgba(255, 255, 255, 0.08);
   --flow-border-strong: rgba(255, 255, 255, 0.14);
   --flow-text: #ececec;
-  --flow-muted: #8a8a8a;
-  --flow-inactive: #5c5c5c;
+  --flow-muted: #9a9a9a;
+  --flow-inactive: #666;
   --flow-claude: #d4a574;
   --flow-claude-strong: #e0b68a;
   --flow-blue: #d4a574;
@@ -191,13 +191,13 @@ html:has(.agent-shell) #root {
 .agent-chat-header button,
 .agent-shell-toolbar button {
   min-height: 30px;
-  padding: 6px 10px;
+  padding: 6px 11px;
   color: var(--shell-text);
   border: 1px solid var(--shell-border);
   border-radius: 10px;
   background: transparent;
   font: inherit;
-  font-size: 10px;
+  font-size: 11px;
   cursor: pointer;
   transition: background 140ms ease, border-color 140ms ease;
 }
@@ -227,6 +227,16 @@ html:has(.agent-shell) #root {
   font-size: 18px !important;
 }
 
+.agent-pane-close {
+  color: var(--shell-muted) !important;
+  font-size: 12px !important;
+  line-height: 1;
+}
+
+.agent-pane-close:hover {
+  color: var(--shell-text) !important;
+}
+
 .agent-stage-tabs {
   display: flex;
   flex: 0 0 auto;
@@ -239,14 +249,15 @@ html:has(.agent-shell) #root {
 
 .agent-stage-tabs button {
   position: relative;
-  padding: 10px 12px;
+  padding: 11px 13px;
   color: var(--shell-muted);
   border: 0;
   border-radius: 0;
   background: transparent;
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
+  transition: color 140ms ease;
 }
 
 .agent-stage-tabs button:hover {
@@ -259,14 +270,18 @@ html:has(.agent-shell) #root {
   box-shadow: none;
 }
 
+.agent-stage-tabs button.active {
+  font-weight: 600;
+}
+
 .agent-stage-tabs button.active::after {
   position: absolute;
   right: 10px;
   bottom: 0;
   left: 10px;
-  height: 1px;
-  border-radius: 0;
-  background: var(--shell-text);
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--shell-accent);
   box-shadow: none;
   content: "";
 }
@@ -396,6 +411,69 @@ html:has(.agent-shell) #root {
   touch-action: none;
 }
 
+/* Widen the grab target beyond the visible 10px track. */
+.agent-shell-divider::after {
+  position: absolute;
+  inset: 0 -5px;
+  content: "";
+}
+
+/* Keep dragging smooth: a stable cursor, no accidental text selection,
+   and no hover work inside the panes while resizing. */
+body.agent-shell-resizing {
+  cursor: col-resize;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body.agent-shell-resizing .agent-dashboard-pane,
+body.agent-shell-resizing .agent-chat-column {
+  pointer-events: none;
+}
+
+/* Every drag frame relayouts and repaints both panes. Strip the effects that
+   make those frames expensive — glass blurs repaint their whole backdrop,
+   and transitions/looping pulses keep invalidating styles mid-drag. All of
+   this is restored the moment the class is removed on pointerup. */
+body.agent-shell-resizing .agent-shell-panes *,
+body.agent-shell-resizing .agent-shell-panes *::before,
+body.agent-shell-resizing .agent-shell-panes *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: none !important;
+  animation-play-state: paused !important;
+}
+
+/* Ghost divider: while dragging, the panes keep their width and only this
+   transform-positioned indicator follows the pointer (compositor-only, no
+   layout). The real grid width is applied once on pointerup, landing the
+   divider exactly where the ghost line was. Absolutely positioned so it
+   never becomes a fourth grid track. The inset matches the panes padding
+   (28px 12px 12px) so the line spans the full pane height. */
+.agent-shell-divider-ghost {
+  position: absolute;
+  z-index: 30;
+  inset: 28px auto 12px 0;
+  display: none;
+  width: 10px;
+  place-items: center;
+  pointer-events: none;
+  will-change: transform;
+}
+
+body.agent-shell-resizing .agent-shell-divider-ghost {
+  display: grid;
+}
+
+.agent-shell-divider-ghost::before {
+  width: 2px;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--shell-accent);
+  opacity: 0.85;
+  content: "";
+}
+
 .agent-shell-divider::before {
   position: absolute;
   inset: 0 2px;
@@ -425,16 +503,9 @@ html:has(.agent-shell) #root {
   box-shadow: none;
 }
 
-.agent-chat-header-left > div {
+.agent-chat-header-left h2 {
   min-width: 0;
-}
-
-.agent-chat-header-left > div > span {
-  display: block;
-  max-width: 240px;
   overflow: hidden;
-  color: var(--shell-muted);
-  font-size: 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -533,8 +604,26 @@ html:has(.agent-shell) #root {
   display: none;
 }
 
+/* Empty state: pin the composer to the bottom of the pane (matching its
+   position once messages exist) and let the greeting fill the space above.
+   margin:auto on the log (not justify-content:center) keeps the greeting
+   scrollable instead of clipped when the pane is short. */
+.agent-harness-shell.is-empty {
+  overflow-y: auto;
+}
+
 .agent-harness-shell.is-empty .agent-shell-scroll {
-  justify-content: center;
+  flex: 1;
+  padding-top: 24px;
+  /* A faint warm glow behind the greeting keeps the empty pane from reading
+     as dead black. Plain background gradients cost nothing to composite. */
+  background:
+    radial-gradient(ellipse 110% 46% at 50% 30%, rgba(212, 165, 116, 0.05), transparent 68%),
+    radial-gradient(ellipse 80% 34% at 50% 24%, rgba(255, 255, 255, 0.02), transparent 70%);
+}
+
+.agent-harness-shell.is-empty .agent-shell-scroll-spacer {
+  display: none;
 }
 
 .agent-harness-shell .pi-chat-log {
@@ -552,7 +641,8 @@ html:has(.agent-shell) #root {
 .agent-harness-shell.is-empty .pi-chat-log {
   flex: 0 0 auto;
   width: min(100%, 640px);
-  padding: 12px clamp(18px, 5vw, 40px) 0;
+  margin: auto;
+  padding: 0 clamp(18px, 5vw, 40px);
   gap: 0;
 }
 
@@ -570,10 +660,47 @@ html:has(.agent-shell) #root {
 .agent-harness-shell .pi-chat-empty {
   display: grid;
   max-width: 560px;
+  min-height: 0;
   margin: 0 auto;
-  gap: 10px;
-  padding: 24px 0 8px;
+  gap: 12px;
+  padding: 0 0 4px;
   text-align: center;
+  justify-items: center;
+  /* One-shot entrance, transform/opacity only; the global reduced-motion
+     block at the bottom of this file collapses it to a single frame. */
+  animation: pi-empty-in 460ms cubic-bezier(0.22, 0.7, 0.3, 1) both;
+}
+
+@keyframes pi-empty-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.agent-harness-shell .pi-chat-empty::before {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 8px;
+  place-items: center;
+  color: #17110a;
+  border: 1px solid rgba(224, 182, 138, 0.55);
+  border-radius: 999px;
+  background: linear-gradient(160deg, #f7efe4, #e2c69f);
+  box-shadow:
+    0 0 0 1px rgba(212, 165, 116, 0.16),
+    0 0 0 7px rgba(212, 165, 116, 0.05),
+    0 0 34px rgba(212, 165, 116, 0.16);
+  font-family: var(--shell-serif);
+  font-size: 21px;
+  font-weight: 500;
+  content: "π";
 }
 
 .agent-harness-shell .pi-chat-greeting {
@@ -590,9 +717,74 @@ html:has(.agent-shell) #root {
 .agent-harness-shell .pi-chat-empty > span {
   max-width: 42ch;
   margin: 0 auto;
-  color: var(--shell-muted);
-  font-size: 12px;
+  color: #9a9a9a;
+  font-size: 13px;
   line-height: 1.55;
+}
+
+/* Capability cards inside the welcome area. These prefill the composer
+   draft when clicked — distinct from the removed composer suggestion row. */
+.pi-chat-hero-cards {
+  display: grid;
+  width: 100%;
+  margin-top: 16px;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.pi-chat-hero-card {
+  display: grid;
+  gap: 5px;
+  padding: 13px 14px 12px;
+  justify-items: start;
+  color: var(--shell-text);
+  border: 1px solid var(--shell-border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0)) #181818;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+}
+
+.pi-chat-hero-card:hover,
+.pi-chat-hero-card:focus-visible {
+  border-color: rgba(212, 165, 116, 0.38);
+  background-color: #1d1c1a;
+  transform: translateY(-1px);
+}
+
+.pi-chat-hero-card:active {
+  transform: none;
+}
+
+.pi-chat-hero-card-icon {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  margin-bottom: 3px;
+  place-items: center;
+  color: var(--shell-accent);
+  border: 1px solid rgba(212, 165, 116, 0.26);
+  border-radius: 8px;
+  background: rgba(212, 165, 116, 0.07);
+}
+
+.pi-chat-hero-card-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.pi-chat-hero-card strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.pi-chat-hero-card > span:last-child {
+  color: var(--shell-muted);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .agent-harness-shell .pi-chat-suggestions {
@@ -745,8 +937,8 @@ html:has(.agent-shell) #root {
   bottom: auto;
   left: auto;
   width: min(100%, 640px);
-  margin: 8px auto 0;
-  padding: 0 clamp(18px, 5vw, 40px) 28px;
+  margin: 22px auto 0;
+  padding: 0 clamp(18px, 5vw, 40px) 24px;
 }
 
 .pi-chat-composer-inner {
@@ -766,15 +958,16 @@ html:has(.agent-shell) #root {
   min-height: 108px;
   padding: 16px 52px 44px 16px;
   border: 1px solid var(--shell-border-strong);
-  border-radius: 16px;
-  background: #1a1a1a;
+  border-radius: 18px;
+  background: #1c1c1c;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
   backdrop-filter: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .pi-chat-composer-field:focus-within {
-  border-color: rgba(255, 255, 255, 0.22);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+  border-color: rgba(212, 165, 116, 0.45);
+  box-shadow: 0 0 0 3px rgba(212, 165, 116, 0.08), 0 12px 32px rgba(0, 0, 0, 0.32);
 }
 
 .pi-chat-composer-field textarea {
@@ -795,6 +988,12 @@ html:has(.agent-shell) #root {
   color: #6a6a6a;
 }
 
+.agent-harness-shell .pi-chat-composer-field textarea:disabled {
+  color: #7a7a7a;
+  background: transparent;
+  cursor: not-allowed;
+}
+
 .pi-chat-composer-actions {
   position: absolute;
   right: 12px;
@@ -807,12 +1006,17 @@ html:has(.agent-shell) #root {
   height: 36px;
   padding: 0;
   place-items: center;
-  color: #111;
+  color: #1a120a;
   border: 0;
   border-radius: 999px;
-  background: #f2f2f2;
+  background: var(--shell-accent);
   box-shadow: none;
   cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.pi-chat-send:hover:not(:disabled) {
+  background: var(--shell-accent-strong);
 }
 
 .pi-chat-send:disabled {
@@ -840,13 +1044,15 @@ html:has(.agent-shell) #root {
 }
 
 .pi-chat-composer-tools button {
-  padding: 4px 8px;
+  padding: 4px 9px;
   color: var(--shell-muted);
-  border: 0;
-  border-radius: 8px;
+  border: 1px solid var(--shell-border);
+  border-radius: 999px;
   background: transparent;
   font: inherit;
+  font-size: 10.5px;
   cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
 }
 
 .pi-chat-composer-tools button:hover,
@@ -878,35 +1084,26 @@ html:has(.agent-shell) #root {
   border-color: var(--shell-border-strong);
 }
 
-.pi-chat-suggestion-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.pi-chat-suggestion-row button {
-  padding: 8px 12px;
-  color: var(--shell-muted);
-  border: 1px solid var(--shell-border);
-  border-radius: 999px;
-  background: transparent;
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-.pi-chat-suggestion-row button:hover:not(:disabled) {
-  color: var(--shell-text);
-  border-color: var(--shell-border-strong);
-}
-
 .pi-chat-footnote {
-  margin-top: 8px;
-  color: #555;
-  font-size: 8px;
+  margin-top: 14px;
+  color: #6a6a6a;
+  font-size: 10px;
+  line-height: 1.5;
   text-align: center;
+}
+
+/* Fade chat content out behind the floating composer so overlapping
+   messages stay legible while scrolling. */
+.agent-harness-shell:not(.is-empty) .pi-chat-composer::before {
+  position: absolute;
+  z-index: -1;
+  right: -16px;
+  bottom: -14px;
+  left: -16px;
+  height: calc(100% + 46px);
+  background: linear-gradient(to top, #121212 62%, rgba(18, 18, 18, 0));
+  content: "";
+  pointer-events: none;
 }
 
 .pi-composer-skills {
@@ -1089,6 +1286,20 @@ html:has(.agent-shell) #root {
   background: var(--shell-panel);
   box-shadow: none;
   backdrop-filter: none;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.agent-dashboard-restore:hover,
+.agent-chat-restore:hover {
+  color: var(--shell-text);
+  border-color: rgba(212, 165, 116, 0.45);
+  background: var(--shell-panel-raised);
+}
+
+.agent-dashboard-restore:hover span,
+.agent-chat-restore:hover span {
+  background: var(--shell-accent-strong);
 }
 
 .agent-dashboard-restore span,
@@ -1150,8 +1361,7 @@ html:has(.agent-shell) #root {
 
 @media (max-width: 1180px) {
   .agent-dashboard-kicker,
-  .agent-chat-project > span,
-  .agent-chat-header-left > div > span {
+  .agent-chat-project > span {
     display: none;
   }
 

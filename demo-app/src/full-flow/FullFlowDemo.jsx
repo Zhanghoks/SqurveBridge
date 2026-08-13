@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { detectLocale, setDocumentLocale, translate } from '../i18n/index.js'
 import BoardWorkspace from './BoardWorkspace.jsx'
 import ConfigurationStudio from './ConfigurationStudio.jsx'
@@ -26,6 +26,16 @@ import './ui-enhancements.css'
 
 const AgentHarness = lazy(() => import('../AgentHarness.jsx'))
 const SPLIT_STORAGE_KEY = 'squrve-demo-shell-layout'
+
+// All five stage pages stay mounted (hidden pages keep their state), so any
+// FullFlowDemo state change used to re-render every workspace. Memoizing them
+// keeps shell interactions (pane collapse, run polling, locale-safe props)
+// from touching pages whose props did not change.
+const MemoConfigurationStudio = memo(ConfigurationStudio)
+const MemoConnectionComposer = memo(ConnectionComposer)
+const MemoQueryWorkspace = memo(QueryWorkspace)
+const MemoBoardWorkspace = memo(BoardWorkspace)
+const MemoEvidenceHub = memo(EvidenceHub)
 
 function loadShellLayout() {
   try {
@@ -70,11 +80,26 @@ export default function FullFlowDemo({
   const [mobilePane, setMobilePane] = useState('dashboard')
   const [adoptedSql, setAdoptedSql] = useState(null)
   const splitRef = useRef(null)
+  const shellRef = useRef(null)
+  const dividerGhostRef = useRef(null)
+  const workspaceBodyRef = useRef(null)
   const t = useCallback((key, params) => translate(locale, key, params), [locale])
-  const focusedConfig = resolveFocusedConfig(configs, focusedMethod, focusedDatabase)
-  const selectedMethods = selectedMethodsFromConnections(selectedConnections)
-  const selectedDatabases = selectedDatabasesFromConnections(selectedConnections)
-  const connections = withConnectionKeys(selectedConnections)
+  const focusedConfig = useMemo(
+    () => resolveFocusedConfig(configs, focusedMethod, focusedDatabase),
+    [configs, focusedMethod, focusedDatabase],
+  )
+  const selectedMethods = useMemo(
+    () => selectedMethodsFromConnections(selectedConnections),
+    [selectedConnections],
+  )
+  const selectedDatabases = useMemo(
+    () => selectedDatabasesFromConnections(selectedConnections),
+    [selectedConnections],
+  )
+  const connections = useMemo(
+    () => withConnectionKeys(selectedConnections),
+    [selectedConnections],
+  )
 
   useEffect(() => {
     window.localStorage.setItem('squrve-demo-locale', locale)
@@ -91,6 +116,12 @@ export default function FullFlowDemo({
     return () => window.removeEventListener('hashchange', syncFromHash)
   }, [])
 
+  useEffect(() => {
+    // Stage pages share one scroll container; reset it so the new page
+    // header is never clipped by a stale scroll offset.
+    if (workspaceBodyRef.current) workspaceBodyRef.current.scrollTop = 0
+  }, [activeStep])
+
   const navigateToStep = useCallback(step => {
     const next = resolveProcessStep(step)
     setActiveStep(next)
@@ -99,12 +130,12 @@ export default function FullFlowDemo({
     }
   }, [])
 
-  const applyFocus = (method, database) => {
+  const applyFocus = useCallback((method, database) => {
     setFocusedMethod(method)
     setFocusedDatabase(database)
-  }
+  }, [])
 
-  const syncFocus = (next, preferredMethod = focusedMethod, preferredDatabase = focusedDatabase) => {
+  const syncFocus = useCallback((next, preferredMethod = focusedMethod, preferredDatabase = focusedDatabase) => {
     const preferred = next.find(item =>
       item.method === preferredMethod && item.database === preferredDatabase,
     )
@@ -112,21 +143,21 @@ export default function FullFlowDemo({
     const byDatabase = next.find(item => item.database === preferredDatabase)
     const target = preferred || byMethod || byDatabase || next[0]
     applyFocus(target.method, target.database)
-  }
+  }, [focusedMethod, focusedDatabase, applyFocus])
 
-  const toggleMethod = method => {
+  const toggleMethod = useCallback(method => {
     const next = toggleMethodConnections(selectedConnections, method)
     setSelectedConnections(next)
     syncFocus(next, method, focusedDatabase)
-  }
+  }, [selectedConnections, focusedDatabase, syncFocus])
 
-  const toggleDatabase = database => {
+  const toggleDatabase = useCallback(database => {
     const next = toggleDatabaseConnections(selectedConnections, database)
     setSelectedConnections(next)
     syncFocus(next, focusedMethod, database)
-  }
+  }, [selectedConnections, focusedMethod, syncFocus])
 
-  const onToggleConnection = (method, database) => {
+  const onToggleConnection = useCallback((method, database) => {
     const next = toggleConnection(selectedConnections, method, database)
     setSelectedConnections(next)
     if (next.some(item => item.method === method && item.database === database)) {
@@ -134,68 +165,83 @@ export default function FullFlowDemo({
       return
     }
     syncFocus(next)
-  }
+  }, [selectedConnections, applyFocus, syncFocus])
 
-  const onFocusConnection = (method, database) => {
+  const onFocusConnection = useCallback((method, database) => {
     const next = ensureConnection(selectedConnections, method, database)
     setSelectedConnections(next)
     applyFocus(method, database)
-  }
+  }, [selectedConnections, applyFocus])
 
-  const selection = {
-    selectedMethods,
-    selectedDatabases,
-    selectedConnections: connections,
-    focusedMethod,
-    focusedDatabase,
-    onToggleMethod: toggleMethod,
-    onToggleDatabase: toggleDatabase,
-    onToggleConnection,
-    onFocusConnection,
-  }
-
-  const adoptSqlFromAgent = sql => {
+  const adoptSqlFromAgent = useCallback(sql => {
     setAdoptedSql({ id: Date.now(), sql })
     navigateToStep('query')
     setMobilePane('dashboard')
     setShellLayout(current => (current.dashboardCollapsed
       ? { ...current, dashboardCollapsed: false }
       : current))
-  }
+  }, [navigateToStep])
 
-  const askPiFromQuery = prompt => {
+  const askPiFromQuery = useCallback(prompt => {
     setHarnessTask({ id: `query-analyze-${Date.now()}`, command: prompt })
     setMobilePane('agent')
     setShellLayout(current => (current.agentCollapsed
       ? { ...current, agentCollapsed: false }
       : current))
-  }
-  const sampling = {
-    sampleLimit,
-    sampleMode,
-    sampleSeed,
-    onSampleLimitChange: setSampleLimit,
-    onSampleModeChange: setSampleMode,
-    onSampleSeedChange: setSampleSeed,
-  }
+  }, [])
+
+  const onAdoptedSqlHandled = useCallback(() => setAdoptedSql(null), [])
+  const onQueuedCommandSent = useCallback(() => setHarnessTask(null), [])
+  const onRequestNewChat = useCallback(() => setChatKey(key => key + 1), [])
+
+  // The run workspace republishes its state on every 2.5s poll while a job is
+  // active; only the phase is displayed here, so drop identical-phase updates
+  // instead of re-rendering the whole shell each poll.
+  const onRunStateChange = useCallback(next => {
+    setRunState(current => (current?.phase === next?.phase ? current : next))
+  }, [])
+
+  // Personal-workspace snapshot for the Studio status strip. Only local
+  // session state; credential info is limited to a configured flag plus
+  // provider/model names — never the key itself.
+  const studioWorkspaceStatus = useMemo(() => ({
+    connectionCount: connections.length,
+    focusedMethod,
+    focusedDatabase,
+    credentialConfigured: Boolean(sqlAuth?.configured),
+    credentialLabel: sqlAuth?.configured
+      ? [sqlAuth.provider, sqlAuth.model].filter(Boolean).join(' / ')
+      : '',
+    runPhase: runState?.phase || 'ready',
+  }), [connections, focusedMethod, focusedDatabase, sqlAuth, runState?.phase])
 
   const pages = {
     configure: (
-      <ConfigurationStudio
+      <MemoConfigurationStudio
         hostedReadOnly={credentialMode !== 'local'}
+        workspaceStatus={studioWorkspaceStatus}
+        onNavigateStep={navigateToStep}
         t={t}
       />
     ),
     compose: (
-      <ConnectionComposer
-        {...selection}
+      <MemoConnectionComposer
+        selectedMethods={selectedMethods}
+        selectedDatabases={selectedDatabases}
+        selectedConnections={connections}
+        focusedMethod={focusedMethod}
+        focusedDatabase={focusedDatabase}
+        onToggleMethod={toggleMethod}
+        onToggleDatabase={toggleDatabase}
+        onToggleConnection={onToggleConnection}
+        onFocusConnection={onFocusConnection}
         configs={configs}
         focusedConfig={focusedConfig}
         t={t}
       />
     ),
     query: (
-      <QueryWorkspace
+      <MemoQueryWorkspace
         databases={databases}
         capabilities={capabilities}
         focusedConfig={focusedConfig}
@@ -207,13 +253,13 @@ export default function FullFlowDemo({
         postJson={postJson}
         api={api}
         adoptedSql={adoptedSql}
-        onAdoptedSqlHandled={() => setAdoptedSql(null)}
+        onAdoptedSqlHandled={onAdoptedSqlHandled}
         onAskPi={askPiFromQuery}
         t={t}
       />
     ),
     board: (
-      <BoardWorkspace
+      <MemoBoardWorkspace
         selectedConnections={connections}
         configs={configs}
         focusedMethod={focusedMethod}
@@ -228,13 +274,13 @@ export default function FullFlowDemo({
         onSampleSeedChange={setSampleSeed}
         postJson={postJson}
         api={api}
-        onRunStateChange={setRunState}
+        onRunStateChange={onRunStateChange}
         liveEvaluation={Boolean(capabilities?.deployment?.features?.live_evaluation)}
         t={t}
       />
     ),
     evidence: (
-      <EvidenceHub
+      <MemoEvidenceHub
         pageId="evidence"
         capabilities={capabilities}
         api={api}
@@ -273,27 +319,59 @@ export default function FullFlowDemo({
     if (dashboardCollapsed || agentCollapsed || window.matchMedia('(max-width: 899px)').matches) return
     event.preventDefault()
     const root = splitRef.current
-    if (!root) return
+    const shell = shellRef.current
+    if (!root || !shell) return
+    const ghost = dividerGhostRef.current
+    if (!ghost) return
     const bounds = root.getBoundingClientRect()
+    const divider = event.currentTarget
+    // Live-resizing the grid forces a full layout of both panes (SVG
+    // connection graph, editors, large tables) on every frame, which cannot
+    // keep up with the pointer no matter how the style write is batched.
+    // Instead the drag only moves a transform-driven ghost indicator —
+    // compositor work, zero layout — and the width is applied to the grid
+    // exactly once on release. Writing the transform synchronously per
+    // pointermove (no rAF queue) also avoids a frame of added latency.
+    // Percentage grid tracks resolve against the grid content box, so the
+    // pointer→width mapping uses the content box too; the released divider
+    // then lands exactly where the ghost was. The mapping is linear: the
+    // only adjustments are the 35–75 clamp mirrored by aria-valuemin/max
+    // and rounding for the aria-valuenow attribute (never for layout).
+    const rootStyles = window.getComputedStyle(root)
+    const paddingLeft = parseFloat(rootStyles.paddingLeft) || 0
+    const paddingRight = parseFloat(rootStyles.paddingRight) || 0
+    const contentWidth = Math.max(1, bounds.width - paddingLeft - paddingRight)
+    let latest = shellLayout.dashboardWidth
+    const placeGhost = width => {
+      ghost.style.transform = `translateX(${paddingLeft + (contentWidth * width) / 100}px)`
+    }
     const onMove = moveEvent => {
-      const next = ((moveEvent.clientX - bounds.left) / bounds.width) * 100
-      setShellLayout(current => ({
-        ...current,
-        dashboardWidth: Math.min(75, Math.max(35, next)),
-      }))
+      const next = ((moveEvent.clientX - bounds.left - paddingLeft) / contentWidth) * 100
+      latest = Math.min(75, Math.max(35, next))
+      placeGhost(latest)
+      divider.setAttribute('aria-valuenow', String(Math.round(latest)))
     }
     const stop = () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', stop)
+      window.removeEventListener('pointercancel', stop)
       document.body.classList.remove('agent-shell-resizing')
+      // Commit once: the shell variable updates the grid in a single
+      // relayout, then React state persists the layout.
+      shell.style.setProperty('--dashboard-width', `${latest}%`)
+      divider.setAttribute('aria-valuenow', String(Math.round(latest)))
+      setShellLayout(current => ({ ...current, dashboardWidth: latest }))
     }
+    placeGhost(latest)
     document.body.classList.add('agent-shell-resizing')
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', stop, { once: true })
+    window.addEventListener('pointercancel', stop, { once: true })
   }
 
   return (
     <main
+      ref={shellRef}
       className={[
         'flow-demo agent-shell',
         dashboardCollapsed ? 'dashboard-collapsed' : '',
@@ -379,6 +457,7 @@ export default function FullFlowDemo({
             </div>
           </div>
           <div
+            ref={workspaceBodyRef}
             className="agent-live-workspace-body"
             data-testid="flow-stage"
             data-active-step={activeStep}
@@ -427,26 +506,35 @@ export default function FullFlowDemo({
           <span />
         </div>
 
+        <span
+          className="agent-shell-divider-ghost"
+          ref={dividerGhostRef}
+          aria-hidden="true"
+          data-testid="agent-shell-divider-ghost"
+        />
+
         <section className="agent-chat-column" aria-label={t('shell.chatColumn')}>
           <header className="agent-chat-header">
             <div className="agent-chat-header-left">
               <span className="agent-chat-pi-orb" aria-hidden="true">π</span>
-              <div>
-                <h2>{t('shell.piBackend')}</h2>
-                <span>{t('shell.piBackendDetail')}</span>
-              </div>
-              <span className="agent-chat-pi-badge" data-testid="pi-backend-badge">
+              <h2 title={t('shell.piBackendDetail')}>{t('shell.piBackend')}</h2>
+              <span
+                className="agent-chat-pi-badge"
+                data-testid="pi-backend-badge"
+                title={t('shell.piBackendDetail')}
+              >
                 Pi · {credentialMode === 'local' ? 'Local' : 'Read only'}
               </span>
             </div>
             <div className="agent-chat-header-right">
               <button
                 type="button"
-                className="agent-pane-toggle"
+                className="agent-pane-toggle agent-pane-close"
                 aria-label={t('shell.collapseAgent')}
+                title={t('shell.collapseAgent')}
                 onClick={() => setCollapsed('agent')}
               >
-                ›
+                ✕
               </button>
             </div>
           </header>
@@ -462,8 +550,8 @@ export default function FullFlowDemo({
                   shell
                   t={t}
                   queuedCommand={harnessTask}
-                  onQueuedCommandSent={() => setHarnessTask(null)}
-                  onRequestNewChat={() => setChatKey(key => key + 1)}
+                  onQueuedCommandSent={onQueuedCommandSent}
+                  onRequestNewChat={onRequestNewChat}
                   onAdoptSql={adoptSqlFromAgent}
                 />
               </Suspense>
@@ -479,6 +567,7 @@ export default function FullFlowDemo({
           className="agent-chat-restore"
           type="button"
           aria-label={t('shell.expandAgent')}
+          title={t('shell.expandAgent')}
           onClick={() => setCollapsed('agent')}
         >
           <span>π</span>

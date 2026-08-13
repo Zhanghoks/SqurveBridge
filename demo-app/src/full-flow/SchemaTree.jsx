@@ -79,6 +79,7 @@ export default function SchemaTree({
           type="button"
           className="query-schema-toggle"
           aria-label={t('query.expandSchema')}
+          title={t('query.expandSchema')}
           onClick={onToggleCollapsed}
         >
           <span aria-hidden="true">⌸</span>
@@ -96,6 +97,7 @@ export default function SchemaTree({
           type="button"
           className="query-schema-toggle"
           aria-label={t('query.collapseSchema')}
+          title={t('query.collapseSchema')}
           onClick={onToggleCollapsed}
         >
           ‹

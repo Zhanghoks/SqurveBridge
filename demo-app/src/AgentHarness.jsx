@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import PiAuthDialog from './PiAuthDialog.jsx'
 import { appendUserMessage, applyPiEvent, createPiChatState, skillPrompt } from './piChat.js'
 import { applyPiAuthEvent, createPiAuthState } from './piAuth.js'
@@ -57,6 +57,28 @@ const LOCAL_SUGGESTIONS = [
   { id: 'config', labelKey: 'agent.suggest.writeConfig', skill: 'config-adapter' },
 ]
 
+// Welcome-screen capability cards. Unlike the removed composer suggestion row,
+// these only prefill the composer draft — nothing is sent automatically.
+const EMPTY_CARD_ICONS = {
+  inspect: <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="6.5" /><path d="m15.8 15.8 4.2 4.2" /></svg>,
+  integrate: <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 5v14M5 12h14" /></svg>,
+  reproduce: <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4.5 12a7.5 7.5 0 1 1 2.2 5.3" /><path d="M4.5 12V7.5M4.5 12H9" /></svg>,
+  evaluate: <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 19V10M12 19V5M19 19v-6" /></svg>,
+}
+
+const LOCAL_EMPTY_CARDS = [
+  { id: 'inspect', titleKey: 'agent.card.inspect', descKey: 'agent.card.inspectDesc', prompt: 'Inspect the current SqurveBridge integration and point out anything that needs attention.' },
+  { id: 'integrate', titleKey: 'agent.card.integrate', descKey: 'agent.card.integrateDesc', prompt: 'Help me integrate a new Text-to-SQL method from a public GitHub repository.' },
+  { id: 'reproduce', titleKey: 'agent.card.reproduce', descKey: 'agent.card.reproduceDesc', prompt: 'Reproduce one experiment from the reproduce catalog and walk me through the run.' },
+  { id: 'evaluate', titleKey: 'agent.card.evaluate', descKey: 'agent.card.evaluateDesc', prompt: 'Run an evaluation, compare two methods, and summarize the differences.' },
+]
+
+const HOSTED_EMPTY_CARDS = [
+  { id: 'inspect', titleKey: 'agent.card.hostedExplain', descKey: 'agent.card.hostedExplainDesc', prompt: HOSTED_SUGGESTIONS[0].prompt },
+  { id: 'reproduce', titleKey: 'agent.card.hostedConfig', descKey: 'agent.card.hostedConfigDesc', prompt: HOSTED_SUGGESTIONS[1].prompt },
+  { id: 'evaluate', titleKey: 'agent.card.hostedEvidence', descKey: 'agent.card.hostedEvidenceDesc', prompt: HOSTED_SUGGESTIONS[2].prompt },
+]
+
 const FALLBACK = {
   'agent.connectModel': 'Connect a model',
   'agent.switchModel': 'Switch model',
@@ -73,6 +95,22 @@ const FALLBACK = {
   'agent.emptyHosted': 'Ask about the published bundle, configs, or evidence.',
   'agent.emptyLocal': 'Ask Pi to inspect, integrate, reproduce, or evaluate.',
   'agent.emptyHint': 'Suggestions below get you started. Skills stay available when you need them.',
+  'agent.emptyLocalDetail': 'Pi works inside this workspace — pick a direction below, or just describe your task.',
+  'agent.emptyHostedDetail': 'Ask about the published bundle, reproduce configs, or public evidence.',
+  'agent.card.inspect': 'Inspect integration',
+  'agent.card.inspectDesc': 'Review the current setup and spot issues',
+  'agent.card.integrate': 'Integrate a method',
+  'agent.card.integrateDesc': 'Bring a public Text-to-SQL method in',
+  'agent.card.reproduce': 'Reproduce a run',
+  'agent.card.reproduceDesc': 'Re-run an experiment from the catalog',
+  'agent.card.evaluate': 'Evaluate & compare',
+  'agent.card.evaluateDesc': 'Score methods and compare results',
+  'agent.card.hostedExplain': 'Explain the bundle',
+  'agent.card.hostedExplainDesc': 'See what this published bundle contains',
+  'agent.card.hostedConfig': 'Walk through a config',
+  'agent.card.hostedConfigDesc': 'Understand one reproduce config in depth',
+  'agent.card.hostedEvidence': 'Find evidence',
+  'agent.card.hostedEvidenceDesc': 'Locate published evaluation artifacts',
   'agent.greetingMorning': 'Good morning',
   'agent.greetingAfternoon': 'Good afternoon',
   'agent.greetingEvening': 'Good evening',
@@ -131,7 +169,9 @@ function greetingKey(date = new Date()) {
 
 export function MessageBody({ message, onAdoptSql, t }) {
   const [copiedIndex, setCopiedIndex] = useState(-1)
-  const segments = extractSqlSegments(message.content || '')
+  // Parsing SQL fences is proportional to the message length; cache it so
+  // streaming deltas in *other* messages never re-run it for settled ones.
+  const segments = useMemo(() => extractSqlSegments(message.content || ''), [message.content])
   const hasSql = segments.some(segment => segment.type === 'sql')
   if (!hasSql) return <p>{message.content || (message.streaming ? '…' : '')}</p>
 
@@ -172,7 +212,39 @@ export function MessageBody({ message, onAdoptSql, t }) {
   )
 }
 
-export default function AgentHarness({
+// Chat entries are memoized so a websocket text_delta only re-renders the one
+// streaming message instead of the whole transcript. applyPiEvent keeps the
+// object identity of untouched messages/tools, which makes these memos effective.
+const ChatMessage = memo(function ChatMessage({ message, onAdoptSql, t }) {
+  return (
+    <article className={`pi-message ${message.role}`}>
+      <header>
+        <span>{message.role === 'user' ? label(t, 'agent.you') : 'π'}</span>
+        {message.role === 'assistant' && <b>{message.streaming ? label(t, 'agent.working') : label(t, 'agent.pi')}</b>}
+      </header>
+      <div>
+        {message.thinking && <details><summary>{label(t, 'agent.reasoning')}</summary><pre>{message.thinking}</pre></details>}
+        <MessageBody message={message} onAdoptSql={onAdoptSql} t={t} />
+      </div>
+    </article>
+  )
+})
+
+const ToolActivity = memo(function ToolActivity({ tool, Status, t }) {
+  return (
+    <div className={`pi-tool ${tool.status}`}>
+      <div className="pi-tool-mark" aria-hidden="true">/</div>
+      <span><strong>{tool.name}</strong><small>{label(t, 'agent.activity')}</small></span>
+      <Status tone={tool.isError ? 'danger' : tool.status === 'running' ? 'running' : 'success'}>{tool.status}</Status>
+      {tool.args && Object.keys(tool.args).length > 0 && <details className="pi-tool-args">
+        <summary>{label(t, 'agent.toolArgs')}</summary>
+        <code>{JSON.stringify(tool.args)}</code>
+      </details>}
+    </div>
+  )
+})
+
+function AgentHarness({
   api,
   postJson,
   Status,
@@ -195,6 +267,7 @@ export default function AgentHarness({
   const autoAuthResolvedRef = useRef(false)
   const selectedModelKeyRef = useRef('')
   const endRef = useRef(null)
+  const composerInputRef = useRef(null)
   const [catalog, setCatalog] = useState(null)
   const [chat, setChat] = useState(createPiChatState)
   const [auth, setAuth] = useState(createPiAuthState)
@@ -334,6 +407,11 @@ export default function AgentHarness({
     sendMessage(suggestion.prompt).catch(error => setChat(current => ({ ...current, error: error.message })))
   }
 
+  const prefillDraft = prompt => {
+    setDraft(prompt)
+    composerInputRef.current?.focus()
+  }
+
   useEffect(() => {
     let active = true
     api('/api/agent').then(data => {
@@ -405,7 +483,19 @@ export default function AgentHarness({
     if (key && key !== previous) setAuthOpen(false)
   }, [auth.selectedModel])
 
-  useEffect(() => { endRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' }) }, [chat.messages, chat.tools])
+  const scrollPendingRef = useRef(false)
+  useEffect(() => {
+    // Streaming deltas arrive faster than frames; coalesce auto-scrolls to at
+    // most one per animation frame instead of queueing a smooth scroll per delta.
+    if (scrollPendingRef.current) return
+    scrollPendingRef.current = true
+    const flush = () => {
+      scrollPendingRef.current = false
+      endRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+    }
+    if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(flush)
+    else flush()
+  }, [chat.messages, chat.tools])
 
   const hosted = chat.profile === 'hosted-readonly'
   const skills = chat.skills.length
@@ -517,22 +607,6 @@ export default function AgentHarness({
     </div>
   ) : null
 
-  const suggestionRow = (
-    <div className="pi-chat-suggestion-row" role="list">
-      {suggestions.map(item => (
-        <button
-          key={item.id}
-          type="button"
-          role="listitem"
-          disabled={composerDisabled}
-          onClick={() => runSuggestion(item)}
-        >
-          {label(t, item.labelKey)}
-        </button>
-      ))}
-    </div>
-  )
-
   const chatLog = (
     <div className="pi-chat-log" aria-live="polite">
       {chat.messages.length > 0 && <div className="pi-chat-date">{label(t, 'agent.today')}</div>}
@@ -542,7 +616,21 @@ export default function AgentHarness({
             <h2 className="pi-chat-greeting">
               {label(t, greetingKey())}
             </h2>
-            <span>{hosted ? label(t, 'agent.emptyHosted') : label(t, 'agent.emptyLocal')}</span>
+            <span>{hosted ? label(t, 'agent.emptyHostedDetail') : label(t, 'agent.emptyLocalDetail')}</span>
+            <div className="pi-chat-hero-cards" data-testid="agent-empty-cards">
+              {(hosted ? HOSTED_EMPTY_CARDS : LOCAL_EMPTY_CARDS).map(card => (
+                <button
+                  key={card.id}
+                  type="button"
+                  className="pi-chat-hero-card"
+                  onClick={() => prefillDraft(card.prompt)}
+                >
+                  <span className="pi-chat-hero-card-icon" aria-hidden="true">{EMPTY_CARD_ICONS[card.id]}</span>
+                  <strong>{label(t, card.titleKey)}</strong>
+                  <span>{label(t, card.descKey)}</span>
+                </button>
+              ))}
+            </div>
           </>
         ) : (
           <>
@@ -556,25 +644,17 @@ export default function AgentHarness({
           </>
         )}
       </div>}
-      {chat.messages.map((message, index) => <article key={`${message.role}-${index}`} className={`pi-message ${message.role}`}>
-        <header>
-          <span>{message.role === 'user' ? label(t, 'agent.you') : 'π'}</span>
-          {message.role === 'assistant' && <b>{message.streaming ? label(t, 'agent.working') : label(t, 'agent.pi')}</b>}
-        </header>
-        <div>
-          {message.thinking && <details><summary>{label(t, 'agent.reasoning')}</summary><pre>{message.thinking}</pre></details>}
-          <MessageBody message={message} onAdoptSql={onAdoptSql} t={t} />
-        </div>
-      </article>)}
-      {chat.tools.slice(-8).map(tool => <div key={tool.id} className={`pi-tool ${tool.status}`}>
-        <div className="pi-tool-mark" aria-hidden="true">/</div>
-        <span><strong>{tool.name}</strong><small>{label(t, 'agent.activity')}</small></span>
-        <Status tone={tool.isError ? 'danger' : tool.status === 'running' ? 'running' : 'success'}>{tool.status}</Status>
-        {tool.args && Object.keys(tool.args).length > 0 && <details className="pi-tool-args">
-          <summary>{label(t, 'agent.toolArgs')}</summary>
-          <code>{JSON.stringify(tool.args)}</code>
-        </details>}
-      </div>)}
+      {chat.messages.map((message, index) => (
+        <ChatMessage
+          key={`${message.role}-${index}`}
+          message={message}
+          onAdoptSql={onAdoptSql}
+          t={t}
+        />
+      ))}
+      {chat.tools.slice(-8).map(tool => (
+        <ToolActivity key={tool.id} tool={tool} Status={Status} t={t} />
+      ))}
       <div ref={endRef} />
     </div>
   )
@@ -596,6 +676,7 @@ export default function AgentHarness({
         )}
         <div className="pi-chat-composer-field">
           <textarea
+            ref={composerInputRef}
             value={draft}
             disabled={composerDisabled}
             onChange={event => setDraft(event.target.value)}
@@ -642,7 +723,6 @@ export default function AgentHarness({
             </button>
           </div>
         </div>
-        {isEmpty && suggestionRow}
         <div className="pi-chat-footnote">{label(t, 'shell.chatFootnote')}</div>
       </div> : <>
         <textarea
@@ -699,3 +779,7 @@ export default function AgentHarness({
     <PiAuthDialog open={authOpen} state={auth} send={sendCommand} onClose={() => setAuthOpen(false)} t={t} embedded={embedded || shell} />
   </section>
 }
+
+// Memoized so shell-level re-renders (pane resize/collapse, run-state polling)
+// skip the chat tree entirely when its props are unchanged.
+export default memo(AgentHarness)

@@ -34,6 +34,19 @@ test('tracks Pi tool calls as structured activity', async () => {
   })
 })
 
+test('streaming deltas keep untouched message identities for memoized rendering', async () => {
+  const { createPiChatState, applyPiEvent, appendUserMessage } = await chatModule()
+  let state = appendUserMessage(createPiChatState(), 'Show all singers')
+  state = applyPiEvent(state, { type: 'text_delta', delta: 'SELECT' })
+  const userMessage = state.messages[0]
+  const next = applyPiEvent(state, { type: 'text_delta', delta: ' * FROM singer' })
+  // The chat log memoizes per message; earlier entries must keep their
+  // object identity so streaming only re-renders the active message.
+  assert.equal(next.messages[0], userMessage)
+  assert.notEqual(next.messages[1], state.messages[1])
+  assert.equal(next.messages[1].content, 'SELECT * FROM singer')
+})
+
 test('formats project skills with Pi native command syntax', async () => {
   const { skillPrompt } = await chatModule()
   assert.equal(skillPrompt('run'), '/skill:run')
