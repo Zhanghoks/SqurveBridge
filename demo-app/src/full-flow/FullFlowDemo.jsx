@@ -68,6 +68,7 @@ export default function FullFlowDemo({
   const [selectedConnections, setSelectedConnections] = useState([
     { method: METHODS[0], database: DATABASES[0] },
   ])
+  const connectionsRef = useRef(selectedConnections)
   const [focusedMethod, setFocusedMethod] = useState(METHODS[0])
   const [focusedDatabase, setFocusedDatabase] = useState(DATABASES[0])
   const [sampleLimit, setSampleLimit] = useState(20)
@@ -157,21 +158,29 @@ export default function FullFlowDemo({
     syncFocus(next, focusedMethod, database)
   }, [selectedConnections, focusedMethod, syncFocus])
 
-  const onToggleConnection = useCallback((method, database) => {
-    const next = toggleConnection(selectedConnections, method, database)
+  // Connection clicks can arrive faster than React commits the previous one, so
+  // the ref — not the rendered state — is the authoritative list. Deriving the
+  // next list from a stale render dropped the earlier pair, which made a method
+  // look like it could only ever hold a single database.
+  const commitConnections = useCallback(next => {
+    connectionsRef.current = next
     setSelectedConnections(next)
+    return next
+  }, [])
+
+  const onToggleConnection = useCallback((method, database) => {
+    const next = commitConnections(toggleConnection(connectionsRef.current, method, database))
     if (next.some(item => item.method === method && item.database === database)) {
       applyFocus(method, database)
       return
     }
     syncFocus(next)
-  }, [selectedConnections, applyFocus, syncFocus])
+  }, [commitConnections, applyFocus, syncFocus])
 
   const onFocusConnection = useCallback((method, database) => {
-    const next = ensureConnection(selectedConnections, method, database)
-    setSelectedConnections(next)
+    commitConnections(ensureConnection(connectionsRef.current, method, database))
     applyFocus(method, database)
-  }, [selectedConnections, applyFocus])
+  }, [commitConnections, applyFocus])
 
   const adoptSqlFromAgent = useCallback(sql => {
     setAdoptedSql({ id: Date.now(), sql })
