@@ -11,14 +11,14 @@
   background:
     radial-gradient(ellipse 80% 50% at 15% -5%, rgb(212 165 116 / 12%), transparent 60%),
     radial-gradient(ellipse 60% 40% at 85% 95%, rgb(90 140 160 / 8%), transparent 50%),
-    linear-gradient(180deg, #0e0e0e 0, #141414 100%);
+    linear-gradient(180deg, #f6f1e8 0, #f1eadb 100%);
 }
 
 .flow-demo {
   background:
     radial-gradient(ellipse 70% 50% at 10% 0%, rgb(212 165 116 / 8%), transparent 55%),
     radial-gradient(ellipse 60% 50% at 90% 100%, rgb(90 140 160 / 6%), transparent 50%),
-    #0e0e0e;
+    #f6f1e8;
 }
 
 /* ========================================
@@ -30,19 +30,19 @@
 .board-panel,
 .archive-list,
 .archive-summary {
-  background: linear-gradient(145deg, rgba(26, 26, 26, 0.95), rgba(22, 22, 22, 0.98));
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(145deg, rgba(255, 253, 247, 0.95), rgba(251, 248, 241, 0.98));
+  border: 1px solid rgba(92, 72, 48, 0.14);
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 8px 32px rgba(120, 96, 60, 0.14),
+    inset 0 1px 0 rgba(92, 72, 48, 0.06);
   backdrop-filter: blur(16px) saturate(120%);
 }
 
 .flow-module {
   box-shadow:
-    0 12px 48px rgba(0, 0, 0, 0.45),
+    0 12px 48px rgba(120, 96, 60, 0.15),
     0 0 0 1px rgba(212, 165, 116, 0.08) inset,
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    inset 0 1px 0 rgba(92, 72, 48, 0.06);
 }
 
 /* ========================================
@@ -53,14 +53,14 @@
   font-weight: 750;
   letter-spacing: -0.04em;
   line-height: 1.05;
-  background: linear-gradient(135deg, #ffffff 0%, #e8e8ea 100%);
+  background: linear-gradient(135deg, #2e2618 0%, #4d4436 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .flow-page-heading h2 {
-  background: linear-gradient(135deg, #ffffff 0%, #d4d4d6 100%);
+  background: linear-gradient(135deg, #2e2618 0%, #4d4436 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -113,16 +113,16 @@
 /* Secondary buttons */
 .flow-header-actions button:not(:first-child),
 .button:not(.primary):not(.danger) {
-  background: linear-gradient(145deg, rgba(38, 38, 42, 0.9), rgba(28, 28, 32, 0.95));
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(145deg, rgba(255, 253, 247, 0.9), rgba(251, 248, 241, 0.95));
+  border: 1px solid rgba(92, 72, 48, 0.18);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .flow-header-actions button:not(:first-child):hover {
   border-color: rgba(212, 165, 116, 0.4);
-  background: linear-gradient(145deg, rgba(42, 38, 36, 0.95), rgba(34, 30, 28, 0.98));
+  background: linear-gradient(145deg, rgba(246, 234, 210, 0.95), rgba(239, 231, 214, 0.98));
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 16px rgba(120, 96, 60, 0.12);
 }
 
 /* ========================================
@@ -138,7 +138,7 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(212, 165, 116, 0.03) 0%, transparent 15%, transparent 85%, rgba(90, 140, 160, 0.03) 100%);
+    linear-gradient(90deg, rgba(212, 165, 116, 0.03) 0%, transparent 15%, transparent 85%, rgba(212, 165, 116, 0.03) 100%);
   pointer-events: none;
   z-index: 1;
 }
@@ -165,7 +165,7 @@
 .flow-graph-nodes button:hover {
   transform: translateX(-2px);
   box-shadow:
-    0 6px 20px rgba(0, 0, 0, 0.3),
+    0 6px 20px rgba(120, 96, 60, 0.12),
     inset 0 0 0 1px rgba(212, 165, 116, 0.2);
 }
 
@@ -185,7 +185,7 @@
 
 /* Enhanced connection paths */
 .flow-connection-graph path {
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
+  filter: drop-shadow(0 2px 8px rgba(120, 96, 60, 0.1));
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -236,7 +236,7 @@
 .catalog-card:hover {
   transform: translateY(-4px);
   box-shadow:
-    0 12px 32px rgba(0, 0, 0, 0.4),
+    0 12px 32px rgba(120, 96, 60, 0.14),
     inset 0 0 0 1px rgba(212, 165, 116, 0.2);
 }
 
@@ -269,7 +269,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), transparent);
+  background: linear-gradient(135deg, rgba(92, 72, 48, 0.07), transparent);
   opacity: 0;
   transition: opacity 0.25s ease;
 }
@@ -303,23 +303,23 @@
    ======================================== */
 
 .board-chart svg {
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+  filter: drop-shadow(0 4px 12px rgba(120, 96, 60, 0.1));
 }
 
 .radar-grid {
-  stroke: rgba(255, 255, 255, 0.08);
+  stroke: rgba(92, 72, 48, 0.14);
   stroke-dasharray: 2 4;
 }
 
 .radar-axis {
-  stroke: rgba(255, 255, 255, 0.12);
+  stroke: rgba(92, 72, 48, 0.18);
 }
 
 /* Chart labels with better readability */
 .radar-label,
 .bar-label,
 .chart-caption {
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 3px rgba(255, 253, 247, 0.6);
 }
 
 /* ========================================
@@ -334,9 +334,9 @@
 .results-table-wrap th {
   position: sticky;
   top: 0;
-  background: linear-gradient(180deg, rgba(26, 26, 26, 0.98), rgba(22, 22, 22, 0.98));
+  background: linear-gradient(180deg, rgba(255, 253, 247, 0.98), rgba(251, 248, 241, 0.98));
   backdrop-filter: blur(12px);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 0 rgba(92, 72, 48, 0.14);
   z-index: 10;
 }
 
@@ -345,7 +345,7 @@
 }
 
 .results-table-wrap tbody tr:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(92, 72, 48, 0.04);
 }
 
 /* ========================================
@@ -364,7 +364,7 @@
   transform: translateY(-1px);
   box-shadow:
     0 0 0 3px rgba(212, 165, 116, 0.15),
-    0 4px 12px rgba(0, 0, 0, 0.2);
+    0 4px 12px rgba(120, 96, 60, 0.1);
 }
 
 /* ========================================
@@ -453,7 +453,7 @@
 .archive-metric-strip > div:hover,
 .archive-metric-hero:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 20px rgba(120, 96, 60, 0.12);
 }
 
 /* ========================================
@@ -481,7 +481,7 @@
   transform: translateX(2px);
   box-shadow:
     -3px 0 0 rgba(212, 165, 116, 0.3),
-    0 4px 12px rgba(0, 0, 0, 0.2);
+    0 4px 12px rgba(120, 96, 60, 0.1);
 }
 
 /* ========================================
@@ -553,8 +553,8 @@
   .flow-glass,
   .tool-panel {
     box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.6),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      0 8px 32px rgba(120, 96, 60, 0.18),
+      inset 0 1px 0 rgba(92, 72, 48, 0.05);
   }
 }
 
@@ -566,8 +566,8 @@
   animation: tooltip-float 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   backdrop-filter: blur(16px) saturate(140%);
   box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    0 12px 40px rgba(120, 96, 60, 0.16),
+    inset 0 1px 0 rgba(92, 72, 48, 0.08);
 }
 
 @keyframes tooltip-float {
