@@ -24,7 +24,7 @@ RUNTIME_DIRECTORIES = (
 RUNTIME_FILES = (
     "LICENSE",
     "pyproject.toml",
-    "requirements.txt",
+    "uv.lock",
     "benchmarks/packages/manifest.json",
 )
 
@@ -82,7 +82,9 @@ class HuggingFaceBundleContractTests(unittest.TestCase):
             "COPY --from=pi-sdk /build/demo/node_modules /app/demo/node_modules",
             dockerfile,
         )
-        self.assertIn("python /app/tools/benchmarks.py download all", dockerfile)
+        self.assertIn("python3 /app/tools/benchmarks.py download all", dockerfile)
+        self.assertIn("uv sync --frozen --no-dev", dockerfile)
+        self.assertNotIn("pip install", dockerfile)
         self.assertIn("tools/extract_space_assets.py", dockerfile)
         self.assertNotIn("git lfs", dockerfile)
         self.assertIn("node --version", dockerfile)
@@ -102,18 +104,18 @@ class HuggingFaceBundleContractTests(unittest.TestCase):
 
     def test_space_dependency_range_keeps_transformers_hub_compatible(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        requirements = (root / "requirements.txt").read_text(encoding="utf-8")
-        self.assertIn("gradio>=4.0.0,<5.0.0", requirements)
+        pyproject = (root / "pyproject.toml").read_text(encoding="utf-8")
+        self.assertIn("gradio>=4.0.0,<5.0.0", pyproject)
 
     def test_gradio_dependency_constraints_are_compatible(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        requirements = (root / "requirements.txt").read_text(encoding="utf-8")
-        self.assertIn("MarkupSafe==2.1.5", requirements)
-        self.assertNotIn("MarkupSafe==3.0.2", requirements)
-        self.assertIn("pillow==10.4.0", requirements)
-        self.assertNotIn("pillow==11.2.1", requirements)
-        self.assertIn("tomlkit==0.12.0", requirements)
-        self.assertNotIn("tomlkit==0.13.3", requirements)
+        pyproject = (root / "pyproject.toml").read_text(encoding="utf-8")
+        self.assertIn("MarkupSafe==2.1.5", pyproject)
+        self.assertNotIn("MarkupSafe==3.0.2", pyproject)
+        self.assertIn("pillow==10.4.0", pyproject)
+        self.assertNotIn("pillow==11.2.1", pyproject)
+        self.assertIn("tomlkit==0.12.0", pyproject)
+        self.assertNotIn("tomlkit==0.13.3", pyproject)
 
     def test_runtime_reuses_the_node_images_uid_1000_user(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -207,7 +209,7 @@ class HuggingFaceBundleTests(unittest.TestCase):
             "evidence/reported-results",
             "LICENSE",
             "pyproject.toml",
-            "requirements.txt",
+            "uv.lock",
             "Dockerfile",
             "README.md",
             ".dockerignore",
@@ -246,8 +248,8 @@ class HuggingFaceBundleTests(unittest.TestCase):
                 "evidence",
                 "pyproject.toml",
                 "reproduce",
-                "requirements.txt",
                 "skills",
+                "uv.lock",
                 "templates",
                 "tools",
             },
@@ -301,7 +303,8 @@ class HuggingFaceBundleTests(unittest.TestCase):
         # Only the checksum manifest ships; payloads are downloaded in-image.
         self.assertEqual(benchmark_files, ["benchmarks/packages/manifest.json"])
         dockerfile = (self.output / "Dockerfile").read_text(encoding="utf-8")
-        self.assertIn("python /app/tools/benchmarks.py download all", dockerfile)
+        self.assertIn("python3 /app/tools/benchmarks.py download all", dockerfile)
+        self.assertIn("uv sync --frozen --no-dev", dockerfile)
         self.assertIn("tools/extract_space_assets.py", dockerfile)
 
     def test_manifest_is_sorted_complete_and_security_clean(self) -> None:

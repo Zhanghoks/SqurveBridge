@@ -30,39 +30,39 @@ jobs:
         with:
           lfs: false
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
         with:
+          version: "0.8.22"
           python-version: "3.11"
-          cache: pip
-
-      - name: Compile first-party Python
-        run: |
-          python -m compileall -q core demo reproduce tools
+          enable-cache: true
 
       - name: Install tested runtime dependencies
-        run: python -m pip install -r requirements.txt -r demo/requirements.txt
+        run: uv sync --frozen
+
+      - name: Compile first-party Python
+        run: uv run python -m compileall -q core demo reproduce tools
 
       - name: Run dependency-free regressions
-        run: python -m unittest discover -s tests -p 'test_*.py' -v
+        run: uv run python -m unittest discover -s tests -p 'test_*.py' -v
 
       - name: Scan public tree for anonymous-submission leaks
-        run: python tools/anonymity_scan.py
+        run: uv run python tools/anonymity_scan.py
 
       - name: Scan public tree for secrets
-        run: python tools/security_scan.py
+        run: uv run python tools/security_scan.py
 
       - name: Validate the benchmark manifest and distribution source
-        run: python tools/benchmarks.py verify-pointers
+        run: uv run python tools/benchmarks.py verify-pointers
 
       - name: Validate public reproduce configurations
         run: |
-          python tools/verify.py reproduce-contract --path reproduce/configs/spider/c3sql.json
-          python tools/verify.py reproduce-contract --path reproduce/configs/bird/e-sql-smoke.json
+          uv run python tools/verify.py reproduce-contract --path reproduce/configs/spider/c3sql.json
+          uv run python tools/verify.py reproduce-contract --path reproduce/configs/bird/e-sql-smoke.json
 
       - name: Validate release metadata and documentation links
         run: |
-          python - <<'PY'
+          uv run python - <<'PY'
           from tools.release_check import validate_document_links, validate_release_metadata
           from pathlib import Path
 
@@ -80,15 +80,15 @@ jobs:
         with:
           lfs: false
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
         with:
+          version: "0.8.22"
           python-version: "3.11"
+          enable-cache: true
 
       - name: Build source and wheel distributions
-        run: |
-          python -m pip install --upgrade build
-          python -m build
+        run: uv build
 
   frontend:
     name: Demo workspace

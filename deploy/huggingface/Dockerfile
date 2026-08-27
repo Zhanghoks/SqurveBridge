@@ -15,26 +15,30 @@ WORKDIR /build/demo
 COPY demo/package.json demo/package-lock.json ./
 RUN npm ci --ignore-scripts
 
+FROM ghcr.io/astral-sh/uv:0.8.22 AS uv
+
 FROM node:22-bookworm-slim AS runtime
+COPY --from=uv /uv /usr/local/bin/uv
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
     VIRTUAL_ENV=/opt/venv \
     PATH=/opt/venv/bin:$PATH \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_PYTHON_DOWNLOADS=never \
     SQURVE_DEPLOYMENT_TARGET=hf-space
 WORKDIR /app
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential curl git python3 python3-venv \
-    && rm -rf /var/lib/apt/lists/* \
-    && python3 -m venv /opt/venv
+    && apt-get install -y --no-install-recommends build-essential curl git python3 \
+    && rm -rf /var/lib/apt/lists/*
 COPY . /app
 COPY --from=frontend /build/demo-app/dist /app/demo-app/dist
 COPY --from=pi-sdk /build/demo/node_modules /app/demo/node_modules
-RUN python /app/tools/benchmarks.py download all \
-    && python /app/tools/extract_space_assets.py --archive-root benchmarks/packages --output-root /app/benchmarks \
+RUN python3 /app/tools/benchmarks.py download all \
+    && python3 /app/tools/extract_space_assets.py --archive-root benchmarks/packages --output-root /app/benchmarks \
     && rm -f /app/benchmarks/packages/*.zip
-RUN python -m pip install --upgrade pip \
-    && python -m pip install -r deploy/huggingface/requirements.txt \
+RUN uv sync --frozen --no-dev --python python3 \
     && python demo/runtime_check.py \
     && chmod +x deploy/huggingface/entrypoint.sh \
     && mkdir -p /app/workspace \

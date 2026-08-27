@@ -18,7 +18,7 @@ upstream runtime and SqurveBridge's integration/evaluation layer.
 ## Pull Request Gate
 
 ```bash
-python tools/release_check.py --skip-history
+uv run python tools/release_check.py --skip-history
 cd demo-app && npm ci && npm run build
 ```
 
@@ -27,13 +27,14 @@ manifest and must pass `python tools/benchmarks.py verify-archives`. Do not comm
 expanded benchmark directories or add another ZIP payload without an explicit
 distribution and license review.
 
-Maintainers preparing a release should install the standard Python `build`
-frontend, ensure Node.js 22.19+ is available, download the benchmark payloads
-(`python tools/benchmarks.py download all`), and run:
+Maintainers preparing a release should have `uv` and Node.js 22.19+ available,
+download the benchmark payloads (`uv run python tools/benchmarks.py download all`),
+and run:
 
 ```bash
-python -m pip install build
-python tools/release_check.py --full
+uv sync --python 3.11
+uv build
+uv run python tools/release_check.py --full
 ```
 
 Follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Report security problems through

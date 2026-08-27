@@ -131,7 +131,7 @@ PYTHON="$(resolve_python)"
 command -v npm >/dev/null 2>&1 || die "npm not found. Install Node.js first."
 command -v curl >/dev/null 2>&1 || die "curl not found."
 "${PYTHON}" "${ROOT}/demo/runtime_check.py" || die \
-  "Python runtime check failed. Install: uv pip install --python ${PYTHON} -r requirements.txt -r demo/requirements.txt"
+  "Python runtime check failed. Install: uv sync --python ${PYTHON}"
 
 node_major="$(node -p 'process.versions.node.split(".")[0]')"
 [[ "${node_major}" -ge 22 ]] || die "Embedded Pi requires Node.js 22.19 or newer."

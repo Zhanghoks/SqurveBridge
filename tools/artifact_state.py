@@ -115,6 +115,7 @@ COVERAGE_SKIP_DIR_NAMES = frozenset({
 COVERAGE_SCAN_SUFFIXES = frozenset({".py", ".sh", ".bash"})
 COVERAGE_CONFIG_NAMES = frozenset({
     "requirements.txt",
+    "uv.lock",
     "setup.py",
     "pyproject.toml",
     "makefile",

@@ -22,27 +22,26 @@ Integrate · Reproduce · Diagnose · Improve
 
 ## Reproduce in 30 Minutes
 
-SqurveBridge pins one environment and reproduces from source — no package
-install, no version matrix: **Python 3.11**, **Node.js 22.19+** (Demo only),
-and an API key for the provider used by your chosen config.
+SqurveBridge pins one environment and reproduces from source — no version
+matrix: **Python 3.11** via `uv`, **Node.js 22.19+** (Demo only), and an API
+key for the provider used by your chosen config.
 
 ```bash
 # from your clone of this repository:
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+uv sync --python 3.11
 
-python tools/benchmarks.py download spider   # checksummed fetch from the HF dataset
-python tools/benchmarks.py install spider
+uv run python tools/benchmarks.py download spider   # checksummed fetch from the HF dataset
+uv run python tools/benchmarks.py install spider
 
 cp .env.example .env   # add provider keys — never commit .env
-python reproduce/run.py spider c3sql
+uv run python reproduce/run.py spider c3sql
 ```
 
 Scores and evidence land under `workspace/artifacts/`. Verify the toolchain
 without any LLM calls:
 
 ```bash
-python tools/release_check.py --skip-history
+uv run python tools/release_check.py --skip-history
 ```
 
 Remote model calls may incur cost. Full walkthrough:
@@ -337,7 +336,7 @@ npm test --prefix demo-app
 npm run build --prefix demo-app
 
 # Full release gate (see CONTRIBUTING for --full)
-python tools/release_check.py --skip-history
+uv run python tools/release_check.py --skip-history
 ```
 
 Contribution rules (native Actors, branch isolation, PR gate): [CONTRIBUTING.md](CONTRIBUTING.md).  

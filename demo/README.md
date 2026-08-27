@@ -53,9 +53,8 @@ SQURVE_DEMO_WEB_PORT=5174 ./demo/start.sh
 4. 本地 LLM 凭据：复制 `.env.example` → `.env`，或在页面中配置 provider
 
 ```bash
-# 若尚未创建虚拟环境，按仓库主依赖安装后再装 demo 额外包
-python3 -m venv .venv
-.venv/bin/pip install -r demo/requirements.txt
+# 若尚未创建虚拟环境，在仓库根目录安装锁定依赖
+uv sync --python 3.11
 ```
 
 ## 页面导览

@@ -5,7 +5,7 @@ live Text-to-SQL run, and the interactive workspace.
 
 ## Prerequisites
 
-- Python 3.11
+- Python 3.11 and [uv](https://docs.astral.sh/uv/)
 - Node.js 22.19 or newer for the interactive system
 - An API key for the provider selected by the reproduction configuration
 
@@ -13,12 +13,12 @@ live Text-to-SQL run, and the interactive workspace.
 
 ```bash
 # Run the commands from the SqurveBridge repository root.
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+uv sync --python 3.11
 ```
 
-On Windows, activate the environment with `.venv\Scripts\activate`.
+This creates `.venv/` from `pyproject.toml` and `uv.lock`. Activate it with
+`source .venv/bin/activate` (Windows: `.venv\Scripts\activate`) when you want
+the environment on PATH; `uv run …` works without activating.
 
 ## Download and Install Benchmark Packages
 

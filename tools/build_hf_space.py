@@ -22,7 +22,7 @@ RUNTIME_DIRECTORIES = (
 RUNTIME_FILES = (
     "LICENSE",
     "pyproject.toml",
-    "requirements.txt",
+    "uv.lock",
     # The in-image benchmark download resolves archives and checksums
     # through this manifest.
     "benchmarks/packages/manifest.json",

@@ -486,7 +486,7 @@ def _run_custom_metrics(save_lis, config_path=None, quiet=False, config=None):
     """运行 reproduce/metrics/ 中定义的自定义评估指标。"""
     metrics = _load_custom_metrics()
     if metrics is None:
-        print("自定义指标不可用 — pip install sqlglot 后重试")
+        print("自定义指标不可用 — uv sync 后重试")
         return {}
     eval_em, eval_sf1, eval_sc, eval_ves, eval_rves, eval_cf1 = metrics
 
@@ -507,7 +507,7 @@ def _run_custom_metrics(save_lis, config_path=None, quiet=False, config=None):
 def _run_custom_metrics_with_details(save_lis, config_path=None, quiet=False, config=None):
     metrics = _load_custom_metrics_with_fd()
     if metrics is None:
-        print("自定义指标不可用 — pip install sqlglot 后重试")
+        print("自定义指标不可用 — uv sync 后重试")
         return {}
     eval_em, eval_sf1, eval_sc, eval_ves, eval_rves, eval_cf1, eval_fd = metrics
 

@@ -12,8 +12,9 @@ paper-site repository.
 
 ## Build, Test, and Development Commands
 
-- `python -m unittest discover -s tests -p 'test_*.py' -v` runs all Python regressions.
-- `python tools/release_check.py --skip-history` validates anonymity, security, benchmark pointers, reproduce contracts, links, evidence, and tests.
+- `uv sync --python 3.11` installs the locked Python environment into `.venv/`.
+- `uv run python -m unittest discover -s tests -p 'test_*.py' -v` runs all Python regressions.
+- `uv run python tools/release_check.py --skip-history` validates anonymity, security, benchmark pointers, reproduce contracts, links, evidence, and tests.
 - `npm ci --prefix demo-app` installs the locked frontend dependencies.
 - `npm test --prefix demo-app` runs the Node test suite; `npm run build --prefix demo-app` creates the production bundle.
 - `bash demo/build_embedded_pi.sh` installs the pinned embedded Pi SDK into `demo/node_modules`.

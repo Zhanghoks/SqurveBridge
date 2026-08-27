@@ -25,8 +25,7 @@ class DemoRuntimeCheckTests(unittest.TestCase):
 
         self.assertEqual(result, 1)
         self.assertIn("llama_index", stderr.getvalue())
-        self.assertIn("requirements.txt", stderr.getvalue())
-        self.assertIn("demo/requirements.txt", stderr.getvalue())
+        self.assertIn("uv sync", stderr.getvalue())
 
     def test_main_passes_for_a_complete_environment(self):
         with patch.object(runtime_check, "missing_modules", return_value=[]):

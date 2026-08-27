@@ -31,8 +31,7 @@ def main() -> int:
         return 0
     print(
         "SqurveBridge runtime is incomplete; missing Python modules: "
-        f"{', '.join(missing)}. Install both requirements.txt and "
-        "demo/requirements.txt in the selected environment.",
+        f"{', '.join(missing)}. Install with: uv sync",
         file=sys.stderr,
     )
     return 1

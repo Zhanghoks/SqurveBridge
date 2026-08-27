@@ -94,7 +94,7 @@ def xlsx_csv_to_sqlite(
                 try:
                     df = pd.read_excel(fp)
                 except ImportError:
-                    raise ImportError("Reading Excel files requires openpyxl. Install with: pip install openpyxl")
+                    raise ImportError("Reading Excel files requires openpyxl. Install with: uv sync")
             else:
                 logger.warning(f"Unsupported format: {fp.suffix}")
                 continue

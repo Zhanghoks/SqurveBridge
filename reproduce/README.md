@@ -214,7 +214,7 @@ completed IDs、却丢失历史行数据的新 workspace。
 ### 依赖
 
 - 基础 EX：Squrve `core.evaluate`
-- EM / SF1 / SC / VES / CF1 / FD：`pip install sqlglot`（缺失时 EX 仍可用，自定义指标会跳过）
+- EM / SF1 / SC / VES / CF1 / FD：`sqlglot`（由 `uv sync` 安装；缺失时 EX 仍可用，自定义指标会跳过）
 
 ### 可选外部指标
 

@@ -23,6 +23,9 @@ citable DOI (see `CITATION.cff`).
 
 ### Changed
 
+- Python dependencies live in one place, `pyproject.toml`, and are installed
+  with `uv sync`. `uv.lock` is the resolved environment; the old
+  `requirements.txt` files are gone.
 - The embedded Pi runtime is consumed as the pinned npm SDK
   `@earendil-works/pi-coding-agent` declared in `demo/package.json`; the
   vendored `pi/` source tree is gone and scan tooling no longer carries
