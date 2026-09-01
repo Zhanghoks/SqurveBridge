@@ -17,21 +17,21 @@
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",
-    "@codemirror/commands": "6.10.4",
+    "@codemirror/commands": "6.11.0",
     "@codemirror/lang-sql": "6.10.0",
     "@codemirror/language": "6.12.4",
     "@codemirror/state": "6.7.1",
-    "@codemirror/view": "6.43.8",
+    "@codemirror/view": "6.43.9",
     "@lezer/highlight": "1.2.3",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
-    "@vitejs/plugin-react": "6.0.4",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.6",
+    "@vitejs/plugin-react": "6.1.1",
     "jsdom": "30.0.1",
-    "tsx": "^4.23.1",
-    "vite": "8.1.5"
+    "tsx": "^4.23.12",
+    "vite": "8.2.2"
   }
 }
