@@ -30,7 +30,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     SQURVE_DEPLOYMENT_TARGET=hf-space
 WORKDIR /app
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential curl git python3 \
+    && apt-get install -y --no-install-recommends build-essential ca-certificates curl git python3 \
     && rm -rf /var/lib/apt/lists/*
 COPY . /app
 COPY --from=frontend /build/demo-app/dist /app/demo-app/dist

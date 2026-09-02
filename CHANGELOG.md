@@ -23,6 +23,8 @@ citable DOI (see `CITATION.cff`).
 
 ### Changed
 
+- The interactive Demo is only the React app plus Flask API. The Gradio UI is
+  gone; query/database helpers now live in `demo/query_runtime.py`.
 - Python dependencies live in one place, `pyproject.toml`, and are installed
   with `uv sync`. `uv.lock` is the resolved environment; the old
   `requirements.txt` files are gone.

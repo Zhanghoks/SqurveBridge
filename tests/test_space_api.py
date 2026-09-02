@@ -119,12 +119,12 @@ class SpaceApiTests(unittest.TestCase):
         self.assertNotIn("schema_path", response.get_data(as_text=True))
 
     def test_builtin_database_references_include_every_installed_database(self):
-        from demo import gradio_demo
+        from demo import query_runtime
 
         with tempfile.TemporaryDirectory() as directory, patch.object(
-            gradio_demo, "_project_root", Path(directory)
+            query_runtime, "_project_root", Path(directory)
         ):
-            for benchmark, database_relative, schema_relative in gradio_demo.BUILTIN_BENCHMARK_DATABASES:
+            for benchmark, database_relative, schema_relative in query_runtime.BUILTIN_BENCHMARK_DATABASES:
                 database = Path(directory) / database_relative / f"{benchmark}.sqlite"
                 database.parent.mkdir(parents=True, exist_ok=True)
                 database.touch()
@@ -132,20 +132,20 @@ class SpaceApiTests(unittest.TestCase):
                 schema.parent.mkdir(parents=True, exist_ok=True)
                 schema.write_text("[]", encoding="utf-8")
 
-            references = gradio_demo._builtin_database_references()
+            references = query_runtime._builtin_database_references()
 
         self.assertEqual(
             {(db_id, benchmark) for db_id, benchmark, _db_path, _schema_path in references},
-            {(benchmark, benchmark) for benchmark, _database, _schema in gradio_demo.BUILTIN_BENCHMARK_DATABASES},
+            {(benchmark, benchmark) for benchmark, _database, _schema in query_runtime.BUILTIN_BENCHMARK_DATABASES},
         )
 
     def test_builtin_database_references_namespace_colliding_ids(self):
-        from demo import gradio_demo
+        from demo import query_runtime
 
         with tempfile.TemporaryDirectory() as directory, patch.object(
-            gradio_demo, "_project_root", Path(directory)
+            query_runtime, "_project_root", Path(directory)
         ):
-            for benchmark, database_relative, schema_relative in gradio_demo.BUILTIN_BENCHMARK_DATABASES:
+            for benchmark, database_relative, schema_relative in query_runtime.BUILTIN_BENCHMARK_DATABASES:
                 database = Path(directory) / database_relative / "formula_1.sqlite"
                 database.parent.mkdir(parents=True, exist_ok=True)
                 database.touch()
@@ -153,7 +153,7 @@ class SpaceApiTests(unittest.TestCase):
                 schema.parent.mkdir(parents=True, exist_ok=True)
                 schema.write_text("[]", encoding="utf-8")
 
-            references = gradio_demo._builtin_database_references()
+            references = query_runtime._builtin_database_references()
 
         self.assertIn(("formula_1", "spider"), {(db_id, benchmark) for db_id, benchmark, _db_path, _schema_path in references})
         self.assertIn(("bird__formula_1", "bird"), {(db_id, benchmark) for db_id, benchmark, _db_path, _schema_path in references})
@@ -460,7 +460,7 @@ class SpaceApiTests(unittest.TestCase):
         self.assertNotIn(private_path, sanitized)
 
     def test_squrve_demo_direct_key_bypasses_environment_resolution(self):
-        from demo import gradio_demo
+        from demo import query_runtime
 
         config = {
             "api_key": {},
@@ -472,10 +472,10 @@ class SpaceApiTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "config.json"
             config_path.write_text(json.dumps(config), encoding="utf-8")
-            with patch.object(gradio_demo, "resolve_config_api_keys") as resolve, patch.object(
-                gradio_demo, "Engine", return_value=Mock()
-            ), patch.object(gradio_demo.Router, "init_config") as init_config:
-                gradio_demo.SqurveDemo(
+            with patch.object(query_runtime, "resolve_config_api_keys") as resolve, patch.object(
+                query_runtime, "Engine", return_value=Mock()
+            ), patch.object(query_runtime.Router, "init_config") as init_config:
+                query_runtime.SqurveDemo(
                     config_path=str(config_path),
                     provider="qwen",
                     model_name="qwen-plus",
