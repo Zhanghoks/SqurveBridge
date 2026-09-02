@@ -83,6 +83,7 @@ class HuggingFaceBundleContractTests(unittest.TestCase):
             dockerfile,
         )
         self.assertIn("python3 /app/tools/benchmarks.py download all", dockerfile)
+        self.assertIn("ca-certificates", dockerfile)
         self.assertIn("uv sync --frozen --no-dev", dockerfile)
         self.assertNotIn("pip install", dockerfile)
         self.assertIn("tools/extract_space_assets.py", dockerfile)
