@@ -102,12 +102,13 @@ class HuggingFaceBundleContractTests(unittest.TestCase):
         self.assertIn('"@earendil-works/pi-coding-agent": "0.84.1"', package)
         self.assertTrue((root / "demo/package-lock.json").is_file())
 
-    def test_space_dependency_range_keeps_transformers_hub_compatible(self) -> None:
+    def test_space_does_not_depend_on_gradio(self) -> None:
         root = Path(__file__).resolve().parents[1]
         pyproject = (root / "pyproject.toml").read_text(encoding="utf-8")
-        self.assertIn("gradio>=4.0.0,<5.0.0", pyproject)
+        self.assertNotIn("gradio", pyproject)
+        self.assertFalse((root / "demo/gradio_demo.py").exists())
 
-    def test_gradio_dependency_constraints_are_compatible(self) -> None:
+    def test_pinned_frontend_compat_packages_stay_explicit(self) -> None:
         root = Path(__file__).resolve().parents[1]
         pyproject = (root / "pyproject.toml").read_text(encoding="utf-8")
         self.assertIn("MarkupSafe==2.1.5", pyproject)

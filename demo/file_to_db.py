@@ -198,7 +198,7 @@ def process_uploaded_files(
     - If single sqlite: copy to base_root/{db_id}, extract schema
 
     Args:
-        files: List of file paths (from Gradio upload)
+        files: List of file paths (from the Demo App upload)
         base_root: Root directory (e.g. workspace/uploads/uploaded_db)
         db_id: Optional db_id (auto-generated if not provided)
 
@@ -218,7 +218,7 @@ def process_uploaded_files(
     if not files:
         raise ValueError("No files provided")
 
-    # Normalize to Path objects; Gradio may pass path string or Path
+    # Normalize to Path objects; callers may pass a path string or Path
     # Note: Path.name returns filename only, so use Path(f) for str/Path to preserve full path
     paths = []
     for f in files:

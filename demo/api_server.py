@@ -28,7 +28,7 @@ if str(_project_root) not in sys.path:
 from demo import model_catalog
 from demo.deployment import deployment_features, deployment_target, hosted_route_allowed
 from demo.file_to_db import process_uploaded_files, sqlite_to_schema
-from demo.gradio_demo import (
+from demo.query_runtime import (
     ACTOR_BY_TYPE,
     WORKFLOW_SKELETONS,
     SqurveDemo,
